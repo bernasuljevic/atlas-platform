@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Atlas.Api</RootNamespace>
+  </PropertyGroup>
+
+  <!-- DİKKAT: Host sadece Auth.Api'ye referans veriyor, Auth.Domain'e ya da
+       Auth.Infrastructure'a DEĞİL. Modülün "kapısından" içeri giriyoruz,
+       arka kapıdan (iç detaylardan) değil. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Auth\Atlas.Modules.Auth.Api\Atlas.Modules.Auth.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Wiki\Atlas.Modules.Wiki.Api\Atlas.Modules.Wiki.Api.csproj" />
+  </ItemGroup>
+
+</Project>

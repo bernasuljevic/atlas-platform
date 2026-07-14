@@ -1,0 +1,82 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Shared.Kernel", "src\Shared\Atlas.Shared.Kernel\Atlas.Shared.Kernel.csproj", "{F2C018B4-E05E-411A-9FA5-C5DBC8D4C543}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Shared.Contracts", "src\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj", "{7E9261FD-46FA-4506-8432-B6D318E96547}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Shared.CQRS", "src\Shared\Atlas.Shared.CQRS\Atlas.Shared.CQRS.csproj", "{4540E586-B089-43E8-BFD2-1B207B59990A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Auth.Domain", "src\Modules\Auth\Atlas.Modules.Auth.Domain\Atlas.Modules.Auth.Domain.csproj", "{1C4847A3-9A0E-4FB3-8A85-B4331F232F63}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Auth.Application", "src\Modules\Auth\Atlas.Modules.Auth.Application\Atlas.Modules.Auth.Application.csproj", "{97C19320-8421-43A9-A929-219C8F9F199B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Auth.Infrastructure", "src\Modules\Auth\Atlas.Modules.Auth.Infrastructure\Atlas.Modules.Auth.Infrastructure.csproj", "{627DC5A3-B02C-43B4-85EC-CC3ADD29607B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Auth.Api", "src\Modules\Auth\Atlas.Modules.Auth.Api\Atlas.Modules.Auth.Api.csproj", "{E844FFF2-0D87-442F-BCA7-DF3B5EE9A0BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Wiki.Domain", "src\Modules\Wiki\Atlas.Modules.Wiki.Domain\Atlas.Modules.Wiki.Domain.csproj", "{2842700E-E0A2-4B41-AF73-F300A377B5C0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Wiki.Application", "src\Modules\Wiki\Atlas.Modules.Wiki.Application\Atlas.Modules.Wiki.Application.csproj", "{F5B33E6C-E3CD-4EA3-A88F-733C63D07B5E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Wiki.Infrastructure", "src\Modules\Wiki\Atlas.Modules.Wiki.Infrastructure\Atlas.Modules.Wiki.Infrastructure.csproj", "{873AB603-2B8D-4273-931D-4A00C4D07901}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Wiki.Api", "src\Modules\Wiki\Atlas.Modules.Wiki.Api\Atlas.Modules.Wiki.Api.csproj", "{F29428CC-D865-4947-A01D-513DD538FC07}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Api", "src\Host\Atlas.Api\Atlas.Api.csproj", "{1BEE6ED3-5EDF-421D-9539-2009B4CF5E78}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F2C018B4-E05E-411A-9FA5-C5DBC8D4C543}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2C018B4-E05E-411A-9FA5-C5DBC8D4C543}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2C018B4-E05E-411A-9FA5-C5DBC8D4C543}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2C018B4-E05E-411A-9FA5-C5DBC8D4C543}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E9261FD-46FA-4506-8432-B6D318E96547}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E9261FD-46FA-4506-8432-B6D318E96547}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E9261FD-46FA-4506-8432-B6D318E96547}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E9261FD-46FA-4506-8432-B6D318E96547}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4540E586-B089-43E8-BFD2-1B207B59990A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4540E586-B089-43E8-BFD2-1B207B59990A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4540E586-B089-43E8-BFD2-1B207B59990A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4540E586-B089-43E8-BFD2-1B207B59990A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1C4847A3-9A0E-4FB3-8A85-B4331F232F63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1C4847A3-9A0E-4FB3-8A85-B4331F232F63}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1C4847A3-9A0E-4FB3-8A85-B4331F232F63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1C4847A3-9A0E-4FB3-8A85-B4331F232F63}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97C19320-8421-43A9-A929-219C8F9F199B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97C19320-8421-43A9-A929-219C8F9F199B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97C19320-8421-43A9-A929-219C8F9F199B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97C19320-8421-43A9-A929-219C8F9F199B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{627DC5A3-B02C-43B4-85EC-CC3ADD29607B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{627DC5A3-B02C-43B4-85EC-CC3ADD29607B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{627DC5A3-B02C-43B4-85EC-CC3ADD29607B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{627DC5A3-B02C-43B4-85EC-CC3ADD29607B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E844FFF2-0D87-442F-BCA7-DF3B5EE9A0BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E844FFF2-0D87-442F-BCA7-DF3B5EE9A0BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E844FFF2-0D87-442F-BCA7-DF3B5EE9A0BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E844FFF2-0D87-442F-BCA7-DF3B5EE9A0BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2842700E-E0A2-4B41-AF73-F300A377B5C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2842700E-E0A2-4B41-AF73-F300A377B5C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2842700E-E0A2-4B41-AF73-F300A377B5C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2842700E-E0A2-4B41-AF73-F300A377B5C0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5B33E6C-E3CD-4EA3-A88F-733C63D07B5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5B33E6C-E3CD-4EA3-A88F-733C63D07B5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5B33E6C-E3CD-4EA3-A88F-733C63D07B5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5B33E6C-E3CD-4EA3-A88F-733C63D07B5E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{873AB603-2B8D-4273-931D-4A00C4D07901}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{873AB603-2B8D-4273-931D-4A00C4D07901}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{873AB603-2B8D-4273-931D-4A00C4D07901}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{873AB603-2B8D-4273-931D-4A00C4D07901}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F29428CC-D865-4947-A01D-513DD538FC07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F29428CC-D865-4947-A01D-513DD538FC07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F29428CC-D865-4947-A01D-513DD538FC07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F29428CC-D865-4947-A01D-513DD538FC07}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BEE6ED3-5EDF-421D-9539-2009B4CF5E78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BEE6ED3-5EDF-421D-9539-2009B4CF5E78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BEE6ED3-5EDF-421D-9539-2009B4CF5E78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BEE6ED3-5EDF-421D-9539-2009B4CF5E78}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

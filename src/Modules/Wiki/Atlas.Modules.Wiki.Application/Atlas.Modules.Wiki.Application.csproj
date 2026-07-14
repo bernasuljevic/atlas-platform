@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Atlas.Modules.Wiki.Application</RootNamespace>
+  </PropertyGroup>
+
+  <!-- DİKKAT: Auth.Domain'e, Auth.Application'a HİÇ referans yok.
+       Wiki, "kullanıcı" kavramını sadece Shared.Contracts üzerinden tanıyor. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Atlas.Modules.Wiki.Domain\Atlas.Modules.Wiki.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+  </ItemGroup>
+
+</Project>

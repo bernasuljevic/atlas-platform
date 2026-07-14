@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Atlas.Modules.Auth.Api</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Bu proje bir "Web" projesi değil, sıradan bir class library.
+       Ama içinde IEndpointRouteBuilder gibi ASP.NET Core tipleri kullanacağız,
+       o yüzden framework referansını elle ekliyoruz. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Atlas.Modules.Auth.Application\Atlas.Modules.Auth.Application.csproj" />
+    <ProjectReference Include="..\Atlas.Modules.Auth.Infrastructure\Atlas.Modules.Auth.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.CQRS\Atlas.Shared.CQRS.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.4.1" />
+  </ItemGroup>
+
+</Project>
