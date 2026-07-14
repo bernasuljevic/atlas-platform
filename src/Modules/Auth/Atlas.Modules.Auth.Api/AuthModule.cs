@@ -1,9 +1,13 @@
 using Atlas.Modules.Auth.Application.Abstractions;
 using Atlas.Modules.Auth.Application.Users.Queries;
+using Atlas.Modules.Auth.Domain.Entities;
 using Atlas.Modules.Auth.Infrastructure.CurrentUser;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
 using Atlas.Shared.Contracts;
 using Atlas.Shared.CQRS.Behaviors;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Atlas.Modules.Auth.Api;
@@ -17,19 +21,19 @@ namespace Atlas.Modules.Auth.Api;
 /// </summary>
 public static class AuthModule
 {
-    public static IServiceCollection AddAuthModule(this IServiceCollection services)
+    public static IServiceCollection AddAuthModule(this IServiceCollection services, IConfiguration configuration)
     {
-        // Application katmanındaki interface'i (IUserRepository), Infrastructure'daki
-        // gerçek implementasyona (InMemoryUserRepository) burada bağlıyoruz.
-        // NOT: Burada Singleton kullanıyoruz, ama bu genel kural değil.
-        // Genel kural: repository'ler Scoped olur (her istek kendi veritabanı
-        // bağlantısını alır). Ama InMemoryUserRepository BAĞLANTI SARMALAMIYOR -
-        // kendisi doğrudan verinin deposu (ConcurrentDictionary instance alanı).
-        // Scoped olsaydı her istekte yepyeni, boş bir dictionary yaratılır, eklenen
-        // her kullanıcı bir sonraki istekte kaybolurdu (tam da yaşadığımız bug).
-        // EF Core ile gerçek repository'e geçtiğimizde bu tekrar Scoped olacak,
-        // çünkü o zaman DbContext gerçek bir bağlantıyı sarmalayacak.
-        services.AddSingleton<IUserRepository, InMemoryUserRepository>();
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("'DefaultConnection' bağlantı dizesi appsettings.json'da bulunamadı.");
+
+        // AuthDbContext, gerçek bir DB bağlantısını (SqlConnection) sarmalıyor -
+        // bu yüzden Scoped (AddDbContext'in varsayılanı zaten Scoped'tur).
+        services.AddDbContext<AuthDbContext>(options => options.UseSqlServer(connectionString));
+
+        // Artık repository DIŞ BİR KAYNAĞI (DbContext/DB bağlantısı) sarmalıyor,
+        // kendisi veri deposu değil - CLAUDE.md'deki kural burada devreye giriyor:
+        // Scoped doğru seçim, her HTTP isteği kendi DbContext'ini (ve bağlantısını) alır.
+        services.AddScoped<IUserRepository, EfUserRepository>();
 
         // Shared.Contracts'taki ICurrentUserAccessor'ın gerçek implementasyonu burada
         // bağlanıyor. Wiki modülü bu sınıfı hiç görmüyor - sadece interface'i biliyor.
@@ -49,5 +53,24 @@ public static class AuthModule
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Host (Program.cs) sadece bu metodu çağırıyor - AuthDbContext'in var olduğunu
+    /// bile bilmiyor. Migration'ları uygular ve tablo boşsa admin kullanıcısını ekler
+    /// (InMemoryUserRepository'nin constructor'ında yaptığı seed işleminin karşılığı).
+    /// </summary>
+    public static void MigrateAuthDatabase(this IApplicationBuilder app)
+    {
+        using var scope = app.ApplicationServices.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+
+        db.Database.Migrate();
+
+        if (!db.Users.Any())
+        {
+            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", "hashed-password-placeholder"));
+            db.SaveChanges();
+        }
     }
 }
