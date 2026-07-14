@@ -19,6 +19,12 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
+// Kimlik doğrulama (bu kim?) ve yetkilendirme (bunu yapabilir mi?) middleware'leri.
+// Sıra önemli: önce Authentication, sonra Authorization - authorization, kimliği
+// henüz bilinmeyen bir isteği değerlendiremez.
+app.UseAuthentication();
+app.UseAuthorization();
+
 // ============================================================
 // VERİTABANI MIGRATION'LARI
 // ============================================================

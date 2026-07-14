@@ -31,6 +31,15 @@ public static class AuthEndpoints
         })
         .WithName("RegisterUser");
 
+        group.MapPost("/login", async (LoginCommand command, IMediator mediator) =>
+        {
+            var token = await mediator.Send(command);
+            return token is null
+                ? Results.Unauthorized()
+                : Results.Ok(new { token });
+        })
+        .WithName("Login");
+
         return app;
     }
 }

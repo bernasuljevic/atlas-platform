@@ -1,5 +1,21 @@
 # Atlas Platform — Proje Hafızası
 
+## Sırada ne var (kullanıcıyla konuşulan roadmap)
+
+1. YARIM KALAN İŞ - JWT login: appsettings.json'a Jwt:Key/Issuer/Audience eklenmedi.
+   Eklenmeden uygulama BAŞLARKEN ÇÖKER (AddJwtBearer null key ile patlar).
+   İlk iş bu olmalı. Key en az 32 karakter olmalı (HMAC-SHA256 için).
+2. Jwt config eklendikten sonra: mevcut admin kaydının hash'i eski placeholder
+   formatında (Pbkdf2Verify tanımaz) - SSMS'ten admin.Users satırını silip
+   uygulamayı yeniden başlatarak yeniden seed ettir (Admin123! şifresiyle).
+3. POST /api/auth/login test et, dönen token ile POST /api/wiki/pages'i
+   Authorization: Bearer <token> header'ıyla dene - HttpCurrentUserAccessor'ın
+   gerçekten çalıştığını doğrula (artık admin'i sabit değil, token'daki kullanıcıyı görmeli).
+4. Hassas endpoint'lere .RequireAuthorization() eklemeyi düşün (şu an her şey
+   authentication olmadan da erişilebilir, middleware kayıtlı ama zorunlu değil).
+5. dotnet watch ile hot-reload akışı
+6. README.md güncellemesi bekliyor (Bölüm 4'te kalmış, EF Core + JWT notları eksik)
+
 ## Bu projenin amacı
 
 Bu, kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir

@@ -1,14 +1,18 @@
+using System.Text;
 using Atlas.Modules.Auth.Application.Abstractions;
 using Atlas.Modules.Auth.Application.Users.Queries;
-using Atlas.Modules.Auth.Domain.Entities;
 using Atlas.Modules.Auth.Infrastructure.CurrentUser;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
+using Atlas.Modules.Auth.Infrastructure.Security;
 using Atlas.Shared.Contracts;
-using Atlas.Shared.CQRS.Behaviors;
 using Microsoft.AspNetCore.Builder;
+using Atlas.Shared.CQRS.Behaviors;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Atlas.Modules.Auth.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Atlas.Modules.Auth.Api;
 
@@ -39,7 +43,27 @@ public static class AuthModule
         // bağlanıyor. Wiki modülü bu sınıfı hiç görmüyor - sadece interface'i biliyor.
         // Scoped kullanıyoruz çünkü ileride HttpContext'i saracak - HttpContext gerçekten
         // istek bazlı bir kaynak, o yüzden burada Scoped doğru (geçen dersteki hatanın tersi).
-        services.AddScoped<ICurrentUserAccessor, FakeCurrentUserAccessor>();
+        services.AddHttpContextAccessor();
+services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
+
+services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
+services.AddScoped<ITokenGenerator, JwtTokenGenerator>();
+
+services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = configuration["Jwt:Issuer"],
+            ValidAudience = configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!))
+        };
+    });
+services.AddAuthorization();
 
         // MediatR'a "Command/Query/Handler'ları GetAllUsersQuery'nin bulunduğu
         // assembly içinde ara" diyoruz - elle tek tek kayıt yapmamıza gerek yok,
@@ -69,7 +93,10 @@ public static class AuthModule
 
         if (!db.Users.Any())
         {
-            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", "hashed-password-placeholder"));
+            var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+            var adminPasswordHash = passwordHasher.Hash("Admin123!");
+
+            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", adminPasswordHash));
             db.SaveChanges();
         }
     }

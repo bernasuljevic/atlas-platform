@@ -18,6 +18,9 @@ public class EfUserRepository : IUserRepository
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => _context.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
+    public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default)
+        => _context.Users.FirstOrDefaultAsync(u => u.Email == email.Trim().ToLowerInvariant(), ct);
+
     public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct = default)
         => await _context.Users.ToListAsync(ct);
 
