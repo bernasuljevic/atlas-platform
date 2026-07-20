@@ -44,12 +44,31 @@ O adresi tarayıcıda aç, şunları dene:
 
 - `http://localhost:5xxx/` → sağlık kontrolü
 
-- `http://localhost:5xxx/api/auth/users` → GET, **token gerektirir** (`.RequireAuthorization()`)
+- `http://localhost:5xxx/api/auth/users` → GET, **sadece Admin rolü** (`.RequireRole("Admin")`)
 - `http://localhost:5xxx/api/auth/register` → POST, body: `{"email":"...","fullName":"...","password":"..."}`
 - `http://localhost:5xxx/api/auth/login` → POST, body: `{"email":"...","password":"..."}` → `{"token":"..."}` ya da 401
-- `http://localhost:5xxx/api/wiki/pages` → GET (herkese açık), POST (token gerektirmiyor şu an, bilinçli tercih — ileride değişebilir)
+- `http://localhost:5xxx/api/wiki/pages` → GET (herkese açık), POST (token gerektirir)
 
-İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!`
+İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle).
+Not: Bu sadece veritabanı ilk kez boşken çalışır - eğer tabloda zaten kullanıcı
+varsa admin tekrar oluşturulmaz. Gerekirse `POST /api/auth/register` ile yeni
+bir kullanıcı kaydedip SSMS'ten `UPDATE auth.Users SET Role = 1 WHERE Email = '...'`
+ile Admin yapabilirsin.
+
+## Web arayüzü (React)
+
+`web/` klasöründe basit bir React uygulaması var — login, wiki listesi/oluşturma,
+departman filtresi. Çalıştırmak için:
+
+```bash
+cd web
+npm install    # ilk seferde
+npm run dev
+```
+
+`http://localhost:5173` adresinde açılır. **.NET API'nin (5080 portu) ayrıca ayakta
+olması gerekir** — React sadece arayüz, tüm veriyi API'den çekiyor. CORS, backend'de
+sadece `http://localhost:5173`'e izin verecek şekilde ayarlı (`Program.cs`).
 
 ## Bir şey çalışmazsa
 
@@ -125,10 +144,46 @@ claim'lerinden (JWT token'dan) okuyor. Eklenen parçalar:
 hata veriyordu (`UseAuthentication()` middleware'i her istekte token'ı doğrulamaya çalışıyor) -
 ama `GlobalExceptionHandler` sayesinde çökme değil, düzgün 400 JSON yanıtı olarak.
 
+## Bölüm 7 — Veri bütünlüğü ve Wiki authorization
+
+`wiki.WikiPages.CreatedByUserId` artık `auth.Users.Id`'ye gerçek bir **foreign key**
+ile bağlı. İki modül kod seviyesinde birbirini tanımadığı için (Wiki.Domain, Auth.Domain'e
+referans vermiyor) bu kısıtlama EF Core'un otomatik API'siyle değil, migration içinde
+**ham SQL** (`migrationBuilder.Sql(...)`) ile eklendi — "modüller kod seviyesinde ayrık,
+veritabanı seviyesinde tutarlı" ilkesinin somut örneği.
+
+`POST /api/wiki/pages` artık `.RequireAuthorization()` ile korunuyor (token zorunlu),
+`GET /api/wiki/pages` bilinçli olarak açık kaldı — herkes public sayfaları görebilmeli.
+
+## Bölüm 8 — React frontend
+
+`web/` klasöründe Vite + React ile kurulan basit bir arayüz: login formu, wiki sayfası
+listesi/oluşturma formu, departman filtresi. Backend'e CORS ile bağlanıyor
+(`http://localhost:5173` özel olarak izinli). State yönetimi için ekstra kütüphane
+kullanılmadı - `useState`/`useEffect` yeterli oldu, uygulamanın küçük olması sayesinde.
+
+## Bölüm 9 — Rol bazlı yetkilendirme
+
+`User` entity'sine `Role` alanı (`Member`/`Admin` enum) eklendi, JWT token'a
+`ClaimTypes.Role` claim'i olarak gömülüyor. `GET /api/auth/users` artık
+`.RequireRole("Admin")` ile korunuyor - Member rolündeki bir kullanıcı geçerli
+token'la bile `403 Forbidden` alıyor (401'den farkı: kimliği biliniyor, sadece yetkisi yok).
+
+## Bölüm 10 — Otomatik testler
+
+İlk test projesi: `tests/Atlas.Modules.Wiki.Domain.Tests` (xUnit). `WikiPage.IsVisibleTo()`
+için 7 test yazıldı - Domain katmanındaki iş kurallarının hiçbir veritabanı/HTTP
+bağımlılığı olmadan, saniyenin altında test edilebildiğinin kanıtı. Çalıştırmak için:
+
+```bash
+dotnet test tests/Atlas.Modules.Wiki.Domain.Tests/Atlas.Modules.Wiki.Domain.Tests.csproj
+```
+
 ## Sırada ne var?
 
-1. Wiki endpoint'lerine de `.RequireAuthorization()` eklemeyi düşün (şu an bilinçli olarak açık)
-2. İleri konular: refresh token, rol bazlı yetkilendirme (`[Authorize(Roles = "Admin")]`)
-3. AI modülü (SubMed dokümanındaki orijinal fikir - RAG, embedding, LLM entegrasyonu)
-4. Foreign key kısıtlamaları (şu an `WikiPage.CreatedByUserId`, `User.Id`'ye referans veriyor
-   ama veritabanı seviyesinde bağlı değil)
+1. Auth.Domain için de test projesi (`User.Create()` validasyonları)
+2. Wiki endpoint'lerinde `GET`'in de departman bazlı ekstra korumaları düşünülebilir
+3. Refresh token mekanizması (şu an token 8 saatte bir yeniden login gerektiriyor)
+4. AI modülü (SubMed dokümanındaki orijinal fikir - RAG, embedding, LLM entegrasyonu) -
+   büyük kapsamı nedeniyle ayrı bir haftaya bırakıldı
+5. React tarafında: gerçek routing (React Router), daha kapsamlı stil

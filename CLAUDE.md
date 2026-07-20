@@ -1,112 +1,109 @@
 # Atlas Platform — Proje Hafızası
 
-## Sırada ne var (kullanıcıyla konuşulan roadmap)
-
-1. YARIM KALAN İŞ - JWT login: appsettings.json'a Jwt:Key/Issuer/Audience eklenmedi.
-   Eklenmeden uygulama BAŞLARKEN ÇÖKER (AddJwtBearer null key ile patlar).
-   İlk iş bu olmalı. Key en az 32 karakter olmalı (HMAC-SHA256 için).
-2. Jwt config eklendikten sonra: mevcut admin kaydının hash'i eski placeholder
-   formatında (Pbkdf2Verify tanımaz) - SSMS'ten admin.Users satırını silip
-   uygulamayı yeniden başlatarak yeniden seed ettir (Admin123! şifresiyle).
-3. POST /api/auth/login test et, dönen token ile POST /api/wiki/pages'i
-   Authorization: Bearer <token> header'ıyla dene - HttpCurrentUserAccessor'ın
-   gerçekten çalıştığını doğrula (artık admin'i sabit değil, token'daki kullanıcıyı görmeli).
-4. Hassas endpoint'lere .RequireAuthorization() eklemeyi düşün (şu an her şey
-   authentication olmadan da erişilebilir, middleware kayıtlı ama zorunlu değil).
-5. dotnet watch ile hot-reload akışı
-6. README.md güncellemesi bekliyor (Bölüm 4'te kalmış, EF Core + JWT notları eksik)
-
-1. YARIM KALAN İŞ - JWT login: appsettings.json'a Jwt:Key/Issuer/Audience eklenmedi.
-   Eklenmeden uygulama BAŞLARKEN ÇÖKER (AddJwtBearer null key ile patlar).
-   DOĞRULANDI: hata çökme değil, GlobalExceptionHandler sayesinde düzgün 400
-   JSON yanıtı olarak dönüyor - ama TÜM endpoint'leri etkiliyor (sadece login
-   değil, "/" health-check bile), çünkü UseAuthentication() her istekte çalışıyor.
-   İlk iş bu olmalı. Key en az 32 karakter olmalı (HMAC-SHA256 için).
-
 ## Bu projenin amacı
 
-Bu, kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir
-öğrenme projesi. Kurumsal wiki + AI fikrine dayanıyor (bkz. orijinal ilham:
-SubMed Platform mimarisi - departman bazlı wiki + AI katmanı).
+Kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir
+öğrenme + staj defteri projesi. Kurumsal wiki + AI fikrine dayanıyor (orijinal
+ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI modülü
+büyük kapsamı nedeniyle bilinçli olarak ayrı bir haftaya bırakıldı.
 
 ## ÇOK ÖNEMLİ — Nasıl çalışmalısın
 
-Kullanıcı bu projeyi Claude (claude.ai) ile sıfırdan, adım adım, **öğreterek**
-inşa etti. Şimdi Claude Code'a geçiyor çünkü dosyalara doğrudan erişimin var
-ve kopyala-yapıştır döngüsü yorucuydu. AMA öğrenme hedefi hâlâ geçerli:
+Kullanıcı bu projeyi adım adım, **öğreterek** inşa ediyor. Zaman zaman staj
+defteri için ilerleme yazıyor, o yüzden değişiklikler net, açıklanabilir ve
+test edilmiş olmalı:
 
-- Kod yazarken **neden** o kararı verdiğini kısaca açıkla (yorum olarak değil,
-  konuşarak). Sessizce büyük değişiklikler yapıp "bitti" deme.
-- Yeni bir kavram (örsn. bir NuGet paketi, bir tasarım deseni) tanıtırken
-  1-2 cümleyle ne işe yaradığını anlat.
-- Kullanıcı "neden böyle" diye sorarsa, kod göstermeden önce kavramı anlat.
-- Küçük hatalarda (typo, eksik paket) kullanıcıya sormadan düzelt - ama
-  mimari bir karar değiştiriyorsan (örn. bir katmanın sorumluluğunu
-  değiştirmek) önce sor.
-- Kullanıcı zaman zaman "bunu neden yaptık" diye geçmişe referans verebilir -
-  aşağıdaki "Öğrenilen dersler" bölümü tam bunun için var.
+- Kod yazarken **neden** o kararı verdiğini kısaca açıkla, sessizce büyük
+  değişiklikler yapıp "bitti" deme.
+- Yeni bir kavram tanıtırken 1-2 cümleyle ne işe yaradığını anlat.
+- Küçük hatalarda (typo, eksik using) sormadan düzelt - mimari karar
+  değiştiriyorsan önce sor.
+- Her anlamlı adımdan sonra `dotnet build` ile doğrula, sonra commit önerisi sun.
 
 ## Mimari - Modüler Monolith
 
-```
-src/Shared/           → Kernel (Entity base), Contracts (modüller arası interface'ler), CQRS (MediatR pipeline behaviors)
-src/Modules/Auth/      → Domain → Application → Infrastructure → Api (4 katman)
-src/Modules/Wiki/      → aynı 4 katman deseni
-src/Host/Atlas.Api/    → composition root, sadece her modülün *.Api projesine referans verir
-```
+src/Shared/ → Kernel (Entity base), Contracts (modüller arası interface'ler), CQRS (MediatR pipeline behaviors)
+src/Modules/Auth/ → Domain → Application → Infrastructure → Api (4 katman)
+src/Modules/Wiki/ → aynı 4 katman deseni
+src/Host/Atlas.Api/ → composition root, sadece her modülün *.Api projesine referans verir
+tests/ → xUnit test projeleri (şu an: Atlas.Modules.Wiki.Domain.Tests)
+web/ → React (Vite) frontend, ayrı bir npm projesi
+
 
 **Katman kuralı:** Domain framework'ten habersiz. Application "nasıl saklanır"ı
 bilmez, sadece interface (Abstractions/I*.cs) kullanır. Infrastructure gerçek
-implementasyonu yazar. Api, modülün DI kayıt mekanizmasını (`AddXModule()`)
-ve MediatR endpoint'lerini barındırır.
+implementasyonu yazar (EF Core, JWT, hash'leme). Api, modülün DI kayıt
+mekanizmasını (`AddXModule()`) ve MediatR endpoint'lerini barındırır.
 
 **Modüller arası iletişim kuralı:** Modüller birbirinin Domain/Application/
 Infrastructure'ına ASLA referans vermez. Sadece `Shared.Contracts`'taki
-interface'ler üzerinden konuşurlar (örn. Wiki, Auth'u tanımaz, sadece
-`ICurrentUserAccessor`'ı tanır - implementasyonu Auth.Infrastructure sağlar,
-DI container'da otomatik eşleşir).
+interface'ler üzerinden konuşurlar (Wiki, Auth'u tanımaz, sadece
+`ICurrentUserAccessor`'ı tanır). **İstisna:** Veritabanı seviyesinde foreign key
+gerekiyorsa (örn. `WikiPage.CreatedByUserId` → `User.Id`), bu EF Core'un C#
+API'siyle değil, migration içinde **ham SQL** ile eklenir - kod seviyesindeki
+ayrım korunur, veritabanı seviyesinde tutarlılık sağlanır.
 
-**CQRS/MediatR:** Her modülün kendi Command/Query/Handler'ları var
-(`Users/Commands`, `Users/Queries` gibi). `Shared.CQRS`'teki `LoggingBehavior`,
-her modülün `AddXModule()` metodunda `cfg.AddOpenBehavior(...)` ile
-kaydediliyor, tüm Command/Query'lerden otomatik geçiyor.
+**Veritabanı:** SQL Server Express (`.\SQLEXPRESS`, Windows Authentication),
+her modülün kendi `DbContext`'i, ayrı şemalar (`auth.*`, `wiki.*`), tek fiziksel
+veritabanı (`AtlasPlatform`). appsettings.json → `ConnectionStrings:DefaultConnection`
+ve `Jwt:Key`/`Issuer`/`Audience` - ikisi de dolu olmadan uygulama her endpoint'te hata verir.
 
-## Öğrenilen dersler (bunları tekrar sorgulama, zaten test edildi)
+**Kimlik doğrulama:** JWT tabanlı. `Pbkdf2PasswordHasher` (salt + 100k iterasyon)
+şifreleri hash'liyor. Token claim'leri: NameIdentifier, Email, Name, Role.
+`User.Role` (Member/Admin enum) → `.RequireRole("Admin")` ile korunan endpoint'ler var.
 
-1. **Service Lifetime konusunda kritik bir kural:** Repository bir DIŞ
-   KAYNAĞI (DB bağlantısı) sarmalıyorsa → `Scoped`. Repository KENDİSİ veri
-   deposuysa (örn. bizim `InMemoryUserRepository`, `InMemoryWikiPageRepository`
-   - içlerinde `ConcurrentDictionary`/`ConcurrentBag` instance alanı var) →
-   `Singleton` olmalı, yoksa her HTTP isteğinde veri sıfırlanır (bunu canlı
-   bug olarak yaşadık, ID'ler her istekte değişiyordu). Bu ikisi şu an
-   Singleton. EF Core'a geçilince tekrar Scoped olacaklar.
-2. **`ICurrentUserAccessor` şu an `FakeCurrentUserAccessor`** (Auth.Infrastructure)
-   ile karşılanıyor - InMemoryUserRepository'deki ilk kullanıcıyı (admin)
-   "giriş yapmış" sayıyor. Gerçek JWT gelince bu sınıf değişecek, Wiki hiç
-   etkilenmeyecek.
-3. `.NET 10` kullanılıyor (kullanıcının makinesinde bu kurulu, net8.0 değil).
-   Yeni proje eklerken TargetFramework'ü net10.0 yap.
-4. Her yeni proje `Atlas.sln`'e eklenmeli, yoksa Visual Studio/CLI görmüyor.
+## Öğrenilen dersler (tekrar sorgulama, test edildi)
+
+1. **Service Lifetime kuralı:** Repository dış kaynağı (DB bağlantısı)
+   sarmalıyorsa → Scoped. Repository kendisi veri deposuysa → Singleton
+   (artık geçersiz - tüm repository'ler EF Core'a geçti, hepsi Scoped).
+2. `.NET 10` kullanılıyor, yeni projelerde TargetFramework net10.0 olmalı.
+3. Her yeni proje `Atlas.sln`'e eklenmeli (`dotnet sln add`).
+4. Birden fazla DbContext varken migration komutlarında `--context` şart.
+5. Migration process'i (`dotnet build`/`dotnet run`) kapatılmadan yeni migration
+   eklenmeye çalışılırsa "dosya kilitli" hatası alınır - önce
+   `Get-Process -Name "Atlas.Api" | Stop-Process -Force`.
+6. Foreign key eklerken var olan "yetim" veri (referans verdiği kayıt silinmiş)
+   migration'ı başarısız kılar - önce LEFT JOIN ile tespit edip düzeltilmeli.
+7. React tarafında CORS: backend'de `AddCors`/`UseCors("AllowReactApp")`
+   sadece `http://localhost:5173`'e izin veriyor - React portu değişirse
+   burası da güncellenmeli.
 
 ## Şu ana kadar tamamlananlar
 
-- [x] Auth modülü: User entity, RegisterUserCommand, GetAllUsersQuery, MediatR+LoggingBehavior
-- [x] Wiki modülü: WikiPage entity (Title/Content/DepartmentName/Visibility/CreatedByUserId),
-      `IsVisibleTo()` yetkilendirme kuralı Domain'de, CreateWikiPageCommand, GetWikiPagesQuery
-- [ ] Wiki modülü HENÜZ TEST EDİLMEDİ - kullanıcı Claude Code'a geçtiği anda
-      test yapıyordu. İlk iş: `dotnet build` çalıştır, hataları düzelt,
-      sonra `/api/wiki/pages` GET/POST endpoint'lerini test et.
+- [x] Auth modülü: User (Email/FullName/PasswordHash/Role), Register/Login
+      Command'ları, GetAllUsersQuery, MediatR+LoggingBehavior
+- [x] Wiki modülü: WikiPage (Title/Content/DepartmentName/Visibility/CreatedByUserId),
+      `IsVisibleTo()` Domain'de, CreateWikiPageCommand, GetWikiPagesQuery
+- [x] EF Core: AuthDbContext/WikiDbContext, migration'lar, kalıcılık doğrulandı
+- [x] JWT login: Pbkdf2PasswordHasher, JwtTokenGenerator, HttpCurrentUserAccessor
+      (FakeCurrentUserAccessor kaldırıldı)
+- [x] Foreign key: wiki.WikiPages.CreatedByUserId → auth.Users.Id (raw SQL migration)
+- [x] Authorization: GET /api/auth/users → RequireRole("Admin"),
+      POST /api/wiki/pages → RequireAuthorization (GET wiki bilinçli olarak açık)
+- [x] Rol bazlı yetkilendirme: User.Role (Member/Admin), JWT Role claim
+- [x] React frontend (web/): login, wiki listesi/oluşturma, departman filtresi,
+      görünürlük seçimi, yükleme durumları, çıkış yap
+- [x] İlk test projesi: Atlas.Modules.Wiki.Domain.Tests (xUnit), 7 test,
+      WikiPage.IsVisibleTo() için
 
-## Sırada ne var (kullanıcıyla konuşulan roadmap)
+## Sırada ne var
 
-1. Wiki modülünü test edip çalıştığından emin ol (yarım kalan iş)
-2. EF Core ile gerçek veritabanına geçiş (Singleton hack'lerini kalıcı çöz)
-3. JWT ile gerçek login (`FakeCurrentUserAccessor`'ı değiştir)
-4. `dotnet watch` ile hot-reload akışı
+1. Auth.Domain için de test projesi (User.Create() validasyonları)
+2. Refresh token mekanizması (şu an token 8 saatte bir yeniden login gerektiriyor)
+3. AI modülü (SubMed dokümanındaki orijinal fikir) - ayrı bir haftaya bırakıldı
+4. React: routing (React Router), daha kapsamlı stil
+5. Wiki GET endpoint'i için departman bazlı ekstra koruma düşünülebilir
 
 ## Endpoint referansı
 
-- `GET /api/auth/users`, `POST /api/auth/register` (body: email, fullName, password)
-- `GET /api/wiki/pages?department=X`, `POST /api/wiki/pages` (body: title, content, departmentName, visibility: "Public"|"DepartmentOnly")
+- `POST /api/auth/register` (email, fullName, password) → açık
+- `POST /api/auth/login` (email, password) → açık, döner: `{token}` ya da 401
+- `GET /api/auth/users` → sadece Admin rolü
+- `GET /api/wiki/pages?department=X` → açık
+- `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir
 
-Detaylı notlar için `README.md`'ye bak (her oturum sonunda güncellendi).
+İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
+SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
+
+Detaylı notlar için `README.md`'ye bak (Bölüm 10'a kadar güncel).
