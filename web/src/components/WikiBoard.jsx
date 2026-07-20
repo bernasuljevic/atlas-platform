@@ -6,18 +6,26 @@ function WikiBoard({ token, onLogout }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [department, setDepartment] = useState("IT");
+  const [visibility, setVisibility] = useState("Public");
+  // filterDepartment: liste tarafındaki filtre - form'daki "department" state'inden
+  // BİLEREK ayrı tutuyoruz, çünkü "hangi departmana sayfa eklediğim" ile
+  // "hangi departmanı görüntülediğim" birbirinden bağımsız iki karar.
+  const [filterDepartment, setFilterDepartment] = useState("");
   const [error, setError] = useState(null);
   const [isLoadingPages, setIsLoadingPages] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
+  // İkinci parametre artık [filterDepartment] - yani filtre her değiştiğinde
+  // bu effect yeniden çalışacak, listeyi güncelleyecek. Dünkü halinde []
+  // vardı, sadece ilk açılışta çalışıyordu.
   useEffect(() => {
     loadPages();
-  }, []);
+  }, [filterDepartment]);
 
   async function loadPages() {
     setIsLoadingPages(true);
     try {
-      const data = await getWikiPages();
+      const data = await getWikiPages(filterDepartment || undefined);
       setPages(data);
     } catch (err) {
       setError(err.message);
@@ -36,15 +44,13 @@ function WikiBoard({ token, onLogout }) {
         title,
         content,
         departmentName: department,
-        visibility: "Public",
+        visibility,
       });
 
       setTitle("");
       setContent("");
       await loadPages();
     } catch (err) {
-      // Backend'den 401/403 gelirse özel bir mesaj gösterelim - kullanıcı
-      // "neden olmadı" sorusuna daha net bir cevap alsın.
       setError(err.message.includes("giriş") ? err.message : "Sayfa oluşturulamadı: " + err.message);
     } finally {
       setIsCreating(false);
@@ -83,21 +89,62 @@ function WikiBoard({ token, onLogout }) {
           disabled={isCreating}
           style={{ width: "100%", padding: 8, marginBottom: 8 }}
         />
+
+        {/* Görünürlük seçimi - backend'deki WikiVisibility enum'ının React karşılığı.
+            "Public" ve "DepartmentOnly" string'leri backend'in beklediği değerlerle
+            BİREBİR aynı olmalı - Enum.Parse<WikiVisibility> bunu bekliyor. */}
+        <div style={{ marginBottom: 8 }}>
+          <label style={{ marginRight: 16 }}>
+            <input
+              type="radio"
+              name="visibility"
+              value="Public"
+              checked={visibility === "Public"}
+              onChange={(e) => setVisibility(e.target.value)}
+              disabled={isCreating}
+            />{" "}
+            Herkese Açık
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="visibility"
+              value="DepartmentOnly"
+              checked={visibility === "DepartmentOnly"}
+              onChange={(e) => setVisibility(e.target.value)}
+              disabled={isCreating}
+            />{" "}
+            Sadece Departman
+          </label>
+        </div>
+
         {error && <p style={{ color: "red" }}>{error}</p>}
         <button type="submit" disabled={isCreating}>
           {isCreating ? "Ekleniyor..." : "Ekle"}
         </button>
       </form>
 
-      <h3>Sayfalar</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>Sayfalar</h3>
+        <div>
+          <label style={{ marginRight: 8 }}>Departman filtresi:</label>
+          <input
+            placeholder="(boş = sadece herkese açık)"
+            value={filterDepartment}
+            onChange={(e) => setFilterDepartment(e.target.value)}
+            style={{ padding: 6 }}
+          />
+        </div>
+      </div>
+
       {isLoadingPages ? (
         <p>Yükleniyor...</p>
       ) : pages.length === 0 ? (
-        <p>Henüz sayfa yok.</p>
+        <p>Bu filtreyle görünen sayfa yok.</p>
       ) : (
         pages.map((p) => (
           <div key={p.id} style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>
-            <strong>{p.title}</strong> <em>({p.departmentName})</em>
+            <strong>{p.title}</strong> <em>({p.departmentName}, {p.visibility})</em>
             <p>{p.content}</p>
           </div>
         ))
