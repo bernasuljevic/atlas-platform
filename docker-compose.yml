@@ -1,0 +1,9 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: atlas-redis
+    ports:
+      - "6379:6379"
+    # "volumes" olmadan bilerek bırakıyoruz - Redis'teki veri (cache) kalıcı
+    # olmasın istiyoruz, container yeniden başlarsa sıfırdan başlasın.
+    # Bu, cache'in doğasına uygun: kaybolsa da veritabanından yeniden üretilebilir.
