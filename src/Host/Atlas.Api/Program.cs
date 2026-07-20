@@ -10,6 +10,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthModule(builder.Configuration);
 builder.Services.AddWikiModule(builder.Configuration);
 
+// CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)
+// istek atabilmesi için tarayıcıya "bu adrese izin var" demeliyiz - yoksa tarayıcı
+// güvenlik gereği isteği kendisi engeller.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // Global exception handling - yakalanmamış her hata GlobalExceptionHandler'a düşer,
 // ProblemDetails (RFC 7807) formatında JSON döner.
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -18,6 +31,8 @@ builder.Services.AddProblemDetails();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+app.UseCors("AllowReactApp");
 
 // Kimlik doğrulama (bu kim?) ve yetkilendirme (bunu yapabilir mi?) middleware'leri.
 // Sıra önemli: önce Authentication, sonra Authorization - authorization, kimliği
