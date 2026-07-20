@@ -1,4 +1,5 @@
 using Atlas.Shared.Kernel.Entities;
+using Atlas.Modules.Auth.Domain.Enums;
 
 namespace Atlas.Modules.Auth.Domain.Entities;
 
@@ -12,25 +13,25 @@ public class User : Entity<Guid>
     public string Email { get; private set; } = default!;
     public string FullName { get; private set; } = default!;
     public string PasswordHash { get; private set; } = default!;
+    public UserRole Role { get; private set; }
 
-    // EF Core gibi ORM'ler nesneyi veritabanından okurken parametresiz constructor'a
-    // ihtiyaç duyar, ama dışarıdan "new User()" ile boş kullanıcı oluşturulmasını
-    // istemediğimiz için private yapıyoruz.
     private User() { }
 
-    private User(Guid id, string email, string fullName, string passwordHash) : base(id)
+    private User(Guid id, string email, string fullName, string passwordHash, UserRole role) : base(id)
     {
         Email = email;
         FullName = fullName;
         PasswordHash = passwordHash;
+        Role = role;
     }
 
     /// <summary>
-    /// "new User(...)" yerine bilerek statik factory method (Create) kullanıyoruz.
-    /// Neden? Çünkü bu sayede geçersiz bir kural içeren User nesnesi HİÇBİR ZAMAN
-    /// var olamaz - kurallar tek bir kapıdan (buradan) geçmek zorunda.
+    /// "role" parametresine varsayılan değer verdik (Member) - böylece var olan
+    /// tüm "User.Create(email, fullName, hash)" çağrıları (Register, seed vs.)
+    /// hiçbir değişiklik yapmadan derlenmeye devam eder, otomatik olarak Member olur.
+    /// Sadece admin seed'inde bilerek Admin geçeceğiz.
     /// </summary>
-    public static User Create(string email, string fullName, string passwordHash)
+    public static User Create(string email, string fullName, string passwordHash, UserRole role = UserRole.Member)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email boş olamaz.", nameof(email));
@@ -38,6 +39,6 @@ public class User : Entity<Guid>
         if (string.IsNullOrWhiteSpace(passwordHash))
             throw new ArgumentException("Şifre boş olamaz.", nameof(passwordHash));
 
-        return new User(Guid.NewGuid(), email.Trim().ToLowerInvariant(), fullName.Trim(), passwordHash);
+        return new User(Guid.NewGuid(), email.Trim().ToLowerInvariant(), fullName.Trim(), passwordHash, role);
     }
 }
