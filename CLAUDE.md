@@ -16,6 +16,13 @@
 5. dotnet watch ile hot-reload akışı
 6. README.md güncellemesi bekliyor (Bölüm 4'te kalmış, EF Core + JWT notları eksik)
 
+1. YARIM KALAN İŞ - JWT login: appsettings.json'a Jwt:Key/Issuer/Audience eklenmedi.
+   Eklenmeden uygulama BAŞLARKEN ÇÖKER (AddJwtBearer null key ile patlar).
+   DOĞRULANDI: hata çökme değil, GlobalExceptionHandler sayesinde düzgün 400
+   JSON yanıtı olarak dönüyor - ama TÜM endpoint'leri etkiliyor (sadece login
+   değil, "/" health-check bile), çünkü UseAuthentication() her istekte çalışıyor.
+   İlk iş bu olmalı. Key en az 32 karakter olmalı (HMAC-SHA256 için).
+
 ## Bu projenin amacı
 
 Bu, kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir
