@@ -24,5 +24,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.PasswordHash)
             .IsRequired();
+
+        // Enum'lar varsayılan olarak zaten int olarak saklanır, ama bunu BİLEREK
+        // açıkça yazıyoruz - "neden int" sorusuna gelecekte cevap versin diye.
+        // Alternatif olarak .HasConversion<string>() ile "Admin"/"Member" diye
+        // okunabilir string de saklanabilirdi - biz basitlik için int'i seçtik.
+        builder.Property(u => u.Role)
+            .IsRequired()
+            .HasConversion<int>();
     }
 }

@@ -13,6 +13,7 @@ using Atlas.Modules.Auth.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Atlas.Modules.Auth.Domain.Enums;
 
 namespace Atlas.Modules.Auth.Api;
 
@@ -96,7 +97,7 @@ services.AddAuthorization();
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var adminPasswordHash = passwordHasher.Hash("Admin123!");
 
-            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", adminPasswordHash));
+            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", adminPasswordHash, UserRole.Admin));
             db.SaveChanges();
         }
     }

@@ -21,7 +21,7 @@ public static class AuthEndpoints
             return Results.Ok(users);
         })
         .WithName("GetAllUsers")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Admin"));
 
         // YENİ: Gerçek bir Command örneği. RegisterUserCommand, Minimal API'nin
         // "request body'den otomatik doldur" özelliğiyle JSON gövdesinden okunuyor.

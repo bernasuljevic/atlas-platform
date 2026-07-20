@@ -25,7 +25,11 @@ public class JwtTokenGenerator : ITokenGenerator
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.FullName)
+            new Claim(ClaimTypes.Name, user.FullName),
+            // ASP.NET Core'un policy-based authorization mekanizması (.RequireRole(...))
+            // token'daki bu claim'i otomatik okuyor - başka hiçbir yerde elle
+            // eşleştirme yapmamıza gerek yok.
+            new Claim(ClaimTypes.Role, user.Role.ToString())
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
