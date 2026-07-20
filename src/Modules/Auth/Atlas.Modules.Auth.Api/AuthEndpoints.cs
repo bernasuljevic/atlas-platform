@@ -20,7 +20,8 @@ public static class AuthEndpoints
             var users = await mediator.Send(new GetAllUsersQuery());
             return Results.Ok(users);
         })
-        .WithName("GetAllUsers");
+        .WithName("GetAllUsers")
+        .RequireAuthorization();
 
         // YENİ: Gerçek bir Command örneği. RegisterUserCommand, Minimal API'nin
         // "request body'den otomatik doldur" özelliğiyle JSON gövdesinden okunuyor.
