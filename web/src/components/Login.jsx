@@ -1,30 +1,34 @@
 import { useState } from "react";
 import { login } from "../api";
 
-// "onLoginSuccess" burada bir prop - App.jsx'ten gelen bir fonksiyon. Login başarılı
-// olduğunda, token'ı App.jsx'e "geri bildiriyoruz" - Login kendisi token'ı saklamıyor,
-// sadece App.jsx'e haber veriyor. Bu, backend'deki "sorumluluk ayrımı" fikrinin
-// React karşılığı - Login sadece "giriş formu göster ve sonucu bildir" işini yapıyor.
 function Login({ onLoginSuccess }) {
-  const [email, setEmail] = useState("admin@atlas.local");
+  const [email, setEmail] = useState("admin2@atlas.local");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
+  // isLoading: istek sürerken true, bitince false. Butonun devre dışı kalması
+  // ve metninin değişmesi için kullanacağız - kullanıcı "bir şey oluyor" bilsin.
+  const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e) {
-    e.preventDefault(); // formun sayfayı yenilemesini engeller (tarayıcının varsayılanı)
+    e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
     try {
       const token = await login(email, password);
       onLoginSuccess(token);
     } catch (err) {
       setError(err.message);
+    } finally {
+      // finally: hem başarı hem hata durumunda çalışır - "istek bitti" bilgisini
+      // tek bir yerde, unutmadan işaretlemek için ideal.
+      setIsLoading(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 320, margin: "80px auto" }}>
-      <h1>Atlas Platform</h1>
+    <div style={{ maxWidth: 360, margin: "80px auto", textAlign: "center" }}>
+      <h1 style={{ fontSize: 28, marginBottom: 24 }}>Atlas Platform</h1>
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: 12 }}>
           <label>Email</label>
@@ -33,6 +37,7 @@ function Login({ onLoginSuccess }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading}
             style={{ width: "100%", padding: 8 }}
           />
         </div>
@@ -43,12 +48,13 @@ function Login({ onLoginSuccess }) {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
             style={{ width: "100%", padding: 8 }}
           />
         </div>
         {error && <p style={{ color: "red" }}>{error}</p>}
-        <button type="submit" style={{ width: "100%", padding: 10 }}>
-          Giriş Yap
+        <button type="submit" disabled={isLoading} style={{ width: "100%", padding: 10 }}>
+          {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
         </button>
       </form>
     </div>
