@@ -27,7 +27,8 @@ public static class WikiEndpoints
             var newPageId = await mediator.Send(command);
             return Results.Ok(new { id = newPageId });
         })
-        .WithName("CreateWikiPage");
+        .WithName("CreateWikiPage")
+        .RequireAuthorization();
 
         return app;
     }
