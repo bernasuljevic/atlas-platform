@@ -4,8 +4,9 @@
 
 Kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir
 öğrenme + staj defteri projesi. Kurumsal wiki + AI fikrine dayanıyor (orijinal
-ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI modülü
-büyük kapsamı nedeniyle bilinçli olarak ayrı bir haftaya bırakıldı.
+ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI modülünün
+Domain modeli ve PostgreSQL/pgvector altyapısı kuruldu; embedding üretimi/LLM
+entegrasyonu API key'ler gelince yapılacak.
 
 ## ÇOK ÖNEMLİ — Nasıl çalışmalısın
 
@@ -22,12 +23,18 @@ test edilmiş olmalı:
 
 ## Mimari - Modüler Monolith
 
-src/Shared/ → Kernel (Entity base), Contracts (modüller arası interface'ler), CQRS (MediatR pipeline behaviors)
+src/Shared/ → Kernel (Entity base), Contracts (modüller arası interface'ler/event'ler),
+              CQRS (MediatR pipeline behaviors), Caching (Redis - ICacheService)
 src/Modules/Auth/ → Domain → Application → Infrastructure → Api (4 katman)
 src/Modules/Wiki/ → aynı 4 katman deseni
+src/Modules/Notifications/ → aynı 4 katman deseni, SignalR Hub Infrastructure'da yaşıyor
+src/Modules/AI/ → aynı 4 katman deseni, iskelet + Domain modeli kuruldu (embedding/LLM
+                  entegrasyonu henüz yok - API key bekleniyor)
 src/Host/Atlas.Api/ → composition root, sadece her modülün *.Api projesine referans verir
-tests/ → xUnit test projeleri (şu an: Atlas.Modules.Wiki.Domain.Tests)
-web/ → React (Vite) frontend, ayrı bir npm projesi
+tests/ → xUnit test projeleri (Atlas.Modules.Wiki.Domain.Tests, Atlas.Modules.Auth.Domain.Tests)
+Web/ → npm workspaces monorepo (Web/package.json, "apps/*" + "packages/*")
+  Web/apps/platform/ → React (Vite) frontend, shadcn/ui (Tailwind v4 + Base UI preset)
+  Web/packages/ui/ → paylaşılan @atlas/ui paketi (şu an boş iskelet)
 
 
 **Katman kuralı:** Domain framework'ten habersiz. Application "nasıl saklanır"ı
@@ -37,20 +44,46 @@ mekanizmasını (`AddXModule()`) ve MediatR endpoint'lerini barındırır.
 
 **Modüller arası iletişim kuralı:** Modüller birbirinin Domain/Application/
 Infrastructure'ına ASLA referans vermez. Sadece `Shared.Contracts`'taki
-interface'ler üzerinden konuşurlar (Wiki, Auth'u tanımaz, sadece
-`ICurrentUserAccessor`'ı tanır). **İstisna:** Veritabanı seviyesinde foreign key
-gerekiyorsa (örn. `WikiPage.CreatedByUserId` → `User.Id`), bu EF Core'un C#
-API'siyle değil, migration içinde **ham SQL** ile eklenir - kod seviyesindeki
-ayrım korunur, veritabanı seviyesinde tutarlılık sağlanır.
+interface'ler ve **domain event'ler** üzerinden konuşurlar (Wiki, Auth'u tanımaz,
+sadece `ICurrentUserAccessor`'ı tanır; Notifications, Wiki'yi tanımaz, sadece
+`Shared.Contracts`'taki `WikiPageCreatedEvent`'i dinler). **İstisna:** Veritabanı
+seviyesinde foreign key gerekiyorsa (örn. `WikiPage.CreatedByUserId` → `User.Id`),
+bu EF Core'un C# API'siyle değil, migration içinde **ham SQL** ile eklenir - kod
+seviyesindeki ayrım korunur, veritabanı seviyesinde tutarlılık sağlanır.
 
-**Veritabanı:** SQL Server Express (`.\SQLEXPRESS`, Windows Authentication),
-her modülün kendi `DbContext`'i, ayrı şemalar (`auth.*`, `wiki.*`), tek fiziksel
-veritabanı (`AtlasPlatform`). appsettings.json → `ConnectionStrings:DefaultConnection`
-ve `Jwt:Key`/`Issuer`/`Audience` - ikisi de dolu olmadan uygulama her endpoint'te hata verir.
+**Veritabanı:** İki ayrı fiziksel veritabanı, modül gruplarına göre:
+- SQL Server Express (`.\SQLEXPRESS`, Windows Authentication) - Auth + Wiki,
+  ayrı şemalar (`auth.*`, `wiki.*`), tek veritabanı (`AtlasPlatform`).
+- PostgreSQL + pgvector (Docker, `docker-compose.yml`) - AI modülü, şema `ai.*`,
+  veritabanı `AtlasAi`. Host portu **5433** (5432 değil - bu makinede native bir
+  PostgreSQL Windows servisi zaten 5432'yi dinliyor, çakışma yaşandı).
+
+appsettings.json → `ConnectionStrings:DefaultConnection` (SQL Server),
+`ConnectionStrings:Postgres` (PostgreSQL), `ConnectionStrings:Redis`, ve
+`Jwt:Key`/`Issuer`/`Audience` - hepsi dolu olmadan uygulama ilgili endpoint'te hata verir.
+
+**Redis / cache:** `Shared.Caching` projesi, `ICacheService` interface'i +
+`RedisCacheService` implementasyonu. `GetWikiPagesQuery` sonuçları cache'leniyor.
+Docker'da ayrı bir container (`atlas-redis`), kalıcı volume YOK (cache verisi
+kaybolursa DB'den yeniden üretilir, bu bilinçli bir tercih).
+
+**Bildirimler:** `Notifications` modülü, SignalR Hub (`NotificationsHub`) ile
+gerçek zamanlı bildirim gönderiyor. Wiki'de yeni sayfa eklenince
+`WikiPageCreatedEvent` (Shared.Contracts, MediatR `INotification`) yayınlanıyor,
+`WikiPageCreatedEventHandler` (Notifications.Infrastructure) bunu dinleyip
+SignalR üzerinden bağlı React istemcilerine anlık bildirim gönderiyor.
 
 **Kimlik doğrulama:** JWT tabanlı. `Pbkdf2PasswordHasher` (salt + 100k iterasyon)
 şifreleri hash'liyor. Token claim'leri: NameIdentifier, Email, Name, Role.
 `User.Role` (Member/Admin enum) → `.RequireRole("Admin")` ile korunan endpoint'ler var.
+
+**AI modülü (iskelet):** `WikiPageEmbedding` entity (AI.Domain) - `WikiPageId`,
+`Embedding` (`Pgvector.Vector`, boyut 1024 - Voyage AI'a uygun), `CreatedAtUtc`.
+`AiDbContext` (AI.Infrastructure) PostgreSQL'e `Npgsql.EntityFrameworkCore.PostgreSQL`
++ `Pgvector.EntityFrameworkCore` ile bağlanıyor, `HasPostgresExtension("vector")`
+migration'ın "vector" extension'ını otomatik `CREATE EXTENSION` etmesini sağlıyor.
+Henüz bir Command/Query yok - embedding'i kim, ne zaman üretecek (Wiki sayfası
+oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
 
 ## Öğrenilen dersler (tekrar sorgulama, test edildi)
 
@@ -68,6 +101,15 @@ ve `Jwt:Key`/`Issuer`/`Audience` - ikisi de dolu olmadan uygulama her endpoint't
 7. React tarafında CORS: backend'de `AddCors`/`UseCors("AllowReactApp")`
    sadece `http://localhost:5173`'e izin veriyor - React portu değişirse
    burası da güncellenmeli.
+8. **Shared.EventBus ayrı bir proje olarak açılmadı** - MediatR'ın `IPublisher`'ı
+   zaten in-process event bus işlevi görüyor, ekstra bir sarmalayıcı katman
+   gereksiz görüldü (bilinçli sadeleştirme).
+9. Aynı makinede birden fazla veritabanı motoru varsa (örn. native kurulu
+   PostgreSQL servisi + Docker'daki pgvector container'ı) ikisi de aynı portu
+   (5432) dinlemeye çalışabilir - host bağlantıları yanlış olana gidip
+   "password authentication failed" gibi yanıltıcı bir hata verir. Çözüm:
+   Docker container'ının host portunu değiştirmek (`docker-compose.yml`),
+   native servisi kapatmaktan daha güvenli ve geri alınabilir.
 
 ## Şu ana kadar tamamlananlar
 
@@ -82,18 +124,28 @@ ve `Jwt:Key`/`Issuer`/`Audience` - ikisi de dolu olmadan uygulama her endpoint't
 - [x] Authorization: GET /api/auth/users → RequireRole("Admin"),
       POST /api/wiki/pages → RequireAuthorization (GET wiki bilinçli olarak açık)
 - [x] Rol bazlı yetkilendirme: User.Role (Member/Admin), JWT Role claim
-- [x] React frontend (web/): login, wiki listesi/oluşturma, departman filtresi,
-      görünürlük seçimi, yükleme durumları, çıkış yap
-- [x] İlk test projesi: Atlas.Modules.Wiki.Domain.Tests (xUnit), 7 test,
-      WikiPage.IsVisibleTo() için
+- [x] React frontend (Web/apps/platform/): login, wiki listesi/oluşturma,
+      departman filtresi, görünürlük seçimi, yükleme durumları, çıkış yap,
+      token artık localStorage'da kalıcı (sayfa yenilenince oturum düşmüyor)
+- [x] Test projeleri: Atlas.Modules.Wiki.Domain.Tests + Atlas.Modules.Auth.Domain.Tests
+      (xUnit), WikiPage.IsVisibleTo() ve User.Create() validasyonları için
+- [x] Redis cache: Shared.Caching, ICacheService/RedisCacheService,
+      GetWikiPagesQuery sonuçları cache'leniyor
+- [x] Notifications modülü: SignalR Hub, WikiPageCreatedEvent ile Wiki'den
+      Notifications'a olay bildirimi, React'ta anlık bildirim gösteriliyor
+- [x] AI modülü iskeleti: WikiPageEmbedding Domain modeli, PostgreSQL/pgvector
+      bağlantısı, migration uygulandı ve doğrulandı (embedding üretimi yok henüz)
+- [x] Monorepo restructure: web/ → Web/apps/platform + Web/packages/ui,
+      npm workspaces kuruldu
+- [x] shadcn/ui kurulumu (Tailwind v4, Base UI preset) - sitenin orijinal
+      özel tasarımı (mor/koyu tema) korunacak şekilde entegre edildi
 
 ## Sırada ne var
 
-1. Auth.Domain için de test projesi (User.Create() validasyonları)
+1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
 2. Refresh token mekanizması (şu an token 8 saatte bir yeniden login gerektiriyor)
-3. AI modülü (SubMed dokümanındaki orijinal fikir) - ayrı bir haftaya bırakıldı
-4. React: routing (React Router), daha kapsamlı stil
-5. Wiki GET endpoint'i için departman bazlı ekstra koruma düşünülebilir
+3. React: routing (React Router), Web/packages/ui'ye gerçek paylaşılan bileşenler taşınması
+4. Wiki GET endpoint'i için departman bazlı ekstra koruma düşünülebilir
 
 ## Endpoint referansı
 
@@ -102,6 +154,7 @@ ve `Jwt:Key`/`Issuer`/`Audience` - ikisi de dolu olmadan uygulama her endpoint't
 - `GET /api/auth/users` → sadece Admin rolü
 - `GET /api/wiki/pages?department=X` → açık
 - `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir
+- `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
