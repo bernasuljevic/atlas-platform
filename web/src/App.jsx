@@ -15,6 +15,14 @@ function App() {
       })
       .withAutomaticReconnect()
       .build();
+    // Backend'deki WikiPageCreatedEventHandler'ın gönderdiği "WikiPageCreated"
+    // adlı mesajı dinliyoruz - isim BİREBİR eşleşmeli, aksi halde hiçbir şey olmaz
+    // (sessizce yok sayılır, hata da vermez - bu yüzden isim tutarlılığı önemli).
+    connection.on("WikiPageCreated", (data) => {
+      console.log("[SignalR] Yeni bildirim:", data);
+      alert(`Yeni wiki sayfası eklendi: "${data.title}" (${data.departmentName})`);
+    });
+
     connection
       .start()
       .then(() => console.log("[SignalR] Bağlantı kuruldu:", connection.connectionId))
