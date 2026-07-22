@@ -19,8 +19,9 @@ function Login({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      const token = await login(email, password);
-      onLoginSuccess(token);
+      // login() artık { accessToken, refreshToken } döndürüyor - tek bir string değil.
+      const tokens = await login(email, password);
+      onLoginSuccess(tokens);
     } catch (err) {
       setError(err.message);
     } finally {

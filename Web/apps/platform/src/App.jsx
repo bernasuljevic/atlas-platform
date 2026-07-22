@@ -6,17 +6,39 @@ import WikiBoard from "./components/WikiBoard";
 function App() {
   // Başlangıç değerini localStorage'dan okuyoruz (lazy initializer - fonksiyon sadece
   // ilk render'da çalışır). Sayfa yenilendiğinde token hafızadan uçmasın diye.
-  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
 
-  function handleLoginSuccess(newToken) {
-    localStorage.setItem("token", newToken);
-    setToken(newToken);
+  function handleLoginSuccess({ accessToken, refreshToken }) {
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    setToken(accessToken);
   }
 
   function handleLogout() {
-    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
     setToken(null);
   }
+
+  useEffect(() => {
+    // api.js, access token'ı arka planda kendi başına yenilediğinde (401 sonrası)
+    // localStorage'ı güncelliyor ama React state'ini (bu component'teki "token")
+    // bilmiyor - bu event ikisini senkron tutuyor. Refresh token da tükenmişse
+    // ("atlas:auth-expired") direkt çıkış yaptırıyoruz.
+    function handleTokensRefreshed(e) {
+      setToken(e.detail.accessToken);
+    }
+    function handleAuthExpired() {
+      handleLogout();
+    }
+
+    window.addEventListener("atlas:tokens-refreshed", handleTokensRefreshed);
+    window.addEventListener("atlas:auth-expired", handleAuthExpired);
+    return () => {
+      window.removeEventListener("atlas:tokens-refreshed", handleTokensRefreshed);
+      window.removeEventListener("atlas:auth-expired", handleAuthExpired);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) return;

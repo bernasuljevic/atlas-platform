@@ -34,12 +34,24 @@ public static class AuthEndpoints
 
         group.MapPost("/login", async (LoginCommand command, IMediator mediator) =>
         {
-            var token = await mediator.Send(command);
-            return token is null
+            var tokens = await mediator.Send(command);
+            return tokens is null
                 ? Results.Unauthorized()
-                : Results.Ok(new { token });
+                : Results.Ok(tokens);
         })
         .WithName("Login");
+
+        // Access token süresi dolunca (15dk) React tarafı buraya refresh token'ı
+        // gönderiyor, karşılığında yeni bir access+refresh token çifti alıyor -
+        // kullanıcı yeniden email/şifre girmek zorunda kalmıyor.
+        group.MapPost("/refresh", async (RefreshTokenCommand command, IMediator mediator) =>
+        {
+            var tokens = await mediator.Send(command);
+            return tokens is null
+                ? Results.Unauthorized()
+                : Results.Ok(tokens);
+        })
+        .WithName("RefreshToken");
 
         return app;
     }

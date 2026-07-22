@@ -44,6 +44,7 @@ public static class AuthModule
         // kendisi veri deposu değil - CLAUDE.md'deki kural burada devreye giriyor:
         // Scoped doğru seçim, her HTTP isteği kendi DbContext'ini (ve bağlantısını) alır.
         services.AddScoped<IUserRepository, EfUserRepository>();
+        services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
 
         // Shared.Contracts'taki ICurrentUserAccessor'ın gerçek implementasyonu burada
         // bağlanıyor. Wiki modülü bu sınıfı hiç görmüyor - sadece interface'i biliyor.
