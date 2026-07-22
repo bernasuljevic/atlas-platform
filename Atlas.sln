@@ -63,6 +63,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.AI.Infrastruc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.AI.Api", "src\Modules\AI\Atlas.Modules.AI.Api\Atlas.Modules.AI.Api.csproj", "{7816D4DE-6E8C-4188-9319-87872E5B020B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.AI.Domain.Tests", "tests\Atlas.Modules.AI.Domain.Tests\Atlas.Modules.AI.Domain.Tests.csproj", "{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -349,6 +351,18 @@ Global
 		{7816D4DE-6E8C-4188-9319-87872E5B020B}.Release|x64.Build.0 = Release|Any CPU
 		{7816D4DE-6E8C-4188-9319-87872E5B020B}.Release|x86.ActiveCfg = Release|Any CPU
 		{7816D4DE-6E8C-4188-9319-87872E5B020B}.Release|x86.Build.0 = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|x64.Build.0 = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Debug|x86.Build.0 = Debug|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|x64.ActiveCfg = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|x64.Build.0 = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|x86.ActiveCfg = Release|Any CPU
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -371,5 +385,6 @@ Global
 		{99301E14-A289-4760-A559-C24E57D880D3} = {BB1D8860-8311-E62E-D03C-503AF4A8C141}
 		{B62B9257-1890-49B4-8F1B-138E3E19323F} = {BB1D8860-8311-E62E-D03C-503AF4A8C141}
 		{7816D4DE-6E8C-4188-9319-87872E5B020B} = {BB1D8860-8311-E62E-D03C-503AF4A8C141}
+		{6BD3843A-0BC7-438E-BE3C-5E4D8814BE95} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
