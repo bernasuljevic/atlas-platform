@@ -35,6 +35,11 @@ public static class AuthModule
         // bu yüzden Scoped (AddDbContext'in varsayılanı zaten Scoped'tur).
         services.AddDbContext<AuthDbContext>(options => options.UseSqlServer(connectionString));
 
+        // SQL Server için /health kontrolü burada kayıtlı - Host, AuthDbContext'in
+        // varlığını bilmeden "sqlserver" adında bir health check'e sahip oluyor.
+        // AddHealthChecks() birden fazla modülden çağrılabilir, hepsi aynı havuzda birikir.
+        services.AddHealthChecks().AddDbContextCheck<AuthDbContext>("sqlserver");
+
         // Artık repository DIŞ BİR KAYNAĞI (DbContext/DB bağlantısı) sarmalıyor,
         // kendisi veri deposu değil - CLAUDE.md'deki kural burada devreye giriyor:
         // Scoped doğru seçim, her HTTP isteği kendi DbContext'ini (ve bağlantısını) alır.

@@ -18,6 +18,8 @@ public static class AIModule
         services.AddDbContext<AiDbContext>(options =>
             options.UseNpgsql(connectionString, o => o.UseVector()));
 
+        services.AddHealthChecks().AddDbContextCheck<AiDbContext>("postgresql");
+
         return services;
     }
 

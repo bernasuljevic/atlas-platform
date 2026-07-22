@@ -17,6 +17,8 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<ICacheService, RedisCacheService>();
 
+        services.AddHealthChecks().AddCheck<RedisHealthCheck>("redis");
+
         return services;
     }
 }

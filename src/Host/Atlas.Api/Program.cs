@@ -1,9 +1,11 @@
+using System.Text.Json;
 using Atlas.Api.ExceptionHandling;
 using Atlas.Modules.AI.Api;
 using Atlas.Modules.Auth.Api;
 using Atlas.Modules.Notifications.Api;
 using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,5 +74,27 @@ app.MapGet("/", () => Results.Ok(new
     time = DateTime.UtcNow
 }))
 .WithName("HealthCheck");
+
+// "/" endpoint'i sadece API sürecinin ayakta olduğunu söylüyor - "/health" ise
+// gerçekten bağımlılıklara (SQL Server, Redis, PostgreSQL) ulaşılabiliyor mu diye
+// bakıyor. Her check kaydı ilgili modülün AddXModule()/AddCaching() metodunda -
+// Host burada sadece sonucu sade bir JSON'a yazan endpoint'i map'liyor.
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+
+        var json = JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            services = report.Entries.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value.Status.ToString())
+        });
+
+        await context.Response.WriteAsync(json);
+    }
+});
 
 app.Run();
