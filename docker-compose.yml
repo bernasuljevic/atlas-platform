@@ -7,3 +7,22 @@ services:
     # "volumes" olmadan bilerek bırakıyoruz - Redis'teki veri (cache) kalıcı
     # olmasın istiyoruz, container yeniden başlarsa sıfırdan başlasın.
     # Bu, cache'in doğasına uygun: kaybolsa da veritabanından yeniden üretilebilir.
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: atlas-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: atlas
+      POSTGRES_PASSWORD: atlas_dev_password
+      POSTGRES_DB: AtlasAi
+    # Redis'in aksine BURADA volume KULLANIYORUZ - embedding verisi kalıcı
+    # olmalı, container yeniden başlayınca (ya da bilgisayar restart olunca)
+    # kaybolmamalı. "atlas-postgres-data" adında bir Docker volume, container
+    # silinse bile diskte kalıcı olarak durur.
+    volumes:
+      - atlas-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  atlas-postgres-data:
