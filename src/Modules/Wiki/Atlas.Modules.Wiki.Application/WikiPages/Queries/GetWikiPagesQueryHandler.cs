@@ -49,11 +49,11 @@ public class GetWikiPagesQueryHandler : IRequestHandler<GetWikiPagesQuery, IRead
             await _cache.SetAsync(AllPagesCacheKey, allPageDtos, CacheDuration, cancellationToken);
         }
 
-        // Giriş yapmamış bir kullanıcı departman parametresi gönderse bile,
-        // bunu SESSİZCE yok sayıyoruz - hata fırlatmıyoruz, sadece filtreyi
-        // devre dışı bırakıyoruz. Sonuç: giriş yapmamış herkes sadece Public
-        // sayfaları görür, departman adını tahmin etmek işe yaramaz.
-        var effectiveDepartment = _currentUser.IsAuthenticated ? request.ViewerDepartmentName : null;
+        // Departman artık TAMAMEN ICurrentUserAccessor'dan (JWT'deki imzalı claim)
+        // geliyor - istemcinin göndereceği hiçbir değer bunu değiştiremez. Giriş
+        // yapmamış ya da departmansız bir kullanıcı için bu zaten null olur,
+        // dolayısıyla sadece Public sayfalar görünür.
+        var effectiveDepartment = _currentUser.IsAuthenticated ? _currentUser.Department : null;
 
         return allPageDtos
             .Where(p => IsVisibleTo(p, effectiveDepartment))

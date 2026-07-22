@@ -8,4 +8,4 @@ namespace Atlas.Modules.Auth.Application.Users.Commands;
 /// Query gibi zengin bir veri seti döndürmez. Burada geriye sadece yeni kullanıcının
 /// Id'sini döndürüyoruz.
 /// </summary>
-public record RegisterUserCommand(string Email, string FullName, string Password) : IRequest<Guid>;
+public record RegisterUserCommand(string Email, string FullName, string Password, string? Department = null) : IRequest<Guid>;

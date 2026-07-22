@@ -19,7 +19,7 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, G
     {
         var placeholderHash = _passwordHasher.Hash(request.Password);
 
-        var user = User.Create(request.Email, request.FullName, placeholderHash);
+        var user = User.Create(request.Email, request.FullName, placeholderHash, department: request.Department);
 
         await _userRepository.AddAsync(user, cancellationToken);
 

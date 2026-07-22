@@ -74,8 +74,15 @@ gerçek zamanlı bildirim gönderiyor. Wiki'de yeni sayfa eklenince
 SignalR üzerinden bağlı React istemcilerine anlık bildirim gönderiyor.
 
 **Kimlik doğrulama:** JWT tabanlı. `Pbkdf2PasswordHasher` (salt + 100k iterasyon)
-şifreleri hash'liyor. Token claim'leri: NameIdentifier, Email, Name, Role.
-`User.Role` (Member/Admin enum) → `.RequireRole("Admin")` ile korunan endpoint'ler var.
+şifreleri hash'liyor. Access token claim'leri: NameIdentifier, Email, Name, Role,
+(varsa) department. `User.Role` (Member/Admin enum) → `.RequireRole("Admin")` ile
+korunan endpoint'ler var. Access token ömrü 15 dakika (eskiden 8 saatti) - uzun
+oturum artık `RefreshToken` (Auth.Domain, `auth.RefreshTokens` tablosu) ile sağlanıyor:
+`POST /api/auth/login` `{accessToken, refreshToken}` döndürür, `POST /api/auth/refresh`
+"rotation" deseniyle (her kullanımda eski token iptal edilir, yenisi üretilir) yeni
+bir çift verir. `Jwt:Key` artık appsettings.json'da DEĞİL, User Secrets'ta
+(`dotnet user-secrets set "Jwt:Key" "..."` - Development ortamında otomatik yüklenir,
+`Properties/launchSettings.json` bunu garanti ediyor).
 
 **AI modülü (iskelet):** `WikiPageEmbedding` entity (AI.Domain) - `WikiPageId`,
 `Embedding` (`Pgvector.Vector`, boyut 1024 - Voyage AI'a uygun), `CreatedAtUtc`.
@@ -110,6 +117,21 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
    "password authentication failed" gibi yanıltıcı bir hata verir. Çözüm:
    Docker container'ının host portunu değiştirmek (`docker-compose.yml`),
    native servisi kapatmaktan daha güvenli ve geri alınabilir.
+10. **GÜVENLİK - bulunup düzeltildi (2026-07-22):** `GET /api/wiki/pages`'teki
+    departman filtresi eskiden istemcinin `?department=X` query string'iyle
+    gönderdiği bir değere güveniyordu, sadece `IsAuthenticated` kontrol
+    ediliyordu - kullanıcının GERÇEKTEN o departmana ait olup olmadığı hiç
+    sorgulanmıyordu. Sonuç: giriş yapmış herhangi bir kullanıcı, departman
+    adını tahmin ederek (`?department=IK` gibi) başka departmanların
+    DepartmentOnly sayfalarını okuyabiliyordu (canlı olarak doğrulandı: yeni
+    kayıt olan, IK ile hiçbir ilgisi olmayan bir kullanıcı IK'ya özel bir
+    sayfayı görebildi). Düzeltme: `User` entity'sine gerçek bir `Department`
+    alanı eklendi, JWT'ye imzalı bir `department` claim'i gömülüyor,
+    `GetWikiPagesQuery` artık istemciden hiçbir departman parametresi almıyor -
+    `ICurrentUserAccessor.Department` (token'dan) tek doğruluk kaynağı. Ayrıca
+    React'ın `getWikiPages()` çağrısı hiç Authorization header'ı göndermiyordu
+    (bu da düzeltilmeden önce departman özelliğinin UI'da zaten hiç gerçek
+    anlamda çalışmadığı anlamına geliyordu) - bu da düzeltildi.
 
 ## Şu ana kadar tamamlananlar
 
@@ -125,8 +147,11 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       POST /api/wiki/pages → RequireAuthorization (GET wiki bilinçli olarak açık)
 - [x] Rol bazlı yetkilendirme: User.Role (Member/Admin), JWT Role claim
 - [x] React frontend (Web/apps/platform/): login, wiki listesi/oluşturma,
-      departman filtresi, görünürlük seçimi, yükleme durumları, çıkış yap,
-      token artık localStorage'da kalıcı (sayfa yenilenince oturum düşmüyor)
+      görünürlük seçimi, yükleme durumları, çıkış yap, access+refresh token
+      localStorage'da kalıcı, 401 alınca otomatik refresh (bkz. api.js).
+      (Eski "departman filtresi" input'u kaldırıldı - departman artık
+      kullanıcı tarafından seçilebilir değil, JWT'deki gerçek departmandan
+      otomatik geliyor, bkz. Öğrenilen dersler #10.)
 - [x] Test projeleri: Atlas.Modules.Wiki.Domain.Tests + Atlas.Modules.Auth.Domain.Tests
       (xUnit), WikiPage.IsVisibleTo() ve User.Create() validasyonları için
 - [x] Redis cache: Shared.Caching, ICacheService/RedisCacheService,
@@ -139,20 +164,25 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       npm workspaces kuruldu
 - [x] shadcn/ui kurulumu (Tailwind v4, Base UI preset) - sitenin orijinal
       özel tasarımı (mor/koyu tema) korunacak şekilde entegre edildi
+- [x] JWT key rotasyonu + User Secrets (appsettings.json'daki sızmış key kaldırıldı)
+- [x] Refresh token mekanizması: access token 15dk, rotation destekli /api/auth/refresh
+- [x] Wiki GET güvenlik açığı bulundu ve düzeltildi: departman artık JWT'den
+      geliyor, istemciden gelen bir query parametresine güvenilmiyor (Öğrenilen
+      dersler #10)
 
 ## Sırada ne var
 
 1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
-2. Refresh token mekanizması (şu an token 8 saatte bir yeniden login gerektiriyor)
-3. React: routing (React Router), Web/packages/ui'ye gerçek paylaşılan bileşenler taşınması
-4. Wiki GET endpoint'i için departman bazlı ekstra koruma düşünülebilir
+2. React: routing (React Router), Web/packages/ui'ye gerçek paylaşılan bileşenler taşınması
 
 ## Endpoint referansı
 
-- `POST /api/auth/register` (email, fullName, password) → açık
-- `POST /api/auth/login` (email, password) → açık, döner: `{token}` ya da 401
+- `POST /api/auth/register` (email, fullName, password, department?) → açık
+- `POST /api/auth/login` (email, password) → açık, döner: `{accessToken, refreshToken}` ya da 401
+- `POST /api/auth/refresh` (refreshToken) → döner: yeni `{accessToken, refreshToken}` ya da 401
 - `GET /api/auth/users` → sadece Admin rolü
-- `GET /api/wiki/pages?department=X` → açık
+- `GET /api/wiki/pages` → açık, DepartmentOnly filtresi artık query'den DEĞİL,
+  gönderilen token'daki (varsa) department claim'inden otomatik uygulanır
 - `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 

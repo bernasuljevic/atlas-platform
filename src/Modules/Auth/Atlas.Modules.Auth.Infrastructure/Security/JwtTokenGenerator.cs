@@ -22,16 +22,24 @@ public class JwtTokenGenerator : ITokenGenerator
     {
         // Claim = token icine gomulen "iddia" (bu kullanici su id'ye, su email'e sahip).
         // ICurrentUserAccessor'in gercek implementasyonu bunlari okuyacak.
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.FullName),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Name, user.FullName),
             // ASP.NET Core'un policy-based authorization mekanizması (.RequireRole(...))
             // token'daki bu claim'i otomatik okuyor - başka hiçbir yerde elle
             // eşleştirme yapmamıza gerek yok.
-            new Claim(ClaimTypes.Role, user.Role.ToString())
+            new(ClaimTypes.Role, user.Role.ToString())
         };
+
+        // Departman claim'i sadece kullanıcının GERÇEKTEN bir departmanı varsa eklenir.
+        // Wiki modülü artık departman bilgisini buradan (imzalı, sahtesi yapılamayan
+        // token'dan) okuyor - istemcinin query string'te gönderdiği bir değere değil.
+        if (!string.IsNullOrWhiteSpace(user.Department))
+        {
+            claims.Add(new Claim("department", user.Department));
+        }
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

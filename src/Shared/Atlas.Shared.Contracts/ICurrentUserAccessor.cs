@@ -16,4 +16,10 @@ public interface ICurrentUserAccessor
     Guid? UserId { get; }
     string? Email { get; }
     bool IsAuthenticated { get; }
+
+    // Kullanıcının token'daki (imzalı, sahtesi yapılamayan) gerçek departmanı.
+    // Wiki modülü, "hangi departmanın DepartmentOnly sayfalarını görebilirim"
+    // sorusunu artık BUNA göre cevaplıyor - istemcinin gönderdiği bir query
+    // parametresine göre değil (bkz. GetWikiPagesQueryHandler).
+    string? Department { get; }
 }

@@ -32,5 +32,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Role)
             .IsRequired()
             .HasConversion<int>();
+
+        builder.Property(u => u.Department)
+            .HasMaxLength(100)
+            .IsRequired(false);
     }
 }

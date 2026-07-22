@@ -7,25 +7,24 @@ function WikiBoard({ token, onLogout }) {
   const [content, setContent] = useState("");
   const [department, setDepartment] = useState("IT");
   const [visibility, setVisibility] = useState("Public");
-  // filterDepartment: liste tarafındaki filtre - form'daki "department" state'inden
-  // BİLEREK ayrı tutuyoruz, çünkü "hangi departmana sayfa eklediğim" ile
-  // "hangi departmanı görüntülediğim" birbirinden bağımsız iki karar.
-  const [filterDepartment, setFilterDepartment] = useState("");
   const [error, setError] = useState(null);
   const [isLoadingPages, setIsLoadingPages] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
-  // İkinci parametre artık [filterDepartment] - yani filtre her değiştiğinde
-  // bu effect yeniden çalışacak, listeyi güncelleyecek. Dünkü halinde []
-  // vardı, sadece ilk açılışta çalışıyordu.
   useEffect(() => {
     loadPages();
-  }, [filterDepartment]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadPages() {
     setIsLoadingPages(true);
     try {
-      const data = await getWikiPages(filterDepartment || undefined);
+      // Departman filtresi artık burada seçilebilir bir şey değil - backend,
+      // token'daki kullanıcının GERÇEK departmanına göre otomatik filtreliyor
+      // (bkz. GetWikiPagesQueryHandler). Önceden serbest metin olarak
+      // gönderilebiliyordu, bu da başka departmanların içeriğini tahmin ederek
+      // görebilmeyi mümkün kılan bir güvenlik açığıydı.
+      const data = await getWikiPages(token);
       setPages(data);
     } catch (err) {
       setError(err.message);
@@ -124,23 +123,12 @@ function WikiBoard({ token, onLogout }) {
         </button>
       </form>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>Sayfalar</h3>
-        <div>
-          <label style={{ marginRight: 8 }}>Departman filtresi:</label>
-          <input
-            placeholder="(boş = sadece herkese açık)"
-            value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
-            style={{ padding: 6 }}
-          />
-        </div>
-      </div>
+      <h3 style={{ margin: "0 0 8px" }}>Sayfalar</h3>
 
       {isLoadingPages ? (
         <p>Yükleniyor...</p>
       ) : pages.length === 0 ? (
-        <p>Bu filtreyle görünen sayfa yok.</p>
+        <p>Görebileceğin bir sayfa yok.</p>
       ) : (
         pages.map((p) => (
           <div key={p.id} style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>

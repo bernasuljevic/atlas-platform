@@ -13,11 +13,12 @@ public static class WikiEndpoints
     {
         var group = app.MapGroup("/api/wiki").WithTags("Wiki");
 
-        // ?department=Engineering → o departmandaki DepartmentOnly sayfalar da görünür.
-        // Boş bırakılırsa sadece Public sayfalar döner.
-        group.MapGet("/pages", async (IMediator mediator, string? department) =>
+        // GÜVENLİK: Artık bir "?department=" query parametresi YOK - hangi departmanın
+        // DepartmentOnly sayfalarının görüneceği, çağıranın JWT'sindeki imzalı
+        // "department" claim'inden belirleniyor (bkz. GetWikiPagesQuery.cs'teki not).
+        group.MapGet("/pages", async (IMediator mediator) =>
         {
-            var pages = await mediator.Send(new GetWikiPagesQuery(department));
+            var pages = await mediator.Send(new GetWikiPagesQuery());
             return Results.Ok(pages);
         })
         .WithName("GetWikiPages");

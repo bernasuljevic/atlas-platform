@@ -17,9 +17,14 @@ export async function login(email, password) {
   return response.json();
 }
 
-export async function getWikiPages(department) {
-  const query = department ? `?department=${department}` : "";
-  const response = await fetch(`${API_URL}/api/wiki/pages${query}`);
+// GÜVENLİK DÜZELTMESİ: Artık departman filtresi bir query parametresi değil -
+// backend, giriş yapmış kullanıcının GERÇEK departmanını JWT'den okuyor. Bu
+// yüzden token'ı buraya da göndermemiz gerekiyor (önceden hiç göndermiyorduk -
+// bu da düzeltmeden önce bile department-bazlı görünürlüğün React tarafında
+// hiç gerçek anlamda çalışmadığı, sadece elle test edilebildiği anlamına geliyordu).
+export async function getWikiPages(accessToken) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/wiki/pages`, { headers });
 
   if (!response.ok) {
     throw new Error("Wiki sayfaları yüklenemedi");

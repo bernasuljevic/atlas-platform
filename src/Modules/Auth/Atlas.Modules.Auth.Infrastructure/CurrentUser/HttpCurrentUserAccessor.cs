@@ -32,4 +32,6 @@ public class HttpCurrentUserAccessor : ICurrentUserAccessor
     }
 
     public string? Email => User?.FindFirst(ClaimTypes.Email)?.Value;
+
+    public string? Department => User?.FindFirst("department")?.Value;
 }
