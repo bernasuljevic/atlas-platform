@@ -135,3 +135,8 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 });
 
 app.Run();
+
+// Top-level statement'lar arka planda "Program" adında bir sınıf üretir ama bu
+// sınıf varsayılan olarak internal'dır - integration test projesindeki
+// WebApplicationFactory<Program>'ın buraya erişebilmesi için public yapıyoruz.
+public partial class Program;

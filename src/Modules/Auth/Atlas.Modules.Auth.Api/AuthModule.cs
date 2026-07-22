@@ -96,7 +96,19 @@ services.AddAuthorization();
         using var scope = app.ApplicationServices.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
 
-        db.Database.Migrate();
+        // Migrate(), EF Core InMemory provider'da desteklenmiyor (integration
+        // testlerde kullanılıyor). IsRelational() burada UseInternalServiceProvider
+        // ile birlikte güvenilir çalışmadığı için (iç EF Core servis çözümlemesi
+        // hata veriyordu) ProviderName'e bakıyoruz - basit bir string karşılaştırması,
+        // servis çözümlemesi gerektirmiyor.
+        if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            db.Database.EnsureCreated();
+        }
+        else
+        {
+            db.Database.Migrate();
+        }
 
         if (!db.Users.Any())
         {

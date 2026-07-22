@@ -40,6 +40,18 @@ public static class WikiModule
     {
         using var scope = app.ApplicationServices.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<WikiDbContext>();
-        db.Database.Migrate();
+
+        // Migrate(), EF Core InMemory provider'da desteklenmiyor (integration
+        // testlerde kullanılıyor). ProviderName kontrolü, IsRelational()'dan
+        // farklı olarak servis çözümlemesi gerektirmiyor (bkz. AuthModule.cs'teki
+        // aynı not - IsRelational() burada güvenilir çalışmadı).
+        if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            db.Database.EnsureCreated();
+        }
+        else
+        {
+            db.Database.Migrate();
+        }
     }
 }
