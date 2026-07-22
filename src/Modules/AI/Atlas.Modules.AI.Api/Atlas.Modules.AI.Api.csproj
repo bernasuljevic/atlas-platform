@@ -15,5 +15,10 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MediatR" Version="12.4.1" />
+    <!-- AI.Infrastructure'daki Npgsql paketi EF Core'u en az 10.0.4 istiyor - bu proje
+         kendi bağımlılık grafiğini ayrı çözdüğü için bu alt sınıra düşüp Infrastructure'ın
+         derlendiği 10.0.9 ile çakışıyordu. Açıkça sabitleyip tutarlılığı sağlıyoruz. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.9" />
   </ItemGroup>
 </Project>

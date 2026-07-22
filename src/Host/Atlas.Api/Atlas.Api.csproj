@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\Modules\Wiki\Atlas.Modules.Wiki.Api\Atlas.Modules.Wiki.Api.csproj" />
     <ProjectReference Include="..\..\Shared\Atlas.Shared.Caching\Atlas.Shared.Caching.csproj" />
     <ProjectReference Include="..\..\Modules\Notifications\Atlas.Modules.Notifications.Api\Atlas.Modules.Notifications.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\AI\Atlas.Modules.AI.Api\Atlas.Modules.AI.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">

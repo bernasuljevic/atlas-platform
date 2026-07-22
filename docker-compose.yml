@@ -12,7 +12,11 @@ services:
     image: pgvector/pgvector:pg16
     container_name: atlas-postgres
     ports:
-      - "5432:5432"
+      # 5432 yerine 5433: bu makinede native bir PostgreSQL Windows servisi
+      # (postgresql-x64-18) zaten 5432'yi dinliyor ve host'tan gelen bağlantıları
+      # container yerine kendisi kapıyor - bu yüzden host tarafını 5433'e aldık
+      # (container İÇİNDE hâlâ 5432, sadece dışa açılan port değişti).
+      - "5433:5432"
     environment:
       POSTGRES_USER: atlas
       POSTGRES_PASSWORD: atlas_dev_password
