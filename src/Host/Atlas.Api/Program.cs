@@ -6,6 +6,7 @@ using Atlas.Modules.Notifications.Api;
 using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,9 +37,45 @@ builder.Services.AddCors(options =>
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+// Swagger/OpenAPI - her modülün MediatR ile MapGet/MapPost dediği minimal API
+// endpoint'lerini otomatik keşfedip belgeliyor. SignalR Hub (Notifications)
+// bir REST endpoint'i olmadığı için Swagger'da zaten görünmüyor.
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Atlas Platform API", Version = "v1" });
+
+    // Swagger UI'daki "Authorize" butonu - buraya "Bearer eyJ..." yapıştırınca
+    // her istekte Authorization header'ı otomatik ekleniyor, elle Postman'e
+    // geçmeye gerek kalmıyor.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "JWT access token'ı 'Bearer {token}' formatında gönder - örn. login'den dönen accessToken."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+// /swagger -> UI, /swagger/v1/swagger.json -> ham OpenAPI belgesi.
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseCors("AllowReactApp");
 
