@@ -4,7 +4,19 @@ import Login from "./components/Login";
 import WikiBoard from "./components/WikiBoard";
 
 function App() {
-  const [token, setToken] = useState(null);
+  // Başlangıç değerini localStorage'dan okuyoruz (lazy initializer - fonksiyon sadece
+  // ilk render'da çalışır). Sayfa yenilendiğinde token hafızadan uçmasın diye.
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+
+  function handleLoginSuccess(newToken) {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    setToken(null);
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -34,10 +46,10 @@ function App() {
   }, [token]);
 
   if (!token) {
-    return <Login onLoginSuccess={setToken} />;
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  return <WikiBoard token={token} onLogout={() => setToken(null)} />;
+  return <WikiBoard token={token} onLogout={handleLogout} />;
 }
 
 export default App;
