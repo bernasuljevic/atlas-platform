@@ -9,6 +9,10 @@ obj/
 .idea/
 *.DotSettings.user
 
+## Node / npm workspaces
+node_modules/
+dist/
+
 ## OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,8 @@
+{
+  "name": "atlas-web-workspace",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
