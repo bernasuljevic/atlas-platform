@@ -1,5 +1,6 @@
 using Atlas.Api.ExceptionHandling;
 using Atlas.Modules.Auth.Api;
+using Atlas.Modules.Notifications.Api;
 using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
 
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthModule(builder.Configuration);
 builder.Services.AddWikiModule(builder.Configuration);
 builder.Services.AddCaching(builder.Configuration);
+builder.Services.AddNotificationsModule();
 
 // CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)
 // istek atabilmesi için tarayıcıya "bu adrese izin var" demeliyiz - yoksa tarayıcı
@@ -58,6 +60,7 @@ app.MigrateWikiDatabase();
 // ============================================================
 app.MapAuthEndpoints();
 app.MapWikiEndpoints();
+app.MapNotificationsEndpoints();
 
 // Basit bir sağlık kontrolü - "API gerçekten ayakta mı?" sorusuna cevap
 app.MapGet("/", () => Results.Ok(new

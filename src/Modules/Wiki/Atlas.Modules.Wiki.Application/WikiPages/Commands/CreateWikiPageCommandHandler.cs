@@ -10,14 +10,19 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
 {
     private readonly IWikiPageRepository _wikiPageRepository;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IPublisher _publisher;
 
     // ICurrentUserAccessor, Wiki.Application'ın Shared.Contracts'tan tanıdığı bir
     // interface. Gerçek implementasyonu KİM sağlıyor? Wiki'nin haberi yok, umurunda değil.
     // (Bugün Auth.Infrastructure sağlayacak - ama bu handler bunu asla bilmeyecek.)
-    public CreateWikiPageCommandHandler(IWikiPageRepository wikiPageRepository, ICurrentUserAccessor currentUser)
+    public CreateWikiPageCommandHandler(
+        IWikiPageRepository wikiPageRepository,
+        ICurrentUserAccessor currentUser,
+        IPublisher publisher)
     {
         _wikiPageRepository = wikiPageRepository;
         _currentUser = currentUser;
+        _publisher = publisher;
     }
 
     public async Task<Guid> Handle(CreateWikiPageCommand request, CancellationToken cancellationToken)
@@ -32,6 +37,11 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
             visibility, _currentUser.UserId.Value);
 
         await _wikiPageRepository.AddAsync(page, cancellationToken);
+
+        // Sayfa kaydedildikten SONRA event'i yayınlıyoruz - "olan bitmiş bir şeyi"
+        // duyuruyoruz. Wiki, bunu kimin dinlediğini bilmiyor (şu an Notifications
+        // dinleyecek, yarın AI modülü de dinleyebilir - Wiki'de hiçbir şey değişmez).
+        await _publisher.Publish(new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName), cancellationToken);
 
         return page.Id;
     }

@@ -1,6 +1,6 @@
 // API'nin adresi tek bir yerde tanımlı - ileride değişirse (örn. gerçek bir sunucuya
 // taşındığında) sadece burayı değiştireceğiz, kod içinde arama yapmayacağız.
-const API_URL = "http://localhost:5080";
+const API_URL = "http://localhost:5000";
 
 export async function login(email, password) {
   const response = await fetch(`${API_URL}/api/auth/login`, {
