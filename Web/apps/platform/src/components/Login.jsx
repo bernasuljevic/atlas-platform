@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { login } from "../api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState("admin2@atlas.local");
@@ -27,36 +31,49 @@ function Login({ onLoginSuccess }) {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: "80px auto", textAlign: "center" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 24 }}>Atlas Platform</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 12 }}>
-          <label>Email</label>
-          <br />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <label>Şifre</label>
-          <br />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            style={{ width: "100%", padding: 8 }}
-          />
-        </div>
-        {error && <p style={{ color: "red" }}>{error}</p>}
-        <button type="submit" disabled={isLoading} style={{ width: "100%", padding: 10 }}>
-          {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
-        </button>
-      </form>
+    <div style={{ maxWidth: 360, margin: "80px auto" }}>
+      {/* shadcn'in varsayılan nötr Card/Button renkleri yerine sitenin kendi
+          CSS değişkenlerini (--bg, --border, --text, --accent) kullanıyoruz -
+          böylece kart, sitenin mor/koyu temasıyla aynı hissi veriyor. */}
+      <Card className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)]">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl" style={{ color: "var(--text-h)" }}>
+            Atlas Platform
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-email">Email</Label>
+              <Input
+                id="login-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="login-password">Şifre</Label>
+              <Input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            {error && <p style={{ color: "red" }}>{error}</p>}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
+            >
+              {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
