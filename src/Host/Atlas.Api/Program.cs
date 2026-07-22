@@ -1,6 +1,7 @@
 using Atlas.Api.ExceptionHandling;
 using Atlas.Modules.Auth.Api;
 using Atlas.Modules.Wiki.Api;
+using Atlas.Shared.Caching;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ============================================================
 builder.Services.AddAuthModule(builder.Configuration);
 builder.Services.AddWikiModule(builder.Configuration);
+builder.Services.AddCaching(builder.Configuration);
 
 // CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)
 // istek atabilmesi için tarayıcıya "bu adrese izin var" demeliyiz - yoksa tarayıcı

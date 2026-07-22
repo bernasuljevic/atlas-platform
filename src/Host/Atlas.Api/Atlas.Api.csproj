@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Modules\Auth\Atlas.Modules.Auth.Api\Atlas.Modules.Auth.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Wiki\Atlas.Modules.Wiki.Api\Atlas.Modules.Wiki.Api.csproj" />
+    <ProjectReference Include="..\..\Shared\Atlas.Shared.Caching\Atlas.Shared.Caching.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">

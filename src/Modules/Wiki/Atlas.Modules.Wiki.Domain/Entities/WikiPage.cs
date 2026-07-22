@@ -41,16 +41,12 @@ public class WikiPage : Entity<Guid>
     }
 
     /// <summary>
-    /// Yetkilendirme kuralının kalbi - "bu sayfayı şu departmandaki biri görebilir mi?"
-    /// sorusunun cevabı burada, TEK YERDE yaşıyor. Yarın kural değişirse (örn. "yöneticiler
-    /// her departmanı görebilir") sadece bu metodu değiştiririz, her yerde arama yapmayız.
+    /// Yetkilendirme kuralının kalbi - artık gerçek mantık WikiVisibilityRules'ta yaşıyor
+    /// (hem bu Domain nesnesi hem de Application katmanındaki DTO aynı kuralı kullanabilsin
+    /// diye). Bu metod sadece o paylaşılan kurala ince bir sarmalayıcı (wrapper).
     /// </summary>
     public bool IsVisibleTo(string? viewerDepartmentName)
     {
-        if (Visibility == WikiVisibility.Public)
-            return true;
-
-        return !string.IsNullOrWhiteSpace(viewerDepartmentName)
-            && string.Equals(DepartmentName, viewerDepartmentName, StringComparison.OrdinalIgnoreCase);
+        return WikiVisibilityRules.IsVisibleTo(Visibility, DepartmentName, viewerDepartmentName);
     }
 }
