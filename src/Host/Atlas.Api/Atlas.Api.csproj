@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Atlas.Api</RootNamespace>
+    <UserSecretsId>d6b72e27-8d0f-4835-b1fb-0a9274e2b2c0</UserSecretsId>
   </PropertyGroup>
 
   <!-- DİKKAT: Host sadece Auth.Api'ye referans veriyor, Auth.Domain'e ya da
