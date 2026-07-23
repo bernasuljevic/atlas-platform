@@ -1,5 +1,28 @@
 import { useState, useEffect } from "react";
 import { getWikiPages, createWikiPage } from "../api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 function WikiBoard({ token, onLogout }) {
   const [pages, setPages] = useState([]);
@@ -10,6 +33,7 @@ function WikiBoard({ token, onLogout }) {
   const [error, setError] = useState(null);
   const [isLoadingPages, setIsLoadingPages] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     loadPages();
@@ -48,6 +72,7 @@ function WikiBoard({ token, onLogout }) {
 
       setTitle("");
       setContent("");
+      setIsDialogOpen(false);
       await loadPages();
     } catch (err) {
       setError(err.message.includes("giriş") ? err.message : "Sayfa oluşturulamadı: " + err.message);
@@ -57,86 +82,127 @@ function WikiBoard({ token, onLogout }) {
   }
 
   return (
-    <div style={{ maxWidth: 600, margin: "40px auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Atlas Wiki</h1>
-        <button onClick={onLogout} style={{ height: 36 }}>
-          Çıkış Yap
-        </button>
+    <div style={{ maxWidth: 800, margin: "40px auto" }} className="px-4">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-medium" style={{ color: "var(--text-h)" }}>
+          Atlas Wiki
+        </h1>
+        <div className="flex gap-2">
+          {/* Eskiden form her zaman sayfada açık duruyordu - artık bir Dialog
+              içinde, sadece "Yeni Sayfa" butonuna basılınca açılıyor. */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger
+              render={<Button className="bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90" />}
+            >
+              Yeni Sayfa
+            </DialogTrigger>
+            <DialogContent className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle style={{ color: "var(--text-h)" }}>Yeni Sayfa</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="wiki-title">Başlık</Label>
+                  <Input
+                    id="wiki-title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    disabled={isCreating}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="wiki-content">İçerik</Label>
+                  <Textarea
+                    id="wiki-content"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    disabled={isCreating}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="wiki-department">Departman</Label>
+                  <Input
+                    id="wiki-department"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    disabled={isCreating}
+                  />
+                </div>
+
+                {/* "Public"/"DepartmentOnly" string'leri backend'in beklediği
+                    değerlerle BİREBİR aynı olmalı - Enum.Parse<WikiVisibility> bunu bekliyor. */}
+                <div className="flex flex-col gap-1.5">
+                  <Label>Görünürlük</Label>
+                  <RadioGroup value={visibility} onValueChange={setVisibility} className="flex flex-row gap-4">
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="Public" id="visibility-public" disabled={isCreating} />
+                      <Label htmlFor="visibility-public">Herkese Açık</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="DepartmentOnly" id="visibility-department" disabled={isCreating} />
+                      <Label htmlFor="visibility-department">Sadece Departman</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {error && <p style={{ color: "red" }} className="text-sm">{error}</p>}
+
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    disabled={isCreating}
+                    className="bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
+                  >
+                    {isCreating ? "Ekleniyor..." : "Ekle"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" onClick={onLogout}>
+            Çıkış Yap
+          </Button>
+        </div>
       </div>
 
-      <form onSubmit={handleCreate} style={{ marginBottom: 32, border: "1px solid #ccc", padding: 16 }}>
-        <h3>Yeni Sayfa</h3>
-        <input
-          placeholder="Başlık"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          disabled={isCreating}
-          style={{ width: "100%", padding: 8, marginBottom: 8 }}
-        />
-        <textarea
-          placeholder="İçerik"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          disabled={isCreating}
-          style={{ width: "100%", padding: 8, marginBottom: 8, minHeight: 80 }}
-        />
-        <input
-          placeholder="Departman"
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          disabled={isCreating}
-          style={{ width: "100%", padding: 8, marginBottom: 8 }}
-        />
-
-        {/* Görünürlük seçimi - backend'deki WikiVisibility enum'ının React karşılığı.
-            "Public" ve "DepartmentOnly" string'leri backend'in beklediği değerlerle
-            BİREBİR aynı olmalı - Enum.Parse<WikiVisibility> bunu bekliyor. */}
-        <div style={{ marginBottom: 8 }}>
-          <label style={{ marginRight: 16 }}>
-            <input
-              type="radio"
-              name="visibility"
-              value="Public"
-              checked={visibility === "Public"}
-              onChange={(e) => setVisibility(e.target.value)}
-              disabled={isCreating}
-            />{" "}
-            Herkese Açık
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="visibility"
-              value="DepartmentOnly"
-              checked={visibility === "DepartmentOnly"}
-              onChange={(e) => setVisibility(e.target.value)}
-              disabled={isCreating}
-            />{" "}
-            Sadece Departman
-          </label>
-        </div>
-
-        {error && <p style={{ color: "red" }}>{error}</p>}
-        <button type="submit" disabled={isCreating}>
-          {isCreating ? "Ekleniyor..." : "Ekle"}
-        </button>
-      </form>
-
-      <h3 style={{ margin: "0 0 8px" }}>Sayfalar</h3>
-
-      {isLoadingPages ? (
-        <p>Yükleniyor...</p>
-      ) : pages.length === 0 ? (
-        <p>Görebileceğin bir sayfa yok.</p>
-      ) : (
-        pages.map((p) => (
-          <div key={p.id} style={{ borderBottom: "1px solid #eee", padding: "12px 0" }}>
-            <strong>{p.title}</strong> <em>({p.departmentName}, {p.visibility})</em>
-            <p>{p.content}</p>
-          </div>
-        ))
-      )}
+      <Card className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)]">
+        <CardContent>
+          {isLoadingPages ? (
+            <p>Yükleniyor...</p>
+          ) : pages.length === 0 ? (
+            <p>Görebileceğin bir sayfa yok.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Başlık</TableHead>
+                  <TableHead>Departman</TableHead>
+                  <TableHead>Görünürlük</TableHead>
+                  <TableHead>İçerik</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pages.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.title}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{p.departmentName}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {p.visibility === "Public" ? (
+                        <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">Herkese Açık</Badge>
+                      ) : (
+                        <Badge variant="outline">Sadece Departman</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-xs whitespace-normal">{p.content}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
