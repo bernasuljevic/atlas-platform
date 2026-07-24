@@ -24,8 +24,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+const PAGE_SIZE = 5;
+
 function WikiBoard({ token, onLogout }) {
   const [pages, setPages] = useState([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [department, setDepartment] = useState("IT");
@@ -36,11 +40,11 @@ function WikiBoard({ token, onLogout }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
-    loadPages();
+    loadPages(pageNumber);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pageNumber]);
 
-  async function loadPages() {
+  async function loadPages(targetPageNumber) {
     setIsLoadingPages(true);
     try {
       // Departman filtresi artık burada seçilebilir bir şey değil - backend,
@@ -48,8 +52,9 @@ function WikiBoard({ token, onLogout }) {
       // (bkz. GetWikiPagesQueryHandler). Önceden serbest metin olarak
       // gönderilebiliyordu, bu da başka departmanların içeriğini tahmin ederek
       // görebilmeyi mümkün kılan bir güvenlik açığıydı.
-      const data = await getWikiPages(token);
-      setPages(data);
+      const result = await getWikiPages(token, targetPageNumber, PAGE_SIZE);
+      setPages(result.items);
+      setTotalPages(Math.max(1, result.totalPages));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -73,7 +78,15 @@ function WikiBoard({ token, onLogout }) {
       setTitle("");
       setContent("");
       setIsDialogOpen(false);
-      await loadPages();
+
+      // Yeni sayfa en yeni olarak 1. sayfada görünecek (backend CreatedAtUtc'ye
+      // göre azalan sırada döndürüyor) - zaten 1. sayfadaysak yeniden yükle,
+      // değilsek 1. sayfaya dön (bu da kendiliğinden yeniden yükletir, bkz. useEffect).
+      if (pageNumber === 1) {
+        await loadPages(1);
+      } else {
+        setPageNumber(1);
+      }
     } catch (err) {
       setError(err.message.includes("giriş") ? err.message : "Sayfa oluşturulamadı: " + err.message);
     } finally {
@@ -200,6 +213,28 @@ function WikiBoard({ token, onLogout }) {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {!isLoadingPages && pages.length > 0 && (
+            <div className="mt-4 flex items-center justify-between">
+              <Button
+                variant="outline"
+                disabled={pageNumber <= 1 || isLoadingPages}
+                onClick={() => setPageNumber((p) => p - 1)}
+              >
+                ← Önceki
+              </Button>
+              <span className="text-sm" style={{ color: "var(--text)" }}>
+                Sayfa {pageNumber} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                disabled={pageNumber >= totalPages || isLoadingPages}
+                onClick={() => setPageNumber((p) => p + 1)}
+              >
+                Sonraki →
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

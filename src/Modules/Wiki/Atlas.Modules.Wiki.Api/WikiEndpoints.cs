@@ -16,10 +16,11 @@ public static class WikiEndpoints
         // GÜVENLİK: Artık bir "?department=" query parametresi YOK - hangi departmanın
         // DepartmentOnly sayfalarının görüneceği, çağıranın JWT'sindeki imzalı
         // "department" claim'inden belirleniyor (bkz. GetWikiPagesQuery.cs'teki not).
-        group.MapGet("/pages", async (IMediator mediator) =>
+        // ?pageNumber=1&pageSize=10 (ikisi de opsiyonel, varsayılanlar bunlar).
+        group.MapGet("/pages", async (IMediator mediator, int pageNumber = 1, int pageSize = 10) =>
         {
-            var pages = await mediator.Send(new GetWikiPagesQuery());
-            return Results.Ok(pages);
+            var result = await mediator.Send(new GetWikiPagesQuery(pageNumber, pageSize));
+            return Results.Ok(result);
         })
         .WithName("GetWikiPages");
 

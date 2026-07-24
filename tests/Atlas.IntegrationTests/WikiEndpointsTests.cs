@@ -59,8 +59,9 @@ public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
         var listResponse = await _client.GetAsync("/api/wiki/pages");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
-        var pages = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var found = pages.EnumerateArray().Any(p => p.GetProperty("title").GetString() == title);
+        // GET /api/wiki/pages artık sayfalanmış bir sonuç dönüyor: {items, pageNumber, pageSize, totalCount}.
+        var result = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var found = result.GetProperty("items").EnumerateArray().Any(p => p.GetProperty("title").GetString() == title);
 
         Assert.True(found, $"'{title}' başlıklı sayfa listede bulunamadı.");
     }

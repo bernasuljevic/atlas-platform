@@ -22,9 +22,15 @@ export async function login(email, password) {
 // yüzden token'ı buraya da göndermemiz gerekiyor (önceden hiç göndermiyorduk -
 // bu da düzeltmeden önce bile department-bazlı görünürlüğün React tarafında
 // hiç gerçek anlamda çalışmadığı, sadece elle test edilebildiği anlamına geliyordu).
-export async function getWikiPages(accessToken) {
+// Backend artık sayfalanmış bir sonuç dönüyor: {items, pageNumber, pageSize,
+// totalCount, totalPages}. pageNumber/pageSize opsiyonel - verilmezse backend
+// varsayılan olarak 1/10 kullanıyor.
+export async function getWikiPages(accessToken, pageNumber = 1, pageSize = 10) {
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-  const response = await fetch(`${API_URL}/api/wiki/pages`, { headers });
+  const response = await fetch(
+    `${API_URL}/api/wiki/pages?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+    { headers }
+  );
 
   if (!response.ok) {
     throw new Error("Wiki sayfaları yüklenemedi");
