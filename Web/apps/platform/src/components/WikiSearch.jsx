@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { searchWikiPages } from "../api";
+import { searchWikiPages, getWikiPageById } from "../api";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
 import { Badge } from "@atlas/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@atlas/ui/dialog";
 
 // Ayrı bir component olarak açıldı - WikiBoard.jsx zaten liste/oluşturma/silme/
 // detay dialogu ile 350 satıra yaklaşmıştı, arama özelliğini oraya eklemek
@@ -13,6 +14,12 @@ function WikiSearch({ token }) {
   const [results, setResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState(null);
+
+  // Arama sonucu sadece bir chunk (kısa parça) içeriyor - tıklanınca tam
+  // sayfayı GET /api/wiki/pages/{id} ile ayrıca çekiyoruz (bkz. api.js).
+  const [selectedPage, setSelectedPage] = useState(null);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -28,6 +35,19 @@ function WikiSearch({ token }) {
       setResults(null);
     } finally {
       setIsSearching(false);
+    }
+  }
+
+  async function handleResultClick(wikiPageId) {
+    setPageError(null);
+    setIsLoadingPage(true);
+    try {
+      const page = await getWikiPageById(token, wikiPageId);
+      setSelectedPage(page);
+    } catch (err) {
+      setPageError(err.message);
+    } finally {
+      setIsLoadingPage(false);
     }
   }
 
@@ -52,6 +72,7 @@ function WikiSearch({ token }) {
         </form>
 
         {error && <p style={{ color: "red" }} className="mt-3 text-sm">{error}</p>}
+        {pageError && <p style={{ color: "red" }} className="mt-3 text-sm">{pageError}</p>}
 
         {results && (
           <div className="mt-4 flex flex-col gap-2">
@@ -63,7 +84,8 @@ function WikiSearch({ token }) {
               results.map((r) => (
                 <div
                   key={r.wikiPageId}
-                  className="rounded-lg border border-[var(--border)] p-3"
+                  onClick={() => handleResultClick(r.wikiPageId)}
+                  className="cursor-pointer rounded-lg border border-[var(--border)] p-3 hover:bg-[var(--brand-accent)]/10"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="font-medium">{r.title}</span>
@@ -85,6 +107,37 @@ function WikiSearch({ token }) {
           </div>
         )}
       </CardContent>
+
+      {/* WikiBoard'daki sayfa detay Dialog'uyla aynı desen - Trigger'sız,
+          kontrollü open state'i. isLoadingPage true iken de dialog açık
+          tutuluyor ki kullanıcı "bir şey oluyor" hissi alsın. */}
+      <Dialog
+        open={selectedPage !== null || isLoadingPage}
+        onOpenChange={(open) => !open && setSelectedPage(null)}
+      >
+        <DialogContent className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)] sm:max-w-lg">
+          {isLoadingPage ? (
+            <p className="text-sm">Yükleniyor...</p>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle style={{ color: "var(--text-h)" }}>{selectedPage?.title}</DialogTitle>
+                <div className="flex gap-2">
+                  <Badge variant="outline">{selectedPage?.departmentName}</Badge>
+                  {selectedPage?.visibility === "Public" ? (
+                    <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">Herkese Açık</Badge>
+                  ) : (
+                    <Badge variant="outline">Sadece Departman</Badge>
+                  )}
+                </div>
+              </DialogHeader>
+              <p className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm">
+                {selectedPage?.content}
+              </p>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

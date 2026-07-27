@@ -89,6 +89,20 @@ async function refreshAccessToken() {
   return tokens.accessToken;
 }
 
+export async function getWikiPageById(accessToken, pageId) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/wiki/pages/${pageId}`, { headers });
+
+  if (response.status === 404) {
+    throw new Error("Bu sayfa artık mevcut değil ya da görme yetkin yok.");
+  }
+  if (!response.ok) {
+    throw new Error("Sayfa yüklenemedi");
+  }
+
+  return response.json();
+}
+
 export async function searchWikiPages(accessToken, queryText, topN = 5) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/ai/search?q=${encodeURIComponent(queryText)}&topN=${topN}`, {

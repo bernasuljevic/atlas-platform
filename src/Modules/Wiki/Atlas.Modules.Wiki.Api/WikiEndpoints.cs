@@ -24,6 +24,15 @@ public static class WikiEndpoints
         })
         .WithName("GetWikiPages");
 
+        // Arama sonucundaki bir chunk'a tıklanınca tam sayfayı göstermek için -
+        // aynı görünürlük kuralı burada da uygulanıyor (bkz. GetWikiPageByIdQueryHandler).
+        group.MapGet("/pages/{id:guid}", async (Guid id, IMediator mediator) =>
+        {
+            var page = await mediator.Send(new GetWikiPageByIdQuery(id));
+            return page is null ? Results.NotFound() : Results.Ok(page);
+        })
+        .WithName("GetWikiPageById");
+
         group.MapPost("/pages", async (CreateWikiPageCommand command, IMediator mediator) =>
         {
             var newPageId = await mediator.Send(command);
