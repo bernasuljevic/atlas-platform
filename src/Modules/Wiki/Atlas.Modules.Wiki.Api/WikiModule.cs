@@ -2,6 +2,7 @@ using Atlas.Modules.Wiki.Application.Abstractions;
 using Atlas.Modules.Wiki.Application.WikiPages.Queries;
 using Atlas.Modules.Wiki.Infrastructure.Persistence;
 using Atlas.Shared.CQRS.Behaviors;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,7 +27,10 @@ public static class WikiModule
         {
             cfg.RegisterServicesFromAssemblyContaining<GetWikiPagesQuery>();
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
+
+        services.AddValidatorsFromAssemblyContaining<GetWikiPagesQuery>();
 
         return services;
     }

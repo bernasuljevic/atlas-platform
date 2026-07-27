@@ -5,6 +5,7 @@ using Atlas.Modules.Auth.Infrastructure.CurrentUser;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
 using Atlas.Modules.Auth.Infrastructure.Security;
 using Atlas.Shared.Contracts;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Atlas.Shared.CQRS.Behaviors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -81,7 +82,16 @@ services.AddAuthorization();
 
             // Her Command/Query bu davranıştan geçsin - loglama burada devreye giriyor.
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+
+            // ValidationBehavior, LoggingBehavior'dan SONRA eklendi - MediatR pipeline'ı
+            // kayıt sırasına göre iç içe geçiyor, yani loglama her zaman en dışta kalıyor
+            // (geçersiz bir istek bile loglanmış olsun isteriz).
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
         });
+
+        // FluentValidation'a "RegisterUserCommandValidator gibi validator'ları bu
+        // assembly içinde ara" diyoruz - MediatR handler taramasıyla aynı mantık.
+        services.AddValidatorsFromAssemblyContaining<GetAllUsersQuery>();
 
         return services;
     }

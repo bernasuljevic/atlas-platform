@@ -194,10 +194,20 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
 - [x] shadcn bileşenleri Web/packages/ui'ye taşındı, @atlas/ui paketi olarak
       gerçekten paylaşılabilir hale geldi (bkz. Öğrenilen dersler #11 -
       shadcn CLI'nin bu monorepo yapısındaki sınırlaması)
+- [x] CQRS pipeline'ına `ValidationBehavior` (FluentValidation) eklendi:
+      `RegisterUserCommandValidator`, `LoginCommandValidator`,
+      `CreateWikiPageCommandValidator`. `GlobalExceptionHandler` artık
+      `FluentValidation.ValidationException`'ı ayrı yakalayıp alan bazlı
+      `ValidationProblemDetails` (`errors: {alan: [mesajlar]}`) dönüyor -
+      Domain'in `ArgumentException` fırlatan son-hat validasyonu hâlâ duruyor,
+      bu behavior sadece isteği Handler'a ulaşmadan, daha temiz bir hata
+      mesajıyla erken kesiyor.
 
 ## Sırada ne var
 
 1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
+2. `GetWikiPagesQuery`'nin manuel Redis cache kodunu genel bir `CachingBehavior`'a çevirme
+3. Notifications modülünün SignalR Hub'ına Redis backplane ekleme (çoklu instance desteği)
 
 ## Endpoint referansı
 

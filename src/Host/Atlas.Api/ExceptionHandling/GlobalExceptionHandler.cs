@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,33 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
+        _logger.LogError(exception, "İşlenmeyen hata yakalandı: {Message}", exception.Message);
+
+        // FluentValidation'ın ValidationBehavior'dan fırlattığı hata, diğerlerinden
+        // farklı: alan bazlı birden fazla hata taşıyor, tek bir "Detail" string'ine
+        // sığmıyor. Bu yüzden ayrı bir dal - ValidationProblemDetails, "errors" adında
+        // { alanAdı: [mesajlar] } şeklinde bir sözlük üretir (React tarafı alan
+        // bazlı gösterebilsin diye).
+        if (exception is ValidationException validationException)
+        {
+            httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+
+            var errors = validationException.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+            return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                Exception = exception,
+                ProblemDetails = new ValidationProblemDetails(errors)
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Geçersiz istek"
+                }
+            });
+        }
+
         // Domain katmanı kural ihlallerini ArgumentException ile fırlatıyor (bkz. WikiPage.Create).
         // Bu yüzden burada "beklenen" bir hata sayılıp 400 dönüyor; geri kalan her şey
         // (beklenmeyen hatalar - null reference, DB koptu vb.) 500 sayılıyor.
@@ -28,8 +56,6 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             ArgumentException => (StatusCodes.Status400BadRequest, "Geçersiz istek"),
             _ => (StatusCodes.Status500InternalServerError, "Beklenmeyen bir hata oluştu")
         };
-
-        _logger.LogError(exception, "İşlenmeyen hata yakalandı: {Message}", exception.Message);
 
         httpContext.Response.StatusCode = statusCode;
 
