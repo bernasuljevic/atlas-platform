@@ -198,6 +198,27 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     "istemciden gelen bir alana güvenme" kuralını bir CRUD kaynağının SADECE
     GET'inde uygulayıp POST/PUT/DELETE'inde unutmak kolay - ikisi de aynı
     şekilde denetlenmeli.
+14. **Gerçek bir veritabanına karşı "yer tutucu" (placeholder) bir SQL sorgusu
+    ÇALIŞTIRILMAMALI - önce tam sorgu yazılıp öyle çalıştırılmalı:**
+    Yetim embedding'leri temizlerken yazılan bir ara adım sorgusundaki
+    `WHERE NOT EXISTS (... WHERE FALSE)` koşulu her satır için her zaman true
+    çıkıyordu - bu, hedeflenen ~36 yetimin yanında hâlâ geçerli olan tüm
+    embedding'leri de sildi (2026-07-27, canlı yaşandı). Kurtarma
+    `ReindexWikiPagesCommand` eklenerek yapıldı. Genel ders: "şimdilik
+    böyle bırakayım, sonra düzeltirim" diye ara bir sorguyu gerçek veriye
+    karşı çalıştırmak yerine, DELETE gibi geri alınamaz bir işlemden önce
+    her zaman önce bir SELECT ile etkilenecek satırları görmeli.
+15. **Sıfır büyüklüklü (zero-magnitude) bir vektör, cosine distance'ta NaN
+    üretir ve JSON serileştirmesini çökertir:** `FakeEmbeddingService.Normalize()`
+    hiç kelime içermeyen bir chunk için (örn. sadece "????????") 0'a bölmeyi
+    önlemek amacıyla normalize ETMEDEN sıfır vektör döndürüyordu (kendi
+    içinde güvenli) - ama bu sıfır vektör pgvector'ın `<=>` operatörüyle
+    karşılaştırılınca NaN üretiyor, `System.Text.Json` NaN'ı yazamayıp TÜM
+    isteği çökertiyordu (2026-07-27, canlı doğrulandı, küçük veri setlerinde
+    tetiklendi - büyük bir tabloda bu satır genelde TopN dışında kalıp fark
+    edilmiyordu). Genel ders: bir embedding/vektör pipeline'ında "anlamsız
+    girdi" (boş, sadece noktalama) durumunu HER ZAMAN düşün - normalize
+    etmemek yetmez, o veriyi hiç kaydetmemek gerekir.
 
 ## Şu ana kadar tamamlananlar
 
@@ -395,6 +416,34 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
       Arama sonucu her satır başlık/departman/skor (yüzde, cosine mesafesinden
       çevrilmiş) + chunk metnini gösteriyor. Tarayıcıda canlı doğrulandı.
 
+- [x] **Arama sonucuna tıklanınca tam sayfa açılıyor:** `GET /api/wiki/pages/{id}`
+      eklendi (aynı görünürlük kuralı burada da uygulanıyor - Id'yi bilmek
+      görebilmek anlamına gelmiyor). `WikiSearch.jsx`'teki her sonuç artık
+      WikiBoard'daki detay dialoguyla aynı desende tıklanınca açılıyor.
+
+- [x] **Silinen sayfanın embedding'i de temizleniyor (hayalet arama sonucu
+      bug'ı):** `WikiPageDeletedEvent` eklendi (WikiPageCreatedEvent'in silme
+      tarafındaki karşılığı) - AI artık bir sayfa silinince kendi
+      embedding'lerini de temizliyor. Bunsuz, silinen bir sayfa arama
+      sonuçlarında sonsuza kadar "hayalet" olarak çıkmaya devam ediyordu
+      (canlı doğrulandı).
+
+- [x] **Sıfır-vektör NaN çökmesi + admin reindex aracı:** İçeriği sadece
+      noktalama işaretlerinden oluşan bir chunk (örn. "????????") sıfır vektör
+      üretiyordu, bu da pgvector'ın cosine distance hesabında NaN'a yol açıp
+      TÜM arama isteğini çökertiyordu (canlı doğrulandı, küçük veri setlerinde
+      tetiklendi). Kaynağında (anlamsız chunk artık kaydedilmiyor) VE savunma
+      amaçlı (NaN/Infinity sonuçlar filtreleniyor) düzeltildi.
+      `POST /api/wiki/reindex` (Admin) eklendi - var olan tüm sayfalar için
+      embedding'leri yeniden üretiyor.
+
+- [x] **Integration testler artık kendi ürettikleri AI verisini temizliyor:**
+      `AtlasApiFactory`'nin AI'ın Postgres'ini InMemory'e çevirmemesi (bilinçli
+      tasarım - gerçek ingestion'ı test edebilmek için), her test çalıştırmasının
+      geride kalıcı "yetim" embedding bırakmasına yol açıyordu (36+ birikmişti,
+      canlı doğrulandı). Testler artık oluşturdukları sayfaların id'lerini
+      try/finally ile takip edip sadece kendi verilerini temizliyor.
+
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
 - `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
@@ -439,6 +488,10 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
   zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
 - `DELETE /api/wiki/pages/{id}` → token gerektirir. Admin HER sayfayı, normal
   kullanıcı SADECE kendi oluşturduğunu silebilir (aksi halde 403).
+- `POST /api/wiki/reindex` → sadece Admin rolü. Var olan TÜM sayfalar için
+  AI'ın embedding'lerini yeniden üretir (`WikiPageCreatedEvent`'i toplu
+  yeniden yayınlayarak) - bir bakım hatası ya da embedding sağlayıcısı
+  değişikliği sonrası kullanılacak bir admin aracı.
 - `GET /api/ai/search?q=...&topN=5` (topN opsiyonel, varsayılan 5) → token
   gerektirir, sonuçlar departman görünürlük kuralına göre filtrelenir (Admin bypass eder).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
