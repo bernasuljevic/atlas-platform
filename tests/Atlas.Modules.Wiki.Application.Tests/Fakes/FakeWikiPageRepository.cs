@@ -10,9 +10,18 @@ public class FakeWikiPageRepository : IWikiPageRepository
     public Task<IReadOnlyList<WikiPage>> GetAllAsync(CancellationToken ct = default)
         => Task.FromResult((IReadOnlyList<WikiPage>)AddedPages);
 
+    public Task<WikiPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult(AddedPages.FirstOrDefault(p => p.Id == id));
+
     public Task AddAsync(WikiPage page, CancellationToken ct = default)
     {
         AddedPages.Add(page);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(WikiPage page, CancellationToken ct = default)
+    {
+        AddedPages.Remove(page);
         return Task.CompletedTask;
     }
 }

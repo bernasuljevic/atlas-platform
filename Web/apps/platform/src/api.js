@@ -89,6 +89,31 @@ async function refreshAccessToken() {
   return tokens.accessToken;
 }
 
+export async function deleteWikiPage(accessToken, pageId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  // createWikiPage'deki AYNI 401 -> refresh -> tekrar dene deseni.
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu sayfayı silme yetkin yok.");
+    }
+    throw new Error("Sayfa silinemedi");
+  }
+}
+
 export async function createWikiPage(accessToken, page) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pages`, {

@@ -32,6 +32,17 @@ public static class WikiEndpoints
         .WithName("CreateWikiPage")
         .RequireAuthorization();
 
+        // Yetki kuralı istemciden gelmiyor - Handler, Admin mi yoksa sayfanın
+        // sahibi mi diye ICurrentUserAccessor üzerinden kendisi karar veriyor
+        // (bkz. DeleteWikiPageCommandHandler).
+        group.MapDelete("/pages/{id:guid}", async (Guid id, IMediator mediator) =>
+        {
+            await mediator.Send(new DeleteWikiPageCommand(id));
+            return Results.NoContent();
+        })
+        .WithName("DeleteWikiPage")
+        .RequireAuthorization();
+
         return app;
     }
 }

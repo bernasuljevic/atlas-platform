@@ -13,8 +13,15 @@ public class CreateWikiPageCommandValidator : AbstractValidator<CreateWikiPageCo
         RuleFor(x => x.Content)
             .NotEmpty().WithMessage("İçerik boş olamaz.");
 
-        RuleFor(x => x.DepartmentName)
-            .NotEmpty().WithMessage("Departman adı boş olamaz.");
+        // DepartmentName için ARTIK bir kural YOK - normal bir kullanıcı için bu
+        // alanın istemciden gelen değeri zaten Handler tarafından tamamen yok
+        // sayılıyor (departman her zaman JWT'den geliyor, bkz.
+        // CreateWikiPageCommandHandler). Burada NotEmpty şart koşsaydık,
+        // departmanı Handler'da otomatik atanacak normal bir kullanıcının boş
+        // gönderdiği (ki göndermesi GEREKEN) istek, Handler'a hiç ulaşmadan bu
+        // validasyona takılırdı. Departmanın GERÇEKTEN boş olma durumu (departmansız
+        // bir kullanıcı) zaten Handler'da kendi anlaşılır hatasıyla (ArgumentException)
+        // ele alınıyor - burada tekrar kontrol etmeye gerek yok.
 
         // Domain'deki Enum.Parse çağrısı geçersiz bir değerde exception fırlatıp
         // 400 yerine yanlışlıkla 500'e düşebilirdi - burada erken, alan bazlı bir

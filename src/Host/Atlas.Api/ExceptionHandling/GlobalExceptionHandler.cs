@@ -54,6 +54,10 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         var (statusCode, title) = exception switch
         {
             ArgumentException => (StatusCodes.Status400BadRequest, "Geçersiz istek"),
+            // Yetki kuralı ihlalleri (örn. başkasının wiki sayfasını silmeye çalışmak) -
+            // bir "kötü istek" değil, "kimliğin doğru ama bu işlemi yapamazsın" anlamına
+            // geliyor, bu yüzden 400 değil 403 dönüyor.
+            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Bu işlem için yetkiniz yok"),
             _ => (StatusCodes.Status500InternalServerError, "Beklenmeyen bir hata oluştu")
         };
 

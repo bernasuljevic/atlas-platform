@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
-import { getWikiPages, createWikiPage } from "../api";
+import { useState, useEffect, useMemo } from "react";
+import { getWikiPages, createWikiPage, deleteWikiPage } from "../api";
+import { getUserInfoFromToken } from "../jwt";
+import { DEPARTMENTS } from "../departments";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
@@ -36,18 +38,27 @@ function truncateContent(text) {
 }
 
 function WikiBoard({ token, onLogout }) {
+  // JWT'yi sadece UI kararları için okuyoruz (buton/alan göster-gizle) - gerçek
+  // yetkilendirme her zaman backend'de (bkz. CreateWikiPageCommandHandler,
+  // DeleteWikiPageCommandHandler). Token değişirse (refresh sonrası) yeniden hesaplanır.
+  const { userId, department: ownDepartment, isAdmin } = useMemo(() => getUserInfoFromToken(token), [token]);
+
   const [pages, setPages] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [department, setDepartment] = useState("IT");
+  // Admin herhangi bir departmanı seçebiliyor (varsayılan ilk departman);
+  // normal kullanıcı için bu değerin önemi yok - backend zaten kendi
+  // departmanını zorluyor, formda sadece bilgilendirme metni gösteriyoruz.
+  const [department, setDepartment] = useState(isAdmin ? DEPARTMENTS[0].value : "");
   const [visibility, setVisibility] = useState("Public");
   const [error, setError] = useState(null);
   const [isLoadingPages, setIsLoadingPages] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPage, setSelectedPage] = useState(null);
+  const [deletingPageId, setDeletingPageId] = useState(null);
 
   useEffect(() => {
     loadPages(pageNumber);
@@ -104,6 +115,23 @@ function WikiBoard({ token, onLogout }) {
     }
   }
 
+  async function handleDelete(pageId, e) {
+    // Satırın kendi onClick'i (detay dialogunu açan) tetiklenmesin.
+    e.stopPropagation();
+
+    if (!window.confirm("Bu sayfayı silmek istediğine emin misin?")) return;
+
+    setDeletingPageId(pageId);
+    try {
+      await deleteWikiPage(token, pageId);
+      await loadPages(pageNumber);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingPageId(null);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 800, margin: "40px auto" }} className="px-4">
       <div className="mb-6 flex items-center justify-between">
@@ -142,14 +170,33 @@ function WikiBoard({ token, onLogout }) {
                     disabled={isCreating}
                   />
                 </div>
+                {/* Departman artık serbest metin DEĞİL - backend, normal bir
+                    kullanıcının sayfasını her zaman kendi (JWT'deki gerçek)
+                    departmanına kaydediyor, istemcinin gönderdiği değeri yok
+                    sayıyor (bkz. CreateWikiPageCommandHandler). Admin bu kuralın
+                    dışında olduğu için sadece Admin bir seçim yapabiliyor. */}
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="wiki-department">Departman</Label>
-                  <Input
-                    id="wiki-department"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    disabled={isCreating}
-                  />
+                  <Label>Departman</Label>
+                  {isAdmin ? (
+                    <RadioGroup value={department} onValueChange={setDepartment} className="flex flex-row gap-4">
+                      {DEPARTMENTS.map((d) => (
+                        <div key={d.value} className="flex items-center gap-2">
+                          <RadioGroupItem
+                            value={d.value}
+                            id={`create-department-${d.value}`}
+                            disabled={isCreating}
+                          />
+                          <Label htmlFor={`create-department-${d.value}`}>{d.label}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  ) : (
+                    <p className="text-sm" style={{ color: "var(--text)" }}>
+                      {ownDepartment
+                        ? `Bu sayfa senin departmanına (${ownDepartment}) eklenecek.`
+                        : "Departmanın olmadığı için sayfa oluşturamazsın."}
+                    </p>
+                  )}
                 </div>
 
                 {/* "Public"/"DepartmentOnly" string'leri backend'in beklediği
@@ -173,7 +220,7 @@ function WikiBoard({ token, onLogout }) {
                 <DialogFooter>
                   <Button
                     type="submit"
-                    disabled={isCreating}
+                    disabled={isCreating || (!isAdmin && !ownDepartment)}
                     className="bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
                   >
                     {isCreating ? "Ekleniyor..." : "Ekle"}
@@ -202,6 +249,7 @@ function WikiBoard({ token, onLogout }) {
                   <TableHead>Departman</TableHead>
                   <TableHead>Görünürlük</TableHead>
                   <TableHead>İçerik</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -224,6 +272,22 @@ function WikiBoard({ token, onLogout }) {
                     </TableCell>
                     <TableCell className="max-w-xs whitespace-normal text-[var(--text)]/70">
                       {truncateContent(p.content)}
+                    </TableCell>
+                    <TableCell>
+                      {/* Silme yetkisi istemcide "gösterme" kararı - gerçek
+                          kontrol DeleteWikiPageCommandHandler'da (Admin ya da
+                          sayfanın gerçek sahibi olmayan biri butonu görmese
+                          bile isteği elle atarsa 403 alır). */}
+                      {(isAdmin || p.createdByUserId === userId) && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={deletingPageId === p.id}
+                          onClick={(e) => handleDelete(p.id, e)}
+                        >
+                          {deletingPageId === p.id ? "Siliniyor..." : "Sil"}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

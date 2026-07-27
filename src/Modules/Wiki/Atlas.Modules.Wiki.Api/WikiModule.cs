@@ -40,6 +40,11 @@ public static class WikiModule
             // GetAllWikiPagesRawQuery) bu davranıştan geçer - constraint'i karşılamayan
             // Command/Query'ler için MediatR bu behavior'ı hiç devreye sokmuyor.
             cfg.AddOpenBehavior(typeof(CachingBehavior<,>));
+
+            // CachingBehavior'ın tersi yönü - sadece ICacheInvalidatingCommand'ı
+            // implemente eden Command'lar (CreateWikiPageCommand, DeleteWikiPageCommand)
+            // bu davranıştan geçer, Handler çalıştıktan sonra ilgili cache anahtarını temizler.
+            cfg.AddOpenBehavior(typeof(CacheInvalidationBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblyContaining<GetWikiPagesQuery>();
