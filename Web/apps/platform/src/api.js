@@ -2,6 +2,24 @@
 // taşındığında) sadece burayı değiştireceğiz, kod içinde arama yapmayacağız.
 const API_URL = "http://localhost:5000";
 
+export async function register(email, fullName, password, department) {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // department boşsa (Departmansız seçildiyse) hiç göndermiyoruz - backend
+    // zaten null/eksikse departmansız kullanıcı olarak kaydediyor.
+    body: JSON.stringify(department ? { email, fullName, password, department } : { email, fullName, password }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? body?.detail ?? "Kayıt oluşturulamadı");
+  }
+
+  return response.json();
+}
+
 export async function login(email, password) {
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",

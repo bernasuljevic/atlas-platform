@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { login } from "../api";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@atlas/ui/card";
@@ -72,6 +73,12 @@ function Login({ onLoginSuccess }) {
             >
               {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </Button>
+            <p className="text-center text-sm" style={{ color: "var(--text)" }}>
+              Hesabın yok mu?{" "}
+              <Link to="/register" style={{ color: "var(--brand-accent)" }}>
+                Kayıt ol
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>
