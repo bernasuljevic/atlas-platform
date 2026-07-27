@@ -379,6 +379,18 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
       UI kararları için (buton/alan göster-gizle) çözülüyor, gerçek yetkilendirme
       her zaman backend'de.
 
+- [x] **AI Semantik Arama - Gün 5/6:** `GET /api/ai/search?q=...&topN=5`
+      eklendi (token gerektiriyor - sonuçlar zaten departmana göre filtreleniyor,
+      anonim istek kafa karıştırıcı olurdu). `SearchWikiPagesByMeaningQueryValidator`
+      (FluentValidation) - boş sorgu, 500 karakterden uzun sorgu, TopN aralık
+      dışı (1-50) erken 400 ile kesiliyor. Swagger otomatik yakaladı, ekstra
+      bir şey yapmaya gerek kalmadı. Canlı doğrulandı: alakalı bir Türkçe
+      sayfa gerçek bir pozitif skorla (0.52) en üstte çıktı, alakasızlar 0
+      skorla altta kaldı; departman görünürlük filtresi arama sonuçlarında
+      da doğru çalıştı (IT kullanıcısı IK'nın gizli sayfasını göremedi, Admin
+      bypass etti). **Henüz bir frontend arama kutusu YOK** - WikiBoard.jsx'e
+      eklenmedi, sadece backend API hazır.
+
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
 - `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
@@ -397,12 +409,12 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
 
 ## Sırada ne var
 
-1. **AI Semantik Arama - Gün 5/6:** Arama için gerçek bir API endpoint'i
-   (`GET /api/ai/search?q=...`), FluentValidation ile boş/çok uzun sorgu
-   kontrolü, Swagger dokümantasyonu.
-2. **AI Semantik Arama - Gün 6/6:** Integration test (sayfa oluştur → embed
+1. **AI Semantik Arama - Gün 6/6:** Integration test (sayfa oluştur → embed
    edildiğini doğrula → ara → sonuçta çık) + haftalık mimari retro (Outbox
-   Pattern teknik borcu dahil - bkz. Gün 3 notu).
+   Pattern teknik borcu dahil - bkz. Gün 3 notu, ayrıca bu oturumdaki
+   "İzlenecek teknik borç" listesi de gözden geçirilmeli).
+2. Frontend'e arama kutusu eklenmesi - backend hazır (`GET /api/ai/search`)
+   ama WikiBoard.jsx'te (ya da ayrı bir component'te) hiç kullanılmıyor henüz.
 3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
@@ -419,6 +431,8 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
   zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
 - `DELETE /api/wiki/pages/{id}` → token gerektirir. Admin HER sayfayı, normal
   kullanıcı SADECE kendi oluşturduğunu silebilir (aksi halde 403).
+- `GET /api/ai/search?q=...&topN=5` (topN opsiyonel, varsayılan 5) → token
+  gerektirir, sonuçlar departman görünürlük kuralına göre filtrelenir (Admin bypass eder).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
