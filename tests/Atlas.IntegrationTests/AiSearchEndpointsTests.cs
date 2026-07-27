@@ -13,13 +13,22 @@ namespace Atlas.IntegrationTests;
 /// önceki testlerden kalan onlarca alakasız chunk olsa bile, gerçekten eşleşen
 /// (ortak kelimesi olan) tek sayfa her zaman en düşük mesafeyle (en yüksek
 /// skorla) döner - bu yüzden TopN=5 gibi küçük bir sınırda bile güvenilir çıkar.
+///
+/// Her test kendi oluşturduğu sayfaların embedding'lerini try/finally ile
+/// temizliyor (bkz. AiEmbeddingTestCleanup) - WikiDbContext InMemory olduğu
+/// için sayfa test bitince kayboluyor ama AI'ın Postgres'i kalıcı, temizlik
+/// olmasa her çalıştırma geride "yetim" embedding bırakırdı (canlı doğrulanmış
+/// bir sorun - IAsyncLifetime.DisposeAsync güvenilir çalışmadığı için burada
+/// bilerek try/finally kullanılıyor, daha öngörülebilir).
 /// </summary>
 public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
 {
+    private readonly AtlasApiFactory _factory;
     private readonly HttpClient _client;
 
     public AiSearchEndpointsTests(AtlasApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -40,7 +49,7 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         return body.GetProperty("accessToken").GetString()!;
     }
 
-    private async Task<HttpResponseMessage> CreateWikiPageAsync(
+    private async Task<Guid> CreateWikiPageAsync(
         string token, string title, string content, string departmentName, string visibility)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/wiki/pages")
@@ -48,7 +57,11 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
             Content = JsonContent.Create(new { title, content, departmentName, visibility })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return await _client.SendAsync(request);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return created.GetProperty("id").GetGuid();
     }
 
     private async Task<List<string?>> SearchTitlesAsync(string token, string queryText)
@@ -70,17 +83,24 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         var token = await RegisterAndLoginAsync("IT");
         var uniqueTerm = $"kuantumfiltresi{Guid.NewGuid():N}";
         var title = $"Uçtan Uca Arama Testi {uniqueTerm}";
+        Guid pageId = default;
 
-        var createResponse = await CreateWikiPageAsync(
-            token, title, $"Bu sayfa {uniqueTerm} konusunda detaylı bilgi içeriyor.", "IT", "Public");
-        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+        try
+        {
+            pageId = await CreateWikiPageAsync(
+                token, title, $"Bu sayfa {uniqueTerm} konusunda detaylı bilgi içeriyor.", "IT", "Public");
 
-        // Best-effort embedding senkron (await ile) çalışıyor - bkz.
-        // WikiPageCreatedEventHandler notu - bu yüzden ekstra bir bekleme/polling
-        // gerekmiyor, HTTP yanıtı dönene kadar embedding zaten yazılmış olmalı.
-        var titles = await SearchTitlesAsync(token, uniqueTerm);
+            // Best-effort embedding senkron (await ile) çalışıyor - bkz.
+            // WikiPageCreatedEventHandler notu - bu yüzden ekstra bir bekleme/polling
+            // gerekmiyor, HTTP yanıtı dönene kadar embedding zaten yazılmış olmalı.
+            var titles = await SearchTitlesAsync(token, uniqueTerm);
 
-        Assert.Contains(title, titles);
+            Assert.Contains(title, titles);
+        }
+        finally
+        {
+            await AiEmbeddingTestCleanup.DeleteEmbeddingsForPagesAsync(_factory, [pageId]);
+        }
     }
 
     [Fact]
@@ -89,17 +109,24 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         var ownerToken = await RegisterAndLoginAsync("IK");
         var uniqueTerm = $"gizlibordrupolitikasi{Guid.NewGuid():N}";
         var title = $"IK'ya Özel Test Sayfası {uniqueTerm}";
+        Guid pageId = default;
 
-        var createResponse = await CreateWikiPageAsync(
-            ownerToken, title, $"{uniqueTerm} sadece IK departmanına özeldir.", "IK", "DepartmentOnly");
-        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+        try
+        {
+            pageId = await CreateWikiPageAsync(
+                ownerToken, title, $"{uniqueTerm} sadece IK departmanına özeldir.", "IK", "DepartmentOnly");
 
-        var otherDepartmentToken = await RegisterAndLoginAsync("IT");
-        var otherTitles = await SearchTitlesAsync(otherDepartmentToken, uniqueTerm);
-        Assert.DoesNotContain(title, otherTitles);
+            var otherDepartmentToken = await RegisterAndLoginAsync("IT");
+            var otherTitles = await SearchTitlesAsync(otherDepartmentToken, uniqueTerm);
+            Assert.DoesNotContain(title, otherTitles);
 
-        var ownerTitles = await SearchTitlesAsync(ownerToken, uniqueTerm);
-        Assert.Contains(title, ownerTitles);
+            var ownerTitles = await SearchTitlesAsync(ownerToken, uniqueTerm);
+            Assert.Contains(title, ownerTitles);
+        }
+        finally
+        {
+            await AiEmbeddingTestCleanup.DeleteEmbeddingsForPagesAsync(_factory, [pageId]);
+        }
     }
 
     [Fact]

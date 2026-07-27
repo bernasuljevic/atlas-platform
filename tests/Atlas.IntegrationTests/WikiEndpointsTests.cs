@@ -7,10 +7,12 @@ namespace Atlas.IntegrationTests;
 
 public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
 {
+    private readonly AtlasApiFactory _factory;
     private readonly HttpClient _client;
 
     public WikiEndpointsTests(AtlasApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -45,29 +47,45 @@ public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
     {
         var accessToken = await RegisterAndLoginAsync();
         var title = $"Entegrasyon Test Sayfası {Guid.NewGuid()}";
+        Guid? createdPageId = null;
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/wiki/pages")
+        try
         {
-            Content = JsonContent.Create(new
+            var request = new HttpRequestMessage(HttpMethod.Post, "/api/wiki/pages")
             {
-                title,
-                content = "WebApplicationFactory ile uçtan uca oluşturuldu",
-                departmentName = "IT",
-                visibility = "Public"
-            })
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                Content = JsonContent.Create(new
+                {
+                    title,
+                    content = "WebApplicationFactory ile uçtan uca oluşturuldu",
+                    departmentName = "IT",
+                    visibility = "Public"
+                })
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        var createResponse = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+            var createResponse = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
 
-        var listResponse = await _client.GetAsync("/api/wiki/pages");
-        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+            var created = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
+            createdPageId = created.GetProperty("id").GetGuid();
 
-        // GET /api/wiki/pages artık sayfalanmış bir sonuç dönüyor: {items, pageNumber, pageSize, totalCount}.
-        var result = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var found = result.GetProperty("items").EnumerateArray().Any(p => p.GetProperty("title").GetString() == title);
+            var listResponse = await _client.GetAsync("/api/wiki/pages");
+            Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
-        Assert.True(found, $"'{title}' başlıklı sayfa listede bulunamadı.");
+            // GET /api/wiki/pages artık sayfalanmış bir sonuç dönüyor: {items, pageNumber, pageSize, totalCount}.
+            var result = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
+            var found = result.GetProperty("items").EnumerateArray().Any(p => p.GetProperty("title").GetString() == title);
+
+            Assert.True(found, $"'{title}' başlıklı sayfa listede bulunamadı.");
+        }
+        finally
+        {
+            // AI'ın Postgres'i test aralarında sıfırlanmıyor (bkz.
+            // AiEmbeddingTestCleanup) - bu testin oluşturduğu sayfanın
+            // embedding'ini burada temizliyoruz, aksi halde kalıcı bir
+            // "yetim" olarak arama sonuçlarında hayalet gibi çıkabilirdi.
+            if (createdPageId is not null)
+                await AiEmbeddingTestCleanup.DeleteEmbeddingsForPagesAsync(_factory, [createdPageId.Value]);
+        }
     }
 }
