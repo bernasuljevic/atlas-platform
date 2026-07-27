@@ -1,6 +1,8 @@
 using Atlas.Modules.Wiki.Application.Abstractions;
+using Atlas.Modules.Wiki.Application.WikiPages;
 using Atlas.Modules.Wiki.Application.WikiPages.Queries;
 using Atlas.Modules.Wiki.Infrastructure.Persistence;
+using Atlas.Shared.Contracts;
 using Atlas.Shared.CQRS.Behaviors;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
@@ -22,6 +24,11 @@ public static class WikiModule
         // Artık Scoped - WikiDbContext gerçek bir bağlantıyı sarmalıyor,
         // InMemoryWikiPageRepository'deki gibi kendisi depo değil.
         services.AddScoped<IWikiPageRepository, EfWikiPageRepository>();
+
+        // AI modülü (ve ileride Wiki'nin görünürlük kuralına ihtiyaç duyan başka
+        // bir modül) bu arayüz üzerinden Wiki'nin kuralını KOPYALAMADAN kullanabiliyor.
+        // Durumsuz (stateless) - Singleton güvenli.
+        services.AddSingleton<IWikiVisibilityChecker, WikiVisibilityChecker>();
 
         services.AddMediatR(cfg =>
         {

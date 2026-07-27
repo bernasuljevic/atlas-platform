@@ -41,7 +41,9 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
         // Sayfa kaydedildikten SONRA event'i yayınlıyoruz - "olan bitmiş bir şeyi"
         // duyuruyoruz. Wiki, bunu kimin dinlediğini bilmiyor (şu an Notifications
         // dinleyecek, yarın AI modülü de dinleyebilir - Wiki'de hiçbir şey değişmez).
-        await _publisher.Publish(new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content), cancellationToken);
+        await _publisher.Publish(
+            new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString()),
+            cancellationToken);
 
         return page.Id;
     }

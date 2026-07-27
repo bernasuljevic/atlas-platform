@@ -8,4 +8,5 @@ namespace Atlas.Modules.AI.Application.WikiPages.Commands;
 /// tetikleniyor. "IRequest" (generic olmayan) kullanıyoruz çünkü bu bir Command -
 /// bir yan etki (embedding üretip kaydetmek) yapıyor, anlamlı bir dönüş değeri yok.
 /// </summary>
-public record GenerateWikiPageEmbeddingsCommand(Guid WikiPageId, string Content) : IRequest;
+public record GenerateWikiPageEmbeddingsCommand(
+    Guid WikiPageId, string Title, string Content, string DepartmentName, string Visibility) : IRequest;

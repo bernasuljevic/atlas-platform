@@ -33,7 +33,9 @@ public class GenerateWikiPageEmbeddingsCommandHandler : IRequestHandler<Generate
         // validasyonunu kendisi yapıyor (Gün 1'deki fail-fast kontrolü).
         var embeddings = chunks
             .Select((chunkText, index) =>
-                WikiPageEmbedding.Create(request.WikiPageId, index, chunkText, vectors[index]))
+                WikiPageEmbedding.Create(
+                    request.WikiPageId, index, chunkText, request.Title,
+                    request.DepartmentName, request.Visibility, vectors[index]))
             .ToList();
 
         await _repository.AddRangeAsync(embeddings, cancellationToken);

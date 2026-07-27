@@ -15,4 +15,4 @@ namespace Atlas.Shared.Contracts;
 /// kuralını (Wiki'nin DB'sine başka bir modülün doğrudan erişmesi) ihlal ederdi.
 /// Notifications bu alanı kullanmıyor ama görmezden gelebiliyor, zararı yok.
 /// </summary>
-public record WikiPageCreatedEvent(Guid PageId, string Title, string DepartmentName, string Content) : INotification;
+public record WikiPageCreatedEvent(Guid PageId, string Title, string DepartmentName, string Content, string Visibility) : INotification;

@@ -19,6 +19,23 @@ public class WikiPageEmbeddingConfiguration : IEntityTypeConfiguration<WikiPageE
         builder.Property(e => e.ChunkText)
             .IsRequired();
 
+        // Title/DepartmentName/Visibility - Wiki'nin WikiPage'inden denormalize
+        // edilmiş, arama sonucunu Wiki'ye geri sorgu atmadan gösterebilmek ve
+        // görünürlük filtresini uygulayabilmek için (bkz. entity'deki yorum).
+        // Visibility burada bilinçli olarak string - AI.Domain, Wiki.Domain'in
+        // WikiVisibility enum'ını hiç tanımıyor (modüller arası izolasyon kuralı).
+        builder.Property(e => e.Title)
+            .HasMaxLength(200)
+            .IsRequired();
+
+        builder.Property(e => e.DepartmentName)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(e => e.Visibility)
+            .HasMaxLength(50)
+            .IsRequired();
+
         // Sütun tipi Domain'deki tek doğruluk kaynağından (WikiPageEmbedding.
         // EmbeddingDimension) türetiliyor - "1024" sayısı burada AYRICA elle
         // yazılmıyor, ikisi asla birbirinden bağımsız değişemez.

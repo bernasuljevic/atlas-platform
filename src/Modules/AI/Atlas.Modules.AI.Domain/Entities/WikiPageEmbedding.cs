@@ -29,6 +29,20 @@ public class WikiPageEmbedding : Entity<Guid>
 
     public string ChunkText { get; private set; } = string.Empty;
 
+    // Bu üç alan Wiki'nin WikiPage'inden DENORMALIZE edilmiş (WikiPageCreatedEvent
+    // üzerinden ingestion sırasında kopyalanıyor). Neden: (1) Title - arama sonucunu
+    // gösterirken kullanıcıya "hangi sayfa" bilgisini vermek için, Wiki'ye geri
+    // sorgu atmadan. (2) DepartmentName + Visibility - arama sonuçlarını Wiki'nin
+    // departman görünürlük kuralına göre filtrelemek için ZORUNLU: bu bilgi
+    // olmasaydı AI modülü, bir chunk'ın DepartmentOnly bir sayfaya mı ait olduğunu
+    // asla bilemezdi ve arama, yetkisiz kullanıcılara içerik SIZDIRABİLİRDİ (bkz.
+    // CLAUDE.md "Öğrenilen dersler #10"daki güvenlik açığıyla aynı sınıf hata).
+    public string Title { get; private set; } = string.Empty;
+
+    public string DepartmentName { get; private set; } = string.Empty;
+
+    public string Visibility { get; private set; } = string.Empty;
+
     // Vector, Pgvector paketinin sağladığı value type - Infrastructure'daki
     // "vector(1024)" sütun tipiyle dolaysız eşleşiyor.
     public Vector Embedding { get; private set; } = default!;
@@ -38,19 +52,25 @@ public class WikiPageEmbedding : Entity<Guid>
     private WikiPageEmbedding() { }
 
     private WikiPageEmbedding(
-        Guid id, Guid wikiPageId, int chunkIndex, string chunkText, Vector embedding, DateTime createdAtUtc)
+        Guid id, Guid wikiPageId, int chunkIndex, string chunkText, string title,
+        string departmentName, string visibility, Vector embedding, DateTime createdAtUtc)
         : base(id)
     {
         WikiPageId = wikiPageId;
         ChunkIndex = chunkIndex;
         ChunkText = chunkText;
+        Title = title;
+        DepartmentName = departmentName;
+        Visibility = visibility;
         Embedding = embedding;
         CreatedAtUtc = createdAtUtc;
     }
 
     // Factory metodu float[] alıyor - dışarıdan (embedding/LLM katmanından)
     // çağıranlar Pgvector'ı hiç bilmek zorunda kalmıyor, sadece ham sayı dizisi veriyorlar.
-    public static WikiPageEmbedding Create(Guid wikiPageId, int chunkIndex, string chunkText, float[] embedding)
+    public static WikiPageEmbedding Create(
+        Guid wikiPageId, int chunkIndex, string chunkText, string title,
+        string departmentName, string visibility, float[] embedding)
     {
         if (wikiPageId == Guid.Empty)
             throw new ArgumentException("WikiPageId boş olamaz.", nameof(wikiPageId));
@@ -60,6 +80,15 @@ public class WikiPageEmbedding : Entity<Guid>
 
         if (string.IsNullOrWhiteSpace(chunkText))
             throw new ArgumentException("ChunkText boş olamaz.", nameof(chunkText));
+
+        if (string.IsNullOrWhiteSpace(title))
+            throw new ArgumentException("Title boş olamaz.", nameof(title));
+
+        if (string.IsNullOrWhiteSpace(departmentName))
+            throw new ArgumentException("DepartmentName boş olamaz.", nameof(departmentName));
+
+        if (string.IsNullOrWhiteSpace(visibility))
+            throw new ArgumentException("Visibility boş olamaz.", nameof(visibility));
 
         if (embedding is null || embedding.Length == 0)
             throw new ArgumentException("Embedding boş olamaz.", nameof(embedding));
@@ -73,6 +102,8 @@ public class WikiPageEmbedding : Entity<Guid>
                 $"Embedding {EmbeddingDimension} boyutunda olmalı, {embedding.Length} geldi.",
                 nameof(embedding));
 
-        return new WikiPageEmbedding(Guid.NewGuid(), wikiPageId, chunkIndex, chunkText, new Vector(embedding), DateTime.UtcNow);
+        return new WikiPageEmbedding(
+            Guid.NewGuid(), wikiPageId, chunkIndex, chunkText, title, departmentName, visibility,
+            new Vector(embedding), DateTime.UtcNow);
     }
 }

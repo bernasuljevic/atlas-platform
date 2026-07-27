@@ -43,7 +43,9 @@ public class WikiPageCreatedEventHandler : INotificationHandler<WikiPageCreatedE
         try
         {
             await _sender.Send(
-                new GenerateWikiPageEmbeddingsCommand(notification.PageId, notification.Content),
+                new GenerateWikiPageEmbeddingsCommand(
+                    notification.PageId, notification.Title, notification.Content,
+                    notification.DepartmentName, notification.Visibility),
                 cancellationToken);
         }
         catch (Exception ex)
