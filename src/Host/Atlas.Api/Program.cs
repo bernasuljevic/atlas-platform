@@ -103,6 +103,7 @@ app.MigrateAiDatabase();
 app.MapAuthEndpoints();
 app.MapWikiEndpoints();
 app.MapNotificationsEndpoints();
+app.MapAIEndpoints();
 
 // Basit bir sağlık kontrolü - "API gerçekten ayakta mı?" sorusuna cevap
 app.MapGet("/", () => Results.Ok(new
