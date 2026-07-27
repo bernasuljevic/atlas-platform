@@ -30,6 +30,11 @@ public static class WikiModule
         // Durumsuz (stateless) - Singleton güvenli.
         services.AddSingleton<IWikiVisibilityChecker, WikiVisibilityChecker>();
 
+        // Transactional Outbox Pattern - Gün 1. WikiDbContext'i sarmalıyor
+        // (dış kaynak) - Scoped. Gün 2'de Command Handler'lar IPublisher.Publish
+        // yerine bunu kullanmaya başlayacak.
+        services.AddScoped<IOutboxWriter, EfOutboxWriter>();
+
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<GetWikiPagesQuery>();
