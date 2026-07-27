@@ -52,6 +52,17 @@ public static class WikiEndpoints
         .WithName("DeleteWikiPage")
         .RequireAuthorization();
 
+        // Admin aracı: AI'ın embedding indeksini (örn. bir bakım hatası ya da
+        // embedding sağlayıcısı değişikliği sonrası) baştan üretmek için var
+        // olan TÜM sayfalar için WikiPageCreatedEvent'i yeniden yayınlıyor.
+        group.MapPost("/reindex", async (IMediator mediator) =>
+        {
+            var count = await mediator.Send(new ReindexWikiPagesCommand());
+            return Results.Ok(new { reindexedCount = count });
+        })
+        .WithName("ReindexWikiPages")
+        .RequireAuthorization(policy => policy.RequireRole("Admin"));
+
         return app;
     }
 }

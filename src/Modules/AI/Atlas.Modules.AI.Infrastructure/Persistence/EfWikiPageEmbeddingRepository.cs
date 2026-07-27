@@ -36,7 +36,13 @@ public class EfWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
             .Take(limit)
             .ToListAsync(cancellationToken);
 
+        // Savunma amaçlı: sıfır-vektörlü (bkz. GenerateWikiPageEmbeddingsCommandHandler'daki
+        // not) ya da başka bir sebeple bozuk bir satır cosine distance'ı NaN/Infinity
+        // üretebilir - System.Text.Json bunu yazamayıp TÜM isteği 500'e düşürürdü
+        // (canlı doğrulandı). Kaynağında engellemiş olsak da (yeni chunk'lar için),
+        // bu satır eski/olası bozuk veriye karşı ikinci bir güvenlik ağı.
         return rows
+            .Where(x => !double.IsNaN(x.Distance) && !double.IsInfinity(x.Distance))
             .Select(x => new WikiPageEmbeddingSearchHit(x.Embedding, x.Distance))
             .ToList();
     }
