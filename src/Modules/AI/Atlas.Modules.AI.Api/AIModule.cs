@@ -1,3 +1,5 @@
+using Atlas.Modules.AI.Application.Abstractions;
+using Atlas.Modules.AI.Infrastructure.Embeddings;
 using Atlas.Modules.AI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,14 @@ public static class AIModule
             options.UseNpgsql(connectionString, o => o.UseVector()));
 
         services.AddHealthChecks().AddDbContextCheck<AiDbContext>("postgresql");
+
+        // GEÇİCİ: Gerçek bir sağlayıcı (Voyage AI, OpenAI vb.) API key'ler gelince
+        // buraya bağlanacak - o zaman değişecek TEK satır burası. FakeEmbeddingService
+        // hiçbir dış kaynağa (DB, HTTP) bağlı olmadığı, tamamen durumsuz (stateless)
+        // olduğu için Singleton güvenli - her istek için yeni bir instance
+        // oluşturmaya gerek yok (CLAUDE.md'deki "Service Lifetime kuralı"yla tutarlı:
+        // dış bir kaynağı sarmalamıyorsa Singleton olabilir).
+        services.AddSingleton<IEmbeddingService, FakeEmbeddingService>();
 
         return services;
     }

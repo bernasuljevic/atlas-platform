@@ -259,12 +259,27 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       chunk'larını sıralı çekebilmek için). Migration oluşturulup PostgreSQL'e
       uygulandı.
 
+- [x] **AI Semantik Arama - Gün 2/6:** `TextChunker` (AI.Domain/Chunking) -
+      `WikiVisibilityRules` ile aynı desen (durumsuz static sınıf), sabit boyutlu
+      + üst üste binen (overlap) kayan pencere ile metni chunk'lara bölüyor;
+      `overlap >= chunkSize` durumu (sonsuz döngüye yol açardı) baştan
+      reddediliyor. `FakeEmbeddingService` (AI.Infrastructure/Embeddings) -
+      "feature hashing" tekniğiyle (kelimeleri MD5 ile 1024 kovaya hash'leyip
+      normalize ederek) TAMAMEN rastgele olmayan, ortak kelimesi çok olan
+      metinlerin gerçekten birbirine yakın vektör ürettiği deterministik bir
+      sahte embedding servisi. `string.GetHashCode()` KULLANILMADI çünkü .NET
+      onu process başına farklı tuzlar (hash randomization) - MD5 girdiye göre
+      sabit bir çıktı garantiliyor. `AIModule.cs`'e `IEmbeddingService` DI kaydı
+      eklendi (Singleton - durumsuz, dış kaynağa bağlı değil). Yeni bir test
+      projesi (`Atlas.Modules.AI.Infrastructure.Tests`) açıldı - Infrastructure
+      katmanını doğrudan test eden ilk proje.
+
 ## Sırada ne var
 
-1. **AI Semantik Arama - Gün 2/6:** Chunking mantığı (AI.Domain) + sahte/lokal
-   `IEmbeddingService` implementasyonu (AI.Infrastructure) + unit testler.
-2. AI modülünün geri kalanı (Gün 3-6): ingestion akışı, semantik arama Query'si,
-   API endpoint'i, integration test + haftalık mimari retro.
+1. **AI Semantik Arama - Gün 3/6:** Ingestion akışı (Command/Handler + migration) -
+   wiki sayfası oluşunca chunk'lanıp embed edilme akışı.
+2. AI modülünün geri kalanı (Gün 4-6): semantik arama Query'si, API endpoint'i,
+   integration test + haftalık mimari retro.
 3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
