@@ -4,9 +4,12 @@
 
 Kullanıcının .NET / modüler monolith mimarisini **öğrenerek** inşa ettiği bir
 öğrenme + staj defteri projesi. Kurumsal wiki + AI fikrine dayanıyor (orijinal
-ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI modülünün
-Domain modeli ve PostgreSQL/pgvector altyapısı kuruldu; embedding üretimi/LLM
-entegrasyonu API key'ler gelince yapılacak.
+ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI
+modülünün embedding ingestion + semantik arama akışı sahte (Fake) bir
+embedding servisiyle uçtan uca çalışıyor (bkz. "AI Semantik Arama" günlük
+ilerleme kayıtları) - gerçek bir sağlayıcıya (Voyage AI, OpenAI vb.) geçiş
+API key'ler gelince yapılacak, tasarım gereği sadece `IEmbeddingService`'in
+DI kaydını değiştirmek yeterli olacak.
 
 **Hedef büyüdü (2026-07-27):** Artık sadece öğrenme defteri değil - kullanıcı bu
 projeyi GitHub portföyünde ve iş görüşmelerinde gösterebileceği, kurumsal
@@ -111,13 +114,18 @@ bir çift verir. `Jwt:Key` artık appsettings.json'da DEĞİL, User Secrets'ta
 (`dotnet user-secrets set "Jwt:Key" "..."` - Development ortamında otomatik yüklenir,
 `Properties/launchSettings.json` bunu garanti ediyor).
 
-**AI modülü (iskelet):** `WikiPageEmbedding` entity (AI.Domain) - `WikiPageId`,
-`Embedding` (`Pgvector.Vector`, boyut 1024 - Voyage AI'a uygun), `CreatedAtUtc`.
-`AiDbContext` (AI.Infrastructure) PostgreSQL'e `Npgsql.EntityFrameworkCore.PostgreSQL`
-+ `Pgvector.EntityFrameworkCore` ile bağlanıyor, `HasPostgresExtension("vector")`
-migration'ın "vector" extension'ını otomatik `CREATE EXTENSION` etmesini sağlıyor.
-Henüz bir Command/Query yok - embedding'i kim, ne zaman üretecek (Wiki sayfası
-oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
+**AI modülü:** `WikiPageEmbedding` entity (AI.Domain) - `WikiPageId`, `ChunkIndex`/
+`ChunkText`, denormalize `Title`/`DepartmentName`/`Visibility` (Wiki'nin
+görünürlük kuralını uygulayabilmek için), `Embedding` (`Pgvector.Vector`, boyut
+1024 - Voyage AI'a uygun), `CreatedAtUtc`. `AiDbContext` (AI.Infrastructure)
+PostgreSQL'e `Npgsql.EntityFrameworkCore.PostgreSQL` + `Pgvector.EntityFrameworkCore`
+ile bağlanıyor, `HasPostgresExtension("vector")` migration'ın "vector"
+extension'ını otomatik `CREATE EXTENSION` etmesini sağlıyor. Wiki sayfası
+oluşunca `WikiPageCreatedEvent` üzerinden otomatik chunk'lanıp embed ediliyor
+(`GenerateWikiPageEmbeddingsCommand`); `SearchWikiPagesByMeaningQuery` doğal
+dil sorgusunu embed edip pgvector `CosineDistance` ile en yakın chunk'ları
+buluyor, Wiki'nin departman görünürlük kuralına göre filtreliyor. Henüz bir
+HTTP endpoint'i yok (Gün 5'te gelecek).
 
 ## Öğrenilen dersler (tekrar sorgulama, test edildi)
 
@@ -175,6 +183,21 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
     `./X`'e) elle düzelt. `jsconfig.json`'daki `@atlas/ui/*` path eşlemesi
     sadece IDE'nin (autocomplete/go-to-definition) `@atlas/ui/...` import'larını
     anlaması için tutuldu - shadcn CLI'nin yazma hedefini etkilemiyor.
+12. **Çalışan bir Atlas.Api process'i User Secrets değişikliğini görmez:**
+    `Jwt:Key` User Secrets'a eklendikten/değiştirildikten SONRA hâlâ çalışan
+    eski bir process, konfigürasyonu yeniden okumaz - `Encoding.UTF8.GetBytes(null)`
+    her istekte `ArgumentNullException` (→ 500 "Value cannot be null. (Parameter 's')")
+    fırlatır, register/login dahil HER endpoint (hatta `/health`) aynı hatayı verir.
+    Çözüm Ders #5'teki ile aynı: `Get-Process -Name "Atlas.Api" | Stop-Process -Force`
+    sonra `dotnet run` ile yeniden başlat.
+13. **Güvenlik kuralı YAZMA tarafında da tekrar kontrol edilmeli, sadece OKUMA
+    tarafında değil:** Ders #10'daki departman açığı düzeltildikten sonra bile
+    `CreateWikiPageCommandHandler` sayfanın `DepartmentName`'ini hâlâ istemciden
+    alıyordu - IK'daki bir kullanıcı `departmentName: "IT"` göndererek IT'nin
+    alanına sayfa ekleyebiliyordu (canlı doğrulandı, 2026-07-27). Genel ders:
+    "istemciden gelen bir alana güvenme" kuralını bir CRUD kaynağının SADECE
+    GET'inde uygulayıp POST/PUT/DELETE'inde unutmak kolay - ikisi de aynı
+    şekilde denetlenmeli.
 
 ## Şu ana kadar tamamlananlar
 
@@ -301,13 +324,85 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       çözdüğü problem - kalıcı, retry edilebilir bir tetikleyici yerine
       "en iyi çaba" (best-effort) bir tetikleyici kullanıyoruz şu an.
 
+- [x] **AI Semantik Arama - Gün 4/6:** `SearchWikiPagesByMeaningQuery` + Handler
+      (AI.Application) yazıldı - sorguyu embed edip `IWikiPageEmbeddingRepository.
+      FindNearestAsync` ile pgvector `CosineDistance` sıralamasıyla en yakın
+      chunk'ları çekiyor, sayfa başına en yakın chunk'ı seçip (`GroupBy` +
+      `MinBy(Distance)`) skora göre sıralıyor. `WikiPageEmbedding`'e denormalize
+      `Title`/`DepartmentName`/`Visibility` eklendi (migration uygulandı) -
+      arama sonucunu Wiki'ye geri sorgu atmadan gösterebilmek VE görünürlük
+      filtresini uygulayabilmek için. Yeni `IWikiVisibilityChecker`
+      (Shared.Contracts) - Wiki'nin görünürlük kuralı AI tarafından, modül
+      izolasyonu bozulmadan ödünç alınıyor (`ICurrentUserAccessor` ile aynı
+      desen). Yeni `Atlas.Modules.AI.Application.Tests` projesi - Handler elle
+      yazılmış fake'lerle izole test edildi (mocking kütüphanesi eklemeden);
+      en kritik test departman güvenlik filtresini doğruluyor. **Henüz bir HTTP
+      endpoint'i YOK** - bu bilerek Gün 5'e bırakıldı (erken atlanmadı).
+
+- [x] **Admin rolü tüm departmanları görebilir/yazabilir (bypass):**
+      `ICurrentUserAccessor.IsAdmin` eklendi (mevcut Role claim'inden okunuyor).
+      `WikiVisibilityRules.IsVisibleTo` artık bir `viewerIsAdmin` parametresi
+      alıyor (varsayılan `false`) - Admin ise departman sınırı görmezden
+      geliniyor. Kural TEK yerde tanımlı olduğu için Wiki listesi, AI arama
+      VE sayfa oluşturma/silme hepsi bu bypass'ı otomatik aldı.
+
+- [x] **Wiki sayfası oluşturmada departman artık istemciden değil JWT'den
+      geliyor** - Ders #13'teki yazma tarafı açığının düzeltmesi. Normal
+      kullanıcı sadece kendi departmanına yazabiliyor, Admin istediği
+      departmanı seçebiliyor (okuma tarafındaki bypass'la simetrik).
+      Departmansız bir normal kullanıcı artık hiç sayfa oluşturamıyor (anlaşılır
+      400 hatası). Bu yüzden `CreateWikiPageCommandValidator`'daki eski
+      `DepartmentName` NotEmpty kuralı KALDIRILDI - artık zararlı hale gelmişti
+      (normal kullanıcı departmanı BİLEREK boş gönderiyor, Handler'ın override
+      etmesi için; bu kural isteği Handler'a hiç ulaşmadan reddediyordu).
+
+- [x] **Wiki sayfası silme + cache invalidation:** `DeleteWikiPageCommand`/Handler
+      - Admin HER sayfayı, normal kullanıcı SADECE kendi oluşturduğunu silebiliyor
+      (`UnauthorizedAccessException` → yeni 403 dalı, `GlobalExceptionHandler`).
+      Bu sırada fark edilen ayrı bir gecikme sorunu: `GetAllWikiPagesRawQuery`'nin
+      30sn'lik cache'i ne oluşturmada ne silmede temizlenmiyordu. `CachingBehavior`'ın
+      simetriği olan generic bir `ICacheInvalidatingCommand` + `CacheInvalidationBehavior`
+      eklendi (Shared.CQRS) - artık Create/Delete Handler çalıştıktan sonra ilgili
+      cache anahtarını kendiliğinden temizliyor.
+
+- [x] **Register sayfası eklendi (frontend'de daha önce HİÇ yoktu):** Departman
+      seçimi serbest metin değil, sabit bir listeden (`departments.js`, tek
+      doğruluk kaynağı) - RadioGroup ile (WikiBoard'daki Görünürlük seçimiyle
+      aynı desen). Register'da email zaten kayıtlıysa artık anlamsız bir 500
+      yerine anlaşılır bir 400 dönüyor (`RegisterUserCommandValidator`'a
+      `IUserRepository` enjekte edilip async `MustAsync` kuralı eklendi).
+
+- [x] **Wiki listesi UI iyileştirmesi:** İçerik kolonu artık 80 karakterden
+      uzun metinleri kesiyor (satırlar dev boyutlara şişmiyordu), satıra
+      tıklanınca tam içeriği gösteren salt-okunur bir detay Dialog'u açılıyor.
+      `jwt.js` eklendi - JWT payload'ı (Role/department/nameidentifier) SADECE
+      UI kararları için (buton/alan göster-gizle) çözülüyor, gerçek yetkilendirme
+      her zaman backend'de.
+
+## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
+
+- `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
+  `Atlas.Modules.Wiki.Application.Tests`'te neredeyse birebir kopya (tek fark
+  opsiyonel `userId` parametresi). 2 kopya - henüz "üç kural" eşiğine gelmedi,
+  ama üçüncü bir test projesi (örn. Auth.Application.Tests) aynı fake'i
+  isterse, paylaşılan bir `Atlas.Shared.Testing` projesine taşınmalı.
+- `WikiBoard.jsx` 350 satıra yaklaştı - liste, oluşturma, silme, detay dialogu
+  ve JWT çözme tek component'te. Gün 5'te arama kutusu da eklenirse bölünmeyi
+  (örn. ayrı `WikiPageTable`/`CreateWikiPageDialog` component'leri) düşünmenin
+  vakti gelir.
+- `WikiVisibilityRules.IsVisibleTo`'ya eklenen `viewerIsAdmin` bool parametresi
+  şu an temiz ama ölçeklenmiyor - ÜÇÜNCÜ bir rol (örn. "Departman Yöneticisi")
+  eklenirse bir `UserRole` enum'ı ya da capability seti'ne geçmek gerekir
+  (şimdiden yapmak YAGNI ihlali olurdu).
+
 ## Sırada ne var
 
-1. **AI Semantik Arama - Gün 4/6:** Semantik arama Query'si - doğal dil
-   sorgusunu embed edip pgvector ile benzerlik araması yapan Query, Wiki'deki
-   departman görünürlük kuralına uygun şekilde.
-2. AI modülünün geri kalanı (Gün 5-6): API endpoint'i, integration test +
-   haftalık mimari retro (Outbox Pattern teknik borcu dahil).
+1. **AI Semantik Arama - Gün 5/6:** Arama için gerçek bir API endpoint'i
+   (`GET /api/ai/search?q=...`), FluentValidation ile boş/çok uzun sorgu
+   kontrolü, Swagger dokümantasyonu.
+2. **AI Semantik Arama - Gün 6/6:** Integration test (sayfa oluştur → embed
+   edildiğini doğrula → ara → sonuçta çık) + haftalık mimari retro (Outbox
+   Pattern teknik borcu dahil - bkz. Gün 3 notu).
 3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
@@ -319,7 +414,11 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
 - `GET /api/auth/users` → sadece Admin rolü
 - `GET /api/wiki/pages` → açık, DepartmentOnly filtresi artık query'den DEĞİL,
   gönderilen token'daki (varsa) department claim'inden otomatik uygulanır
-- `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir
+- `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir.
+  departmentName normal kullanıcı için YOK SAYILIR (departman her zaman JWT'den
+  zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
+- `DELETE /api/wiki/pages/{id}` → token gerektirir. Admin HER sayfayı, normal
+  kullanıcı SADECE kendi oluşturduğunu silebilir (aksi halde 403).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
