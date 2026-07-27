@@ -9,10 +9,13 @@
 
   <!-- DİKKAT: Auth.Domain'e, Auth.Application'a HİÇ referans yok.
        Wiki, "kullanıcı" kavramını sadece Shared.Contracts üzerinden tanıyor. -->
+  <!-- Atlas.Shared.Caching'e artık DOĞRUDAN referans yok - ICacheService kullanımı
+       CachingBehavior'a (Shared.CQRS) taşındı, bu proje sadece ICacheableQuery
+       marker interface'ini (Shared.CQRS üzerinden) biliyor. -->
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Modules.Wiki.Domain\Atlas.Modules.Wiki.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Caching\Atlas.Shared.Caching.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.CQRS\Atlas.Shared.CQRS.csproj" />
   </ItemGroup>
 
   <ItemGroup>

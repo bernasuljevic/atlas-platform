@@ -28,6 +28,11 @@ public static class WikiModule
             cfg.RegisterServicesFromAssemblyContaining<GetWikiPagesQuery>();
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+
+            // Sadece ICacheableQuery<T>'yi implemente eden Query'ler (şu an yalnızca
+            // GetAllWikiPagesRawQuery) bu davranıştan geçer - constraint'i karşılamayan
+            // Command/Query'ler için MediatR bu behavior'ı hiç devreye sokmuyor.
+            cfg.AddOpenBehavior(typeof(CachingBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblyContaining<GetWikiPagesQuery>();

@@ -202,12 +202,22 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       Domain'in `ArgumentException` fırlatan son-hat validasyonu hâlâ duruyor,
       bu behavior sadece isteği Handler'a ulaşmadan, daha temiz bir hata
       mesajıyla erken kesiyor.
+- [x] CQRS pipeline'ına `CachingBehavior` eklendi: `GetWikiPagesQueryHandler`'daki
+      elle yazılmış "cache'e bak, yoksa DB'den çek, cache'e yaz" mantığı, generic
+      bir `ICacheableQuery<TResponse>` marker interface + `CachingBehavior<,>`'a
+      taşındı. **Önemli güvenlik ayrımı:** Cache'lenen sınıf `GetWikiPagesQuery`
+      DEĞİL, onun çağırdığı ayrı bir iç Query olan `GetAllWikiPagesRawQuery` -
+      çünkü `GetWikiPagesQuery` kullanıcının departmanına göre FİLTRELENMİŞ bir
+      sonuç döndürüyor, bunu olduğu gibi cache'lemek bir kullanıcının filtrelenmiş
+      görünümünün başka bir kullanıcıya sızmasına yol açardı (Öğrenilen dersler
+      #10'daki departman güvenlik açığıyla aynı sınıf hata). `GetAllWikiPagesRawQuery`
+      filtresiz, ham veriyi döndürüyor - filtreleme hâlâ `GetWikiPagesQueryHandler`'da,
+      istek bazlı olarak yapılıyor.
 
 ## Sırada ne var
 
 1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
-2. `GetWikiPagesQuery`'nin manuel Redis cache kodunu genel bir `CachingBehavior`'a çevirme
-3. Notifications modülünün SignalR Hub'ına Redis backplane ekleme (çoklu instance desteği)
+2. Notifications modülünün SignalR Hub'ına Redis backplane ekleme (çoklu instance desteği)
 
 ## Endpoint referansı
 
