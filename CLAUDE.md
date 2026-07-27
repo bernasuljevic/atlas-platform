@@ -444,6 +444,34 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
       canlı doğrulandı). Testler artık oluşturdukları sayfaların id'lerini
       try/finally ile takip edip sadece kendi verilerini temizliyor.
 
+## Transactional Outbox Pattern (Gün 6 retrospektifinde ayrı bir özellik olarak açıldı)
+
+AI Semantik Arama'nın Gün 3/Gün 6 notlarındaki teknik borç (MediatR'ın
+`IPublisher`'ı event'i in-process, KALICI OLMAYAN şekilde yayınlıyor - process
+WikiPage kaydedildikten hemen sonra çökerse event sonsuza kadar kaybolur,
+ayrıca wiki sayfası oluşturma isteği AI'ın embedding üretimini bitirmesini
+bekliyor) artık kendi 5 günlük planıyla ele alınıyor - küçük bir yama değil,
+gerçek bir mimari değişiklik olduğu için.
+
+**Plan:**
+1. Altyapı: `OutboxMessage` entity + migration + `IOutboxWriter` soyutlaması. ✅ (bugün)
+2. Atomik yazma: Command Handler'lar `IPublisher.Publish` yerine `IOutboxWriter.Enqueue`
+   kullanacak, WikiPage'in KENDİSİYLE aynı `SaveChanges` çağrısında (atomiklik).
+3. Arka plan işleyici (`IHostedService`, polling) - işlenmemiş mesajları okuyup
+   gerçek `Publish`'i tetikler. Notifications/AI'ın mevcut handler'ları HİÇ değişmeden çalışır.
+4. Hata/retry stratejisi.
+5. Integration test + wrap-up.
+
+- [x] **Gün 1/5:** `OutboxMessage` (Wiki.Domain) - `EventType`
+      (`AssemblyQualifiedName`, arka plan işleyicinin deserialize edebilmesi
+      için) + `Payload` (JSON) + `ProcessedAtUtc` (null = henüz işlenmedi) +
+      `Attempts`/`LastError` (Gün 4'teki retry için). Migration uygulandı
+      (`wiki.OutboxMessages`, `ProcessedAtUtc` üzerinde index). `IOutboxWriter`
+      (Wiki.Application) + `EfOutboxWriter` (Wiki.Infrastructure) - `Enqueue()`
+      BİLEREK senkron ve kendi `SaveChanges`'ini çağırmıyor, sadece change
+      tracker'a ekliyor; asıl atomiklik Gün 2'de Handler'ların WikiPage için
+      zaten yapacağı `SaveChangesAsync` ile AYNI anda sağlanacak.
+
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
 - `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
@@ -464,12 +492,19 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
 
 ## Sırada ne var
 
-1. **AI Semantik Arama - Gün 6/6:** Integration test (sayfa oluştur → embed
-   edildiğini doğrula → ara → sonuçta çık) + haftalık mimari retro (Outbox
-   Pattern teknik borcu dahil - bkz. Gün 3 notu, ayrıca bu oturumdaki
-   "İzlenecek teknik borç" listesi de gözden geçirilmeli).
+1. **Transactional Outbox Pattern - Gün 2/5:** Atomik yazma - `CreateWikiPageCommandHandler`/
+   `DeleteWikiPageCommandHandler`, `IPublisher.Publish` yerine `IOutboxWriter.Enqueue`
+   kullanacak. Kritik tasarım kararı burada netleşecek: her repository metodu
+   şu an kendi `SaveChangesAsync()`'ini çağırıyor - WikiPage yazması ile Outbox
+   satırının AYNI transaction'da, tek bir `SaveChanges` ile atomik olması için
+   bunu yeniden düşünmek gerekecek.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
+
+**AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
+embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
+API endpoint'i → integration test + haftalık retro (bu retro sırasında
+Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukarıya bkz.).
 
 ## Endpoint referansı
 
