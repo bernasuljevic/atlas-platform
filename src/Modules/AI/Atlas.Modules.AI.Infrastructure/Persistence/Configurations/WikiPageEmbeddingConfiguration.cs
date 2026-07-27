@@ -13,17 +13,27 @@ public class WikiPageEmbeddingConfiguration : IEntityTypeConfiguration<WikiPageE
         builder.Property(e => e.WikiPageId)
             .IsRequired();
 
-        // Voyage AI'ın embedding boyutu 1024 - "vector(1024)" sütun tipi bunu
-        // veritabanı seviyesinde de sabitliyor (yanlış boyutlu bir embedding
-        // eklenmeye çalışılırsa PostgreSQL isteği reddeder).
+        builder.Property(e => e.ChunkIndex)
+            .IsRequired();
+
+        builder.Property(e => e.ChunkText)
+            .IsRequired();
+
+        // Sütun tipi Domain'deki tek doğruluk kaynağından (WikiPageEmbedding.
+        // EmbeddingDimension) türetiliyor - "1024" sayısı burada AYRICA elle
+        // yazılmıyor, ikisi asla birbirinden bağımsız değişemez.
         builder.Property(e => e.Embedding)
-            .HasColumnType("vector(1024)")
+            .HasColumnType($"vector({WikiPageEmbedding.EmbeddingDimension})")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
             .IsRequired();
 
-        // Bir wiki sayfasının embedding'ini ararken sık kullanılacak.
-        builder.HasIndex(e => e.WikiPageId);
+        // Tekil bir WikiPageId index'i yerine (WikiPageId, ChunkIndex) composite
+        // index: bir sayfanın chunk'larını SIRALI çekmek için (arama sonucu
+        // gösterirken işimize yarayacak). Composite index'in "soldan öncelik"
+        // kuralı sayesinde sadece WikiPageId'ye göre filtreleyen sorgular da bu
+        // index'i kullanabiliyor - ayrı bir tekil index'e gerek kalmıyor.
+        builder.HasIndex(e => new { e.WikiPageId, e.ChunkIndex });
     }
 }

@@ -5,15 +5,21 @@ namespace Atlas.Modules.AI.Domain.Tests;
 
 public class WikiPageEmbeddingTests
 {
+    // Gerçek boyutta (1024) bir vektörü elle 1024 kere yazmamak için - değerler
+    // önemli değil, sadece UZUNLUK kontrol ediliyor bu testlerde.
+    private static float[] ValidEmbedding() => new float[WikiPageEmbedding.EmbeddingDimension];
+
     [Fact]
     public void GecerliBilgilerle_EmbeddingBasariylaOlusur()
     {
         var wikiPageId = Guid.NewGuid();
-        var embedding = new float[] { 0.1f, 0.2f, 0.3f };
+        var embedding = ValidEmbedding();
 
-        var result = WikiPageEmbedding.Create(wikiPageId, embedding);
+        var result = WikiPageEmbedding.Create(wikiPageId, chunkIndex: 0, chunkText: "Giriş bölümü", embedding);
 
         Assert.Equal(wikiPageId, result.WikiPageId);
+        Assert.Equal(0, result.ChunkIndex);
+        Assert.Equal("Giriş bölümü", result.ChunkText);
         Assert.Equal(embedding, result.Embedding.ToArray());
         Assert.NotEqual(Guid.Empty, result.Id);
     }
@@ -23,7 +29,7 @@ public class WikiPageEmbeddingTests
     {
         var before = DateTime.UtcNow;
 
-        var result = WikiPageEmbedding.Create(Guid.NewGuid(), new float[] { 0.1f });
+        var result = WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: 0, chunkText: "x", ValidEmbedding());
 
         var after = DateTime.UtcNow;
         Assert.InRange(result.CreatedAtUtc, before, after);
@@ -33,20 +39,45 @@ public class WikiPageEmbeddingTests
     public void BosWikiPageIdIle_ArgumentExceptionFirlatilir()
     {
         Assert.Throws<ArgumentException>(() =>
-            WikiPageEmbedding.Create(Guid.Empty, new float[] { 0.1f, 0.2f }));
+            WikiPageEmbedding.Create(Guid.Empty, chunkIndex: 0, chunkText: "x", ValidEmbedding()));
+    }
+
+    [Fact]
+    public void NegatifChunkIndexIle_ArgumentExceptionFirlatilir()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: -1, chunkText: "x", ValidEmbedding()));
+    }
+
+    [Fact]
+    public void BosChunkTextIle_ArgumentExceptionFirlatilir()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: 0, chunkText: "   ", ValidEmbedding()));
     }
 
     [Fact]
     public void BosEmbeddingDizisiIle_ArgumentExceptionFirlatilir()
     {
         Assert.Throws<ArgumentException>(() =>
-            WikiPageEmbedding.Create(Guid.NewGuid(), Array.Empty<float>()));
+            WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: 0, chunkText: "x", Array.Empty<float>()));
     }
 
     [Fact]
     public void NullEmbeddingIle_ArgumentExceptionFirlatilir()
     {
         Assert.Throws<ArgumentException>(() =>
-            WikiPageEmbedding.Create(Guid.NewGuid(), null!));
+            WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: 0, chunkText: "x", null!));
+    }
+
+    [Fact]
+    public void YanlisBoyutluEmbeddingIle_ArgumentExceptionFirlatilir()
+    {
+        // Veritabanı sütunu "vector(1024)" olarak sabit - 1024'ten farklı bir
+        // boyut Postgres'e ulaşmadan, burada (fail fast) yakalanmalı.
+        var yanlisBoyutlu = new float[] { 0.1f, 0.2f, 0.3f };
+
+        Assert.Throws<ArgumentException>(() =>
+            WikiPageEmbedding.Create(Guid.NewGuid(), chunkIndex: 0, chunkText: "x", yanlisBoyutlu));
     }
 }

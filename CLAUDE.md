@@ -8,18 +8,41 @@ ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı). AI modü
 Domain modeli ve PostgreSQL/pgvector altyapısı kuruldu; embedding üretimi/LLM
 entegrasyonu API key'ler gelince yapılacak.
 
+**Hedef büyüdü (2026-07-27):** Artık sadece öğrenme defteri değil - kullanıcı bu
+projeyi GitHub portföyünde ve iş görüşmelerinde gösterebileceği, kurumsal
+seviyede bir ürün haline getirmek istiyor. Bkz. aşağıdaki "Mentor modu" - bundan
+sonraki yeni özellikler kullanıcı tarafından yazılacak, Claude sadece
+yönlendiriyor.
+
 ## ÇOK ÖNEMLİ — Nasıl çalışmalısın
 
-Kullanıcı bu projeyi adım adım, **öğreterek** inşa ediyor. Zaman zaman staj
-defteri için ilerleme yazıyor, o yüzden değişiklikler net, açıklanabilir ve
-test edilmiş olmalı:
+**GÜNCEL ÇALIŞMA MODU (2026-07-27'den itibaren, 2026-07-27'de bir kez revize
+edildi) — Anlatarak-geliştirme modu:**
+Kullanıcı artık kodu GitHub portföyünde iş görüşmesi seviyesinde gösterebilmek
+istiyor. Saf Socratic/ipucu-only mod (kod hiç yazma, sadece soru sor) bir kez
+denendi ama kullanıcı için çok yavaş kaldı - "sen kodları yaz ama bana da
+anlatarak git önemli olanları bilmem gerekenleri" diyerek modu netleştirdi.
+Şu an geçerli kural:
 
-- Kod yazarken **neden** o kararı verdiğini kısaca açıkla, sessizce büyük
-  değişiklikler yapıp "bitti" deme.
+- Kodu SEN yazıyorsun - ama her önemli kararı (neden bu tasarım, hangi
+  alternatif elendi, hangi tuzağa dikkat) kısaca anlatarak ilerle. Önemli
+  olmayan syntax detaylarını anlatarak boğma - sadece "bilmesi gereken" kısma
+  odaklan.
+- Yeni bir özellik istendiğinde onu tek seferde verme - 4-6 güne böl, her günün
+  TEK bir mantıksal hedefi olsun, her gün bir öncekine bağlı olsun (gerçek bir
+  şirkette geliştiriliyormuş gibi).
+- Bir özelliğe başlamadan önce NEDEN o özelliği yaptığımızı açıkla; teknik
+  olarak sırada başka bir şey daha mantıklıysa bunu gerekçeleriyle söyle,
+  kullanıcının önerisini sorgusuz kabul etme.
+- Her haftanın sonunda mimariyi tekrar değerlendir - teknik borç oluşmuşsa
+  belirt, gerekirse refactoring görevi ekle.
+- Küçük öğretici oyuncak örnekler değil, gerçek şirket pratiğine uygun
+  (kurumsal) görevler ver.
+
+Genel ilkeler (her modda geçerli):
 - Yeni bir kavram tanıtırken 1-2 cümleyle ne işe yaradığını anlat.
-- Küçük hatalarda (typo, eksik using) sormadan düzelt - mimari karar
-  değiştiriyorsan önce sor.
-- Her anlamlı adımdan sonra `dotnet build` ile doğrula, sonra commit önerisi sun.
+- Her anlamlı adımdan sonra `dotnet build`/`dotnet test` ile doğrula, sonra
+  commit önerisi sun.
 
 ## Mimari - Modüler Monolith
 
@@ -223,9 +246,27 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       "WikiPageCreated" olayını da alabiliyor - öncesinde her instance sadece
       kendi bağlı istemcilerini biliyordu.
 
+- [x] **AI Semantik Arama - Gün 1/6 (anlatarak-geliştirme modu):** Mimari
+      tasarım kararları verildi ve uygulandı.
+      `IEmbeddingService` (`AI.Application/Abstractions`) - batch, sıra garantili
+      tek metotlu bir soyutlama, `IPasswordHasher` ile aynı desen (henüz
+      implementasyonu yok, Gün 2'de sahte/lokal bir servisle gelecek).
+      `WikiPageEmbedding` entity'sine `ChunkIndex`/`ChunkText` eklendi -
+      `EmbeddingDimension = 1024` sabiti artık Domain'de TEK yerde tanımlı,
+      hem entity'nin fail-fast validasyonu hem EF configuration'ı (`vector(1024)`
+      sütun tipi) buradan türetiliyor. `WikiPageId` üzerindeki tekil index,
+      `(WikiPageId, ChunkIndex)` composite index'iyle değiştirildi (bir sayfanın
+      chunk'larını sıralı çekebilmek için). Migration oluşturulup PostgreSQL'e
+      uygulandı.
+
 ## Sırada ne var
 
-1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
+1. **AI Semantik Arama - Gün 2/6:** Chunking mantığı (AI.Domain) + sahte/lokal
+   `IEmbeddingService` implementasyonu (AI.Infrastructure) + unit testler.
+2. AI modülünün geri kalanı (Gün 3-6): ingestion akışı, semantik arama Query'si,
+   API endpoint'i, integration test + haftalık mimari retro.
+3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+   `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
 ## Endpoint referansı
 
