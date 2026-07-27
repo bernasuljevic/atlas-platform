@@ -1,77 +1,46 @@
-import { useEffect, useState } from "react";
-import * as signalR from "@microsoft/signalr";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./components/Login";
 import WikiBoard from "./components/WikiBoard";
 
+// Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
+function LoginRoute() {
+  const { token, login } = useAuth();
+
+  if (token) {
+    return <Navigate to="/wiki" replace />;
+  }
+
+  return <Login onLoginSuccess={login} />;
+}
+
+function WikiRoute() {
+  const { token, logout } = useAuth();
+  return <WikiBoard token={token} onLogout={logout} />;
+}
+
+// "/" hiçbir zaman kendi başına bir sayfa değil - sadece giriş durumuna göre
+// doğru yere yönlendiren bir trafik yönlendiricisi.
+function RootRedirect() {
+  const { token } = useAuth();
+  return <Navigate to={token ? "/wiki" : "/login"} replace />;
+}
+
 function App() {
-  // Başlangıç değerini localStorage'dan okuyoruz (lazy initializer - fonksiyon sadece
-  // ilk render'da çalışır). Sayfa yenilendiğinde token hafızadan uçmasın diye.
-  const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
-
-  function handleLoginSuccess({ accessToken, refreshToken }) {
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
-    setToken(accessToken);
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    setToken(null);
-  }
-
-  useEffect(() => {
-    // api.js, access token'ı arka planda kendi başına yenilediğinde (401 sonrası)
-    // localStorage'ı güncelliyor ama React state'ini (bu component'teki "token")
-    // bilmiyor - bu event ikisini senkron tutuyor. Refresh token da tükenmişse
-    // ("atlas:auth-expired") direkt çıkış yaptırıyoruz.
-    function handleTokensRefreshed(e) {
-      setToken(e.detail.accessToken);
-    }
-    function handleAuthExpired() {
-      handleLogout();
-    }
-
-    window.addEventListener("atlas:tokens-refreshed", handleTokensRefreshed);
-    window.addEventListener("atlas:auth-expired", handleAuthExpired);
-    return () => {
-      window.removeEventListener("atlas:tokens-refreshed", handleTokensRefreshed);
-      window.removeEventListener("atlas:auth-expired", handleAuthExpired);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!token) return;
-
-    const connection = new signalR.HubConnectionBuilder()
-      .withUrl("http://localhost:5000/hubs/notifications", {
-        withCredentials: false,
-      })
-      .withAutomaticReconnect()
-      .build();
-    // Backend'deki WikiPageCreatedEventHandler'ın gönderdiği "WikiPageCreated"
-    // adlı mesajı dinliyoruz - isim BİREBİR eşleşmeli, aksi halde hiçbir şey olmaz
-    // (sessizce yok sayılır, hata da vermez - bu yüzden isim tutarlılığı önemli).
-    connection.on("WikiPageCreated", (data) => {
-      console.log("[SignalR] Yeni bildirim:", data);
-      alert(`Yeni wiki sayfası eklendi: "${data.title}" (${data.departmentName})`);
-    });
-
-    connection
-      .start()
-      .then(() => console.log("[SignalR] Bağlantı kuruldu:", connection.connectionId))
-      .catch((err) => console.error("[SignalR] Bağlantı hatası:", err));
-
-    return () => {
-      connection.stop();
-    };
-  }, [token]);
-
-  if (!token) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  return <WikiBoard token={token} onLogout={handleLogout} />;
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/login" element={<LoginRoute />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/wiki" element={<WikiRoute />} />
+          </Route>
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
 export default App;
