@@ -430,6 +430,10 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
 - `GET /api/auth/users` → sadece Admin rolü
 - `GET /api/wiki/pages` → açık, DepartmentOnly filtresi artık query'den DEĞİL,
   gönderilen token'daki (varsa) department claim'inden otomatik uygulanır
+- `GET /api/wiki/pages/{id}` → açık, aynı görünürlük kuralı burada da uygulanır
+  (Id'yi bilmek görebilmek anlamına gelmiyor - başka departmanın DepartmentOnly
+  sayfasının Id'si tahmin edilse bile 404 döner). Arama sonucuna tıklanınca
+  tam sayfayı göstermek için kullanılıyor.
 - `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir.
   departmentName normal kullanıcı için YOK SAYILIR (departman her zaman JWT'den
   zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
