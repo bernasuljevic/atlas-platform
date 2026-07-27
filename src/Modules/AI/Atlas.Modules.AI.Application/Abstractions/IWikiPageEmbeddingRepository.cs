@@ -17,6 +17,12 @@ public interface IWikiPageEmbeddingRepository
     /// </summary>
     Task<IReadOnlyList<WikiPageEmbeddingSearchHit>> FindNearestAsync(
         float[] queryEmbedding, int limit, CancellationToken cancellationToken = default);
+
+    // WikiPageDeletedEvent geldiğinde çağrılıyor - bir sayfanın TÜM chunk'larını
+    // (WikiPageId eşleşen her satırı) temizliyor. Bunsuz, silinen bir sayfanın
+    // embedding'leri Postgres'te sonsuza kadar yetim kalır, arama onu "hayalet"
+    // bir sonuç olarak göstermeye devam eder (canlı doğrulanmış bir bug).
+    Task DeleteByWikiPageIdAsync(Guid wikiPageId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -40,4 +40,15 @@ public class EfWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
             .Select(x => new WikiPageEmbeddingSearchHit(x.Embedding, x.Distance))
             .ToList();
     }
+
+    public async Task DeleteByWikiPageIdAsync(Guid wikiPageId, CancellationToken cancellationToken = default)
+    {
+        // ExecuteDeleteAsync - satırları önce belleğe çekmeden tek bir DELETE
+        // sorgusuyla siliyor (EF Core'un "bulk delete" özelliği). Bir sayfa
+        // birden fazla chunk'a bölünmüş olabileceği için burada WikiPageId
+        // eşleşen TÜM satırlar siliniyor, tek bir Id değil.
+        await _context.WikiPageEmbeddings
+            .Where(e => e.WikiPageId == wikiPageId)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

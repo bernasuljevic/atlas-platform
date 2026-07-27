@@ -9,7 +9,7 @@ public class DeleteWikiPageCommandHandlerTests
 {
     private static DeleteWikiPageCommandHandler CreateHandler(
         FakeWikiPageRepository repository, Guid? viewerUserId = null, bool viewerIsAdmin = false)
-        => new(repository, new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId));
+        => new(repository, new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId), new FakePublisher());
 
     [Fact]
     public async Task SayfayiOlusturanKullanici_KendiSayfasiniSilebilir()

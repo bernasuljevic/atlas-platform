@@ -8,11 +8,14 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
 {
     private readonly IWikiPageRepository _wikiPageRepository;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IPublisher _publisher;
 
-    public DeleteWikiPageCommandHandler(IWikiPageRepository wikiPageRepository, ICurrentUserAccessor currentUser)
+    public DeleteWikiPageCommandHandler(
+        IWikiPageRepository wikiPageRepository, ICurrentUserAccessor currentUser, IPublisher publisher)
     {
         _wikiPageRepository = wikiPageRepository;
         _currentUser = currentUser;
+        _publisher = publisher;
     }
 
     public async Task Handle(DeleteWikiPageCommand request, CancellationToken cancellationToken)
@@ -33,5 +36,11 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
             throw new UnauthorizedAccessException("Bu sayfayı silme yetkiniz yok.");
 
         await _wikiPageRepository.DeleteAsync(page, cancellationToken);
+
+        // WikiPageCreatedEvent'teki AYNI desen - Wiki, AI'ın var olduğundan
+        // habersiz, sadece "bu sayfa silindi" diye duyuruyor. Bunsuz, AI'ın
+        // Postgres'teki embedding'leri sonsuza kadar yetim kalırdı (bkz. bu
+        // event'in kendi XML yorumu).
+        await _publisher.Publish(new WikiPageDeletedEvent(page.Id), cancellationToken);
     }
 }

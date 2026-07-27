@@ -13,9 +13,11 @@ public class FakeWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
 {
     private readonly IReadOnlyList<WikiPageEmbeddingSearchHit> _hits;
 
-    public FakeWikiPageEmbeddingRepository(IReadOnlyList<WikiPageEmbeddingSearchHit> hits)
+    public List<Guid> DeletedWikiPageIds { get; } = new();
+
+    public FakeWikiPageEmbeddingRepository(IReadOnlyList<WikiPageEmbeddingSearchHit>? hits = null)
     {
-        _hits = hits;
+        _hits = hits ?? [];
     }
 
     public Task AddRangeAsync(IEnumerable<WikiPageEmbedding> embeddings, CancellationToken cancellationToken = default)
@@ -24,4 +26,10 @@ public class FakeWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
     public Task<IReadOnlyList<WikiPageEmbeddingSearchHit>> FindNearestAsync(
         float[] queryEmbedding, int limit, CancellationToken cancellationToken = default)
         => Task.FromResult(_hits.Take(limit).ToList() as IReadOnlyList<WikiPageEmbeddingSearchHit>);
+
+    public Task DeleteByWikiPageIdAsync(Guid wikiPageId, CancellationToken cancellationToken = default)
+    {
+        DeletedWikiPageIds.Add(wikiPageId);
+        return Task.CompletedTask;
+    }
 }
