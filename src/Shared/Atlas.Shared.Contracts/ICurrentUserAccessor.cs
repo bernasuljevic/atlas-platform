@@ -22,4 +22,10 @@ public interface ICurrentUserAccessor
     // sorusunu artık BUNA göre cevaplıyor - istemcinin gönderdiği bir query
     // parametresine göre değil (bkz. GetWikiPagesQueryHandler).
     string? Department { get; }
+
+    // Admin, departman sınırını görmezden gelip TÜM DepartmentOnly sayfaları
+    // görebilir (bilinçli bir tasarım kararı - bkz. WikiVisibilityRules).
+    // Bunu Role claim'inden okuyoruz, ayrı bir "IsAdmin" claim'i eklemedik -
+    // JWT'de zaten imzalı bir Role claim'i var, ikinci bir kaynak gereksiz tekrar olurdu.
+    bool IsAdmin { get; }
 }

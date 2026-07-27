@@ -45,8 +45,8 @@ public class WikiPage : Entity<Guid>
     /// (hem bu Domain nesnesi hem de Application katmanındaki DTO aynı kuralı kullanabilsin
     /// diye). Bu metod sadece o paylaşılan kurala ince bir sarmalayıcı (wrapper).
     /// </summary>
-    public bool IsVisibleTo(string? viewerDepartmentName)
+    public bool IsVisibleTo(string? viewerDepartmentName, bool viewerIsAdmin = false)
     {
-        return WikiVisibilityRules.IsVisibleTo(Visibility, DepartmentName, viewerDepartmentName);
+        return WikiVisibilityRules.IsVisibleTo(Visibility, DepartmentName, viewerDepartmentName, viewerIsAdmin);
     }
 }

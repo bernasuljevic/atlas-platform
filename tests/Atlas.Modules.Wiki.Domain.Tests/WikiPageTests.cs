@@ -58,4 +58,24 @@ public class WikiPageTests
 
         Assert.True(result);
     }
+
+    [Fact]
+    public void DepartmentOnlySayfa_ViewerAdminIse_FarkliDepartmandaOlsaBileGorunurOlmali()
+    {
+        var page = WikiPage.Create("Baslik", "Icerik", "Engineering", WikiVisibility.DepartmentOnly, Guid.NewGuid());
+
+        var result = page.IsVisibleTo("IT", viewerIsAdmin: true);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void DepartmentOnlySayfa_ViewerAdminAmaDepartmanBelirtilmemisIse_YineDeGorunurOlmali()
+    {
+        var page = WikiPage.Create("Baslik", "Icerik", "Engineering", WikiVisibility.DepartmentOnly, Guid.NewGuid());
+
+        var result = page.IsVisibleTo(null, viewerIsAdmin: true);
+
+        Assert.True(result);
+    }
 }

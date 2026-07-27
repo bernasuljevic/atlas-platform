@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Atlas.Modules.Auth.Domain.Enums;
 using Atlas.Shared.Contracts;
 using Microsoft.AspNetCore.Http;
 
@@ -34,4 +35,6 @@ public class HttpCurrentUserAccessor : ICurrentUserAccessor
     public string? Email => User?.FindFirst(ClaimTypes.Email)?.Value;
 
     public string? Department => User?.FindFirst("department")?.Value;
+
+    public bool IsAdmin => User?.FindFirst(ClaimTypes.Role)?.Value == nameof(UserRole.Admin);
 }

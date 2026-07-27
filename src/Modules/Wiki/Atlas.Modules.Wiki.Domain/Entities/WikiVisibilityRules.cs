@@ -10,9 +10,18 @@ namespace Atlas.Modules.Wiki.Domain.Entities;
 /// </summary>
 public static class WikiVisibilityRules
 {
-    public static bool IsVisibleTo(WikiVisibility visibility, string departmentName, string? viewerDepartmentName)
+    // viewerIsAdmin: bilinçli bir istisna - Admin rolü departman sınırını
+    // görmezden gelip TÜM DepartmentOnly sayfaları görebilir (kurumsal bir
+    // sistemde IT desteği/üst yönetim için makul bir beklenti). Varsayılan
+    // "false" sayesinde var olan tüm çağrılar (Admin kavramını bilmeyen eski
+    // kod) davranış değiştirmeden derlenmeye devam eder.
+    public static bool IsVisibleTo(
+        WikiVisibility visibility, string departmentName, string? viewerDepartmentName, bool viewerIsAdmin = false)
     {
         if (visibility == WikiVisibility.Public)
+            return true;
+
+        if (viewerIsAdmin)
             return true;
 
         return !string.IsNullOrWhiteSpace(viewerDepartmentName)

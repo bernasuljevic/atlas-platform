@@ -29,13 +29,17 @@ public class GetWikiPagesQueryHandler : IRequestHandler<GetWikiPagesQuery, Paged
         // dolayısıyla sadece Public sayfalar görünür.
         var effectiveDepartment = _currentUser.IsAuthenticated ? _currentUser.Department : null;
 
+        // Admin, departman sınırını görmezden gelip TÜM DepartmentOnly sayfaları
+        // görebiliyor (bilinçli tasarım kararı - bkz. WikiVisibilityRules).
+        var viewerIsAdmin = _currentUser.IsAuthenticated && _currentUser.IsAdmin;
+
         // Sayfalama, filtrelemeden SONRA bellekte uygulanıyor - cache'te hâlâ
         // TÜM sayfalar (filtresiz, sayfalanmamış) duruyor, her pageNumber/pageSize
         // kombinasyonu için ayrı bir cache key açmıyoruz.
         // OrderBy şart: Skip/Take'in tutarlı sonuç vermesi için sıralama sabit olmalı,
         // en yeni sayfa en üstte.
         var visiblePages = allPageDtos
-            .Where(p => IsVisibleTo(p, effectiveDepartment))
+            .Where(p => IsVisibleTo(p, effectiveDepartment, viewerIsAdmin))
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToList();
 
@@ -53,9 +57,9 @@ public class GetWikiPagesQueryHandler : IRequestHandler<GetWikiPagesQuery, Paged
     // Cache'lenen veri DTO olduğu için (Visibility burada string), önce enum'a geri
     // çeviriyoruz, sonra WikiPage ile AYNI paylaşılan kuralı (WikiVisibilityRules)
     // çağırıyoruz - kod tekrarı yok, tek doğruluk kaynağı Domain katmanında.
-    private static bool IsVisibleTo(WikiPageDto page, string? viewerDepartmentName)
+    private static bool IsVisibleTo(WikiPageDto page, string? viewerDepartmentName, bool viewerIsAdmin)
     {
         var visibility = Enum.Parse<WikiVisibility>(page.Visibility);
-        return WikiVisibilityRules.IsVisibleTo(visibility, page.DepartmentName, viewerDepartmentName);
+        return WikiVisibilityRules.IsVisibleTo(visibility, page.DepartmentName, viewerDepartmentName, viewerIsAdmin);
     }
 }
