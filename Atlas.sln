@@ -73,6 +73,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.AI.Infrastruc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.AI.Application.Tests", "tests\Atlas.Modules.AI.Application.Tests\Atlas.Modules.AI.Application.Tests.csproj", "{C2EBA97D-BB97-4944-8B7D-E438CB3D1C41}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Wiki.Application.Tests", "tests\Atlas.Modules.Wiki.Application.Tests\Atlas.Modules.Wiki.Application.Tests.csproj", "{27522019-758B-47AC-88FA-0B1AB739C73D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -407,6 +409,18 @@ Global
 		{C2EBA97D-BB97-4944-8B7D-E438CB3D1C41}.Release|x64.Build.0 = Release|Any CPU
 		{C2EBA97D-BB97-4944-8B7D-E438CB3D1C41}.Release|x86.ActiveCfg = Release|Any CPU
 		{C2EBA97D-BB97-4944-8B7D-E438CB3D1C41}.Release|x86.Build.0 = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|x64.Build.0 = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Debug|x86.Build.0 = Debug|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|x64.ActiveCfg = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|x64.Build.0 = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|x86.ActiveCfg = Release|Any CPU
+		{27522019-758B-47AC-88FA-0B1AB739C73D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -434,5 +448,6 @@ Global
 		{981C2CF6-E5BB-602A-511C-234B538302B0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{D5C1111B-79F1-4533-BA29-C0600DB3FB27} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{C2EBA97D-BB97-4944-8B7D-E438CB3D1C41} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{27522019-758B-47AC-88FA-0B1AB739C73D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

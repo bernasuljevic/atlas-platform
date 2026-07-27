@@ -18,11 +18,16 @@ public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
     {
         var email = $"wiki-test-{Guid.NewGuid()}@atlas.local";
 
+        // Departman ARTIK ZORUNLU - CreateWikiPageCommandHandler, normal bir
+        // kullanıcının sayfasını her zaman kendi (gerçek, JWT'deki) departmanına
+        // kaydediyor; departmansız bir kullanıcı sayfa oluşturamaz (bkz.
+        // "Sayfa oluşturmak için bir departmana ait olmalısınız" hatası).
         await _client.PostAsJsonAsync("/api/auth/register", new
         {
             email,
             fullName = "Wiki Test Kullanıcısı",
-            password = "TestSifre123!"
+            password = "TestSifre123!",
+            department = "IT"
         });
 
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new

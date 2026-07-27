@@ -30,10 +30,22 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
         if (!_currentUser.IsAuthenticated || _currentUser.UserId is null)
             throw new InvalidOperationException("Wiki sayfası oluşturmak için giriş yapmış olmalısınız.");
 
+        // GÜVENLİK: Normal (Member) bir kullanıcı SADECE kendi departmanına sayfa
+        // ekleyebilir - istemcinin gönderdiği DepartmentName'e güvenmiyoruz, aksi
+        // halde IK'daki biri "departmentName: IT" göndererek IT'nin alanına sayfa
+        // ekleyebilirdi (Ders #10'daki okuma tarafı açığının yazma tarafındaki
+        // karşılığı). Admin bu sınırın DIŞINDA - okuma tarafındaki bypass'la
+        // simetrik olarak istediği departmana yazabiliyor (bkz. WikiVisibilityRules).
+        var departmentName = _currentUser.IsAdmin ? request.DepartmentName : _currentUser.Department;
+
+        if (string.IsNullOrWhiteSpace(departmentName))
+            throw new ArgumentException(
+                "Sayfa oluşturmak için bir departmana ait olmalısınız.", nameof(departmentName));
+
         var visibility = Enum.Parse<WikiVisibility>(request.Visibility, ignoreCase: true);
 
         var page = WikiPage.Create(
-            request.Title, request.Content, request.DepartmentName,
+            request.Title, request.Content, departmentName,
             visibility, _currentUser.UserId.Value);
 
         await _wikiPageRepository.AddAsync(page, cancellationToken);
