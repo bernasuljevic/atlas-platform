@@ -3,6 +3,13 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+/* shadcn bileşenleri Web/packages/ui'ye taşındığından beri (İş 2) Tailwind v4'ün
+   otomatik kaynak taraması bu klasörü göremiyor - çünkü artık platform app'in
+   kendi dizin ağacının DIŞINDA, bir kardeş paket içinde yaşıyor. Bu satır
+   olmadan oradaki class'lar (örn. Badge'in rounded-4xl'i) hiç üretilmiyor,
+   bileşenler stilsiz/bozuk görünüyordu. */
+@source "../../../packages/ui/src";
+
 @custom-variant dark (&:is(.dark *));
 :root {
   --text: #6b6375;
