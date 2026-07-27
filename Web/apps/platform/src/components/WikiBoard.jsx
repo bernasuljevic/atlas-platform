@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { getWikiPages, createWikiPage } from "../api";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@atlas/ui/button";
+import { Card, CardContent } from "@atlas/ui/card";
+import { Input } from "@atlas/ui/input";
+import { Label } from "@atlas/ui/label";
+import { Textarea } from "@atlas/ui/textarea";
+import { Badge } from "@atlas/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@atlas/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "@atlas/ui/dialog";
 import {
   Table,
   TableBody,
@@ -22,7 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@atlas/ui/table";
 
 const PAGE_SIZE = 5;
 

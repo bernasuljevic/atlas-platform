@@ -34,7 +34,11 @@ src/Host/Atlas.Api/ → composition root, sadece her modülün *.Api projesine r
 tests/ → xUnit test projeleri (Atlas.Modules.Wiki.Domain.Tests, Atlas.Modules.Auth.Domain.Tests)
 Web/ → npm workspaces monorepo (Web/package.json, "apps/*" + "packages/*")
   Web/apps/platform/ → React (Vite) frontend, shadcn/ui (Tailwind v4 + Base UI preset)
-  Web/packages/ui/ → paylaşılan @atlas/ui paketi (şu an boş iskelet)
+  Web/packages/ui/ → paylaşılan @atlas/ui paketi - tüm shadcn/ui bileşenleri
+                     (Button/Card/Input/Label/Textarea/Badge/RadioGroup/Table/
+                     Dialog + lib/utils.js) burada yaşıyor, platform bunları
+                     "@atlas/ui/button" gibi import ediyor (package.json'daki
+                     "exports" alanı sayesinde)
 
 
 **Katman kuralı:** Domain framework'ten habersiz. Application "nasıl saklanır"ı
@@ -132,6 +136,22 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
     React'ın `getWikiPages()` çağrısı hiç Authorization header'ı göndermiyordu
     (bu da düzeltilmeden önce departman özelliğinin UI'da zaten hiç gerçek
     anlamda çalışmadığı anlamına geliyordu) - bu da düzeltildi.
+11. **SINIRLAMA - shadcn CLI, npm workspace paket adını alias olarak çözemiyor:**
+    `components.json`'daki `aliases.ui`'ı `"@atlas/ui"` yapıp `npx shadcn add`
+    çalıştırınca "Could not resolve the following aliases... ui. Configure path
+    aliases in tsconfig.json or imports in package.json" hatası alındı (denendi,
+    doğrulandı). CLI, `jsconfig.json`'daki `paths` eşlemesini tanımıyor - sadece
+    `tsconfig.json` (TypeScript projeleri) ya da package.json'ın `imports`
+    alanını (Node'un `#foo` iç import özelliği) destekliyor gibi görünüyor, bu
+    proje JS (jsconfig.json) kullandığı için bu yollardan hiçbiri açık değil.
+    Bu yüzden `aliases.ui`/`aliases.utils` platform'un kendi `@/components/ui`
+    ve `@/lib/utils` yoluna GERİ alındı - yeni bir shadcn bileşeni eklerken
+    akış şöyle: `npx shadcn add <bileşen>` (platform'a yazar) → `git mv` ile
+    `Web/packages/ui/src/`'e taşı → içindeki `@/lib/utils` import'unu
+    `./lib/utils`'e (ve varsa component-içi `@/components/ui/X` import'larını
+    `./X`'e) elle düzelt. `jsconfig.json`'daki `@atlas/ui/*` path eşlemesi
+    sadece IDE'nin (autocomplete/go-to-definition) `@atlas/ui/...` import'larını
+    anlaması için tutuldu - shadcn CLI'nin yazma hedefini etkilemiyor.
 
 ## Şu ana kadar tamamlananlar
 
@@ -169,11 +189,15 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
 - [x] Wiki GET güvenlik açığı bulundu ve düzeltildi: departman artık JWT'den
       geliyor, istemciden gelen bir query parametresine güvenilmiyor (Öğrenilen
       dersler #10)
+- [x] React Router: /login, /wiki, / (redirect), ProtectedRoute deseni,
+      AuthContext (token state + eski App.jsx event listener'ları)
+- [x] shadcn bileşenleri Web/packages/ui'ye taşındı, @atlas/ui paketi olarak
+      gerçekten paylaşılabilir hale geldi (bkz. Öğrenilen dersler #11 -
+      shadcn CLI'nin bu monorepo yapısındaki sınırlaması)
 
 ## Sırada ne var
 
 1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
-2. React: routing (React Router), Web/packages/ui'ye gerçek paylaşılan bileşenler taşınması
 
 ## Endpoint referansı
 
