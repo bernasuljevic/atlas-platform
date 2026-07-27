@@ -89,6 +89,30 @@ async function refreshAccessToken() {
   return tokens.accessToken;
 }
 
+export async function searchWikiPages(accessToken, queryText, topN = 5) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/ai/search?q=${encodeURIComponent(queryText)}&topN=${topN}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Arama yapılamadı");
+  }
+
+  return response.json();
+}
+
 export async function deleteWikiPage(accessToken, pageId) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pages/${pageId}`, {

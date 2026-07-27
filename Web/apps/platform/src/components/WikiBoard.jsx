@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { getWikiPages, createWikiPage, deleteWikiPage } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { DEPARTMENTS } from "../departments";
+import WikiSearch from "./WikiSearch";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
@@ -234,6 +235,8 @@ function WikiBoard({ token, onLogout }) {
           </Button>
         </div>
       </div>
+
+      <WikiSearch token={token} />
 
       <Card className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)]">
         <CardContent>
