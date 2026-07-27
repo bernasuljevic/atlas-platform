@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthModule(builder.Configuration);
 builder.Services.AddWikiModule(builder.Configuration);
 builder.Services.AddCaching(builder.Configuration);
-builder.Services.AddNotificationsModule();
+builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddAIModule(builder.Configuration);
 
 // CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)

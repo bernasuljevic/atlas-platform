@@ -214,10 +214,18 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       filtresiz, ham veriyi döndürüyor - filtreleme hâlâ `GetWikiPagesQueryHandler`'da,
       istek bazlı olarak yapılıyor.
 
+- [x] Notifications modülünün SignalR Hub'ına Redis backplane eklendi
+      (`Microsoft.AspNetCore.SignalR.StackExchangeRedis`,
+      `AddSignalR().AddStackExchangeRedis(ConnectionStrings:Redis)`). Tek
+      instance'lı Development kurulumunda görünür bir davranış farkı yok, ama
+      artık uygulama birden fazla instance ile (load balancer arkasında)
+      çalıştırılırsa bir instance'a bağlı istemci başka bir instance'da oluşan
+      "WikiPageCreated" olayını da alabiliyor - öncesinde her instance sadece
+      kendi bağlı istemcilerini biliyordu.
+
 ## Sırada ne var
 
 1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
-2. Notifications modülünün SignalR Hub'ına Redis backplane ekleme (çoklu instance desteği)
 
 ## Endpoint referansı
 
