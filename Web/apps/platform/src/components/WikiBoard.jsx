@@ -25,6 +25,15 @@ import {
 } from "@atlas/ui/table";
 
 const PAGE_SIZE = 5;
+const CONTENT_PREVIEW_LENGTH = 80;
+
+// Tablo hücresinde tüm içeriği göstermek satırları dev boyutlara şişiriyordu -
+// kısa bir önizleme yeterli, tam metin satıra tıklanınca açılan detay
+// Dialog'unda gösteriliyor.
+function truncateContent(text) {
+  if (text.length <= CONTENT_PREVIEW_LENGTH) return text;
+  return text.slice(0, CONTENT_PREVIEW_LENGTH).trimEnd() + "…";
+}
 
 function WikiBoard({ token, onLogout }) {
   const [pages, setPages] = useState([]);
@@ -38,6 +47,7 @@ function WikiBoard({ token, onLogout }) {
   const [isLoadingPages, setIsLoadingPages] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedPage, setSelectedPage] = useState(null);
 
   useEffect(() => {
     loadPages(pageNumber);
@@ -196,7 +206,11 @@ function WikiBoard({ token, onLogout }) {
               </TableHeader>
               <TableBody>
                 {pages.map((p) => (
-                  <TableRow key={p.id}>
+                  <TableRow
+                    key={p.id}
+                    onClick={() => setSelectedPage(p)}
+                    className="cursor-pointer hover:bg-[var(--brand-accent)]/10"
+                  >
                     <TableCell className="font-medium">{p.title}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{p.departmentName}</Badge>
@@ -208,7 +222,9 @@ function WikiBoard({ token, onLogout }) {
                         <Badge variant="outline">Sadece Departman</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-xs whitespace-normal">{p.content}</TableCell>
+                    <TableCell className="max-w-xs whitespace-normal text-[var(--text)]/70">
+                      {truncateContent(p.content)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -238,6 +254,28 @@ function WikiBoard({ token, onLogout }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Satıra tıklanınca açılan salt-okunur detay görünümü - tam içerik burada,
+          liste tablosunda değil (bkz. truncateContent). Trigger'sız, "open" state'i
+          doğrudan seçili sayfa var mı yok mu ona göre kontrol ediliyor. */}
+      <Dialog open={selectedPage !== null} onOpenChange={(open) => !open && setSelectedPage(null)}>
+        <DialogContent className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle style={{ color: "var(--text-h)" }}>{selectedPage?.title}</DialogTitle>
+            <div className="flex gap-2">
+              <Badge variant="outline">{selectedPage?.departmentName}</Badge>
+              {selectedPage?.visibility === "Public" ? (
+                <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">Herkese Açık</Badge>
+              ) : (
+                <Badge variant="outline">Sadece Departman</Badge>
+              )}
+            </div>
+          </DialogHeader>
+          <p className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm">
+            {selectedPage?.content}
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
