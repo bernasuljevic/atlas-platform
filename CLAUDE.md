@@ -388,8 +388,12 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
       sayfa gerçek bir pozitif skorla (0.52) en üstte çıktı, alakasızlar 0
       skorla altta kaldı; departman görünürlük filtresi arama sonuçlarında
       da doğru çalıştı (IT kullanıcısı IK'nın gizli sayfasını göremedi, Admin
-      bypass etti). **Henüz bir frontend arama kutusu YOK** - WikiBoard.jsx'e
-      eklenmedi, sadece backend API hazır.
+      bypass etti).
+
+- [x] **Semantik arama için frontend UI:** `WikiSearch.jsx` - bilerek AYRI bir
+      component (WikiBoard.jsx'e eklenmedi, o zaten 350 satıra yaklaşmıştı).
+      Arama sonucu her satır başlık/departman/skor (yüzde, cosine mesafesinden
+      çevrilmiş) + chunk metnini gösteriyor. Tarayıcıda canlı doğrulandı.
 
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
@@ -398,10 +402,12 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
   opsiyonel `userId` parametresi). 2 kopya - henüz "üç kural" eşiğine gelmedi,
   ama üçüncü bir test projesi (örn. Auth.Application.Tests) aynı fake'i
   isterse, paylaşılan bir `Atlas.Shared.Testing` projesine taşınmalı.
-- `WikiBoard.jsx` 350 satıra yaklaştı - liste, oluşturma, silme, detay dialogu
-  ve JWT çözme tek component'te. Gün 5'te arama kutusu da eklenirse bölünmeyi
-  (örn. ayrı `WikiPageTable`/`CreateWikiPageDialog` component'leri) düşünmenin
-  vakti gelir.
+- `WikiBoard.jsx` hâlâ ~350 satır - liste, oluşturma, silme, detay dialogu ve
+  JWT çözme tek component'te (arama özelliği BİLEREK ayrı bir component'e,
+  `WikiSearch.jsx`'e konuldu, bu dosyayı büyütmedi). Yine de bu dört
+  sorumluluk tek component'te kalmaya devam ediyor - ileride bir değişiklik
+  gerektiğinde (örn. Yeni Sayfa formu genişlerse) ayrı `WikiPageTable`/
+  `CreateWikiPageDialog` component'lerine bölünmesi düşünülmeli.
 - `WikiVisibilityRules.IsVisibleTo`'ya eklenen `viewerIsAdmin` bool parametresi
   şu an temiz ama ölçeklenmiyor - ÜÇÜNCÜ bir rol (örn. "Departman Yöneticisi")
   eklenirse bir `UserRole` enum'ı ya da capability seti'ne geçmek gerekir
@@ -413,9 +419,7 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
    edildiğini doğrula → ara → sonuçta çık) + haftalık mimari retro (Outbox
    Pattern teknik borcu dahil - bkz. Gün 3 notu, ayrıca bu oturumdaki
    "İzlenecek teknik borç" listesi de gözden geçirilmeli).
-2. Frontend'e arama kutusu eklenmesi - backend hazır (`GET /api/ai/search`)
-   ama WikiBoard.jsx'te (ya da ayrı bir component'te) hiç kullanılmıyor henüz.
-3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
 ## Endpoint referansı
