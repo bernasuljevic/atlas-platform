@@ -1,6 +1,10 @@
 using Atlas.Modules.AI.Application.Abstractions;
+using Atlas.Modules.AI.Application.WikiPages.Commands;
+using Atlas.Modules.AI.Infrastructure;
 using Atlas.Modules.AI.Infrastructure.Embeddings;
 using Atlas.Modules.AI.Infrastructure.Persistence;
+using Atlas.Shared.CQRS.Behaviors;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +33,32 @@ public static class AIModule
         // oluşturmaya gerek yok (CLAUDE.md'deki "Service Lifetime kuralı"yla tutarlı:
         // dış bir kaynağı sarmalamıyorsa Singleton olabilir).
         services.AddSingleton<IEmbeddingService, FakeEmbeddingService>();
+
+        // AiDbContext'i sarmalıyor (dış kaynak) - Auth/Wiki'deki repository'lerle
+        // aynı sebepten Scoped.
+        services.AddScoped<IWikiPageEmbeddingRepository, EfWikiPageEmbeddingRepository>();
+
+        // AI modülünde MediatR ilk kez burada kayıt ediliyor (Gün 1'de fark ettiğimiz
+        // eksiklik) - Auth/Wiki'deki AddMediatR bloklarıyla birebir aynı desen:
+        // loglama + validasyon (henüz validator yok ama ValidationBehavior validator
+        // bulamayınca no-op geçiyor, ileride eklenecek bir validator otomatik devreye girer).
+        services.AddMediatR(cfg =>
+        {
+            // İKİ ayrı assembly taranıyor: GenerateWikiPageEmbeddingsCommand'ın
+            // Handler'ı AI.Application'da yaşıyor, ama WikiPageCreatedEventHandler
+            // (Wiki'nin event'ini dinleyen abone) AI.Infrastructure'da yaşıyor.
+            // "RegisterServicesFromAssemblyContaining<T>" SADECE T'nin bulunduğu
+            // assembly'yi tarıyor - referans edilen başka bir assembly'yi OTOMATİK
+            // taramıyor. Bunu atlarsak (ilk denemede tam olarak bu oldu),
+            // WikiPageCreatedEventHandler hiç kayıt olmaz ve Wiki'nin yayınladığı
+            // event'i sessizce hiç dinlemeyen bir "hayalet" abone kalırdı.
+            cfg.RegisterServicesFromAssemblyContaining<GenerateWikiPageEmbeddingsCommand>();
+            cfg.RegisterServicesFromAssemblyContaining<WikiPageCreatedEventHandler>();
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+        });
+
+        services.AddValidatorsFromAssemblyContaining<GenerateWikiPageEmbeddingsCommand>();
 
         return services;
     }

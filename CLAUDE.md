@@ -274,12 +274,40 @@ oluşturulunca mı, ayrı bir job ile mi) LLM entegrasyonu gelince netleşecek.
       projesi (`Atlas.Modules.AI.Infrastructure.Tests`) açıldı - Infrastructure
       katmanını doğrudan test eden ilk proje.
 
+- [x] **AI Semantik Arama - Gün 3/6:** Wiki sayfası oluşunca otomatik embedding
+      üretimi uçtan uca çalışıyor (canlı doğrulandı). `WikiPageCreatedEvent`'e
+      `Content` eklendi (AI'ın embedding üretmek için sayfanın asıl metnine
+      ihtiyacı var, Wiki'nin DB'sine geri sorgu atmak modül izolasyonunu
+      ihlal ederdi). `GenerateWikiPageEmbeddingsCommand` (AI.Application) -
+      TextChunker + IEmbeddingService + yeni `IWikiPageEmbeddingRepository`
+      soyutlamasını orkestra ediyor. `WikiPageCreatedEventHandler`
+      (AI.Infrastructure) - Notifications'ın aynı event'i dinleyen handler'ıyla
+      birebir aynı desen, AI bu event'in ikinci abonesi.
+      **Bulunan gerçek bug:** `AIModule.cs`'te MediatR sadece AI.Application
+      assembly'sini tarıyordu, `WikiPageCreatedEventHandler` AI.Infrastructure'da
+      olduğu için hiç kayıt olmuyordu (event sessizce hiç dinlenmiyordu) -
+      `RegisterServicesFromAssemblyContaining<WikiPageCreatedEventHandler>()`
+      eklenerek düzeltildi.
+      **Bilinçli teknik borç (Gün 6 retrospektifinde tekrar ele alınacak):**
+      MediatR'ın `IPublisher`'ı tüm abonelerini AYNI senkron çağrı zincirinde
+      çalıştırıyor - wiki sayfası oluşturma isteği artık HEM Notifications'ın
+      SignalR yayınını HEM AI'ın chunk'lama+embedding+Postgres'e yazma işlemini
+      bitirmesini bekliyor, ve iki farklı veritabanı (SQL Server + Postgres)
+      arasında hiçbir atomicity garantisi yok. `WikiPageCreatedEventHandler`
+      (AI.Infrastructure) bu yüzden kendi içinde try/catch ile hatayı yutuyor
+      (loglayıp durduruyor) - aksi halde embedding üretimi başarısız olduğunda
+      wiki sayfası SQL Server'a zaten kaydedilmiş olmasına rağmen istemciye
+      500 dönerdi. Bu, en başta konuşulan Transactional Outbox Pattern'in
+      çözdüğü problem - kalıcı, retry edilebilir bir tetikleyici yerine
+      "en iyi çaba" (best-effort) bir tetikleyici kullanıyoruz şu an.
+
 ## Sırada ne var
 
-1. **AI Semantik Arama - Gün 3/6:** Ingestion akışı (Command/Handler + migration) -
-   wiki sayfası oluşunca chunk'lanıp embed edilme akışı.
-2. AI modülünün geri kalanı (Gün 4-6): semantik arama Query'si, API endpoint'i,
-   integration test + haftalık mimari retro.
+1. **AI Semantik Arama - Gün 4/6:** Semantik arama Query'si - doğal dil
+   sorgusunu embed edip pgvector ile benzerlik araması yapan Query, Wiki'deki
+   departman görünürlük kuralına uygun şekilde.
+2. AI modülünün geri kalanı (Gün 5-6): API endpoint'i, integration test +
+   haftalık mimari retro (Outbox Pattern teknik borcu dahil).
 3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 

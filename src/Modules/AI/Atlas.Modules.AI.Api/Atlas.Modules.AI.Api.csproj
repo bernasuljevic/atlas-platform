@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\..\Shared\Atlas.Shared.CQRS\Atlas.Shared.CQRS.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="MediatR" Version="12.4.1" />
     <!-- AI.Infrastructure'daki Npgsql paketi EF Core'u en az 10.0.4 istiyor - bu proje
          kendi bağımlılık grafiğini ayrı çözdüğü için bu alt sınıra düşüp Infrastructure'ın
