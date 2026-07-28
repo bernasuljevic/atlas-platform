@@ -40,6 +40,11 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
         if (!_currentUser.IsAdmin && !isOwner)
             throw new UnauthorizedAccessException("Bu sayfayı silme yetkiniz yok.");
 
+        // AuditBehavior, Handler bitince (next() sonrası) bunu okuyacak - page
+        // silindikten sonra title'a başka hiçbir yerden erişilemeyeceği için
+        // BURADA, silmeden önce yakalanması şart (bkz. IAuditableCommand.AuditDetails).
+        request.AuditDetails = page.Title;
+
         // Outbox Pattern (Gün 2): CreateWikiPageCommandHandler'daki AYNI desen -
         // DeleteAsync artık kalıcı yazmıyor (stage), event doğrudan yayınlanmıyor,
         // AYNI SaveChanges'e bir OutboxMessage ekleniyor (atomiklik).

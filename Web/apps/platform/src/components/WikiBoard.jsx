@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router";
 import { getWikiPages } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import WikiSearch from "./WikiSearch";
@@ -67,6 +68,15 @@ function WikiBoard({ token, onLogout }) {
           Atlas Wiki
         </h1>
         <div className="flex gap-2">
+          {/* Sadece Admin görüyor - gerçek yetkilendirme zaten backend'de
+              (GET /api/audit-log, RequireRole("Admin")); bu sadece UI
+              kararı, normal kullanıcı zaten göremeyeceği bir sayfaya
+              gitmeye çalışmasın diye. */}
+          {isAdmin && (
+            <Link to="/audit-log">
+              <Button variant="outline">Audit Log</Button>
+            </Link>
+          )}
           <CreateWikiPageDialog
             token={token}
             isAdmin={isAdmin}

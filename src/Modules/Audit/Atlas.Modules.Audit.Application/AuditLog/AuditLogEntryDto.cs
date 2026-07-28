@@ -6,4 +6,5 @@ public record AuditLogEntryDto(
     string? UserEmail,
     string Action,
     string? ResourceId,
+    string? Details,
     DateTime OccurredAtUtc);

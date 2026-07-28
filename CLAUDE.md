@@ -696,15 +696,42 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         filtresiz liste (en yeni önce, doğru `totalCount`/`totalPages`),
         `?action=WikiPage.Created` filtresi doğru daraltıyor, Admin olmayan
         kullanıcı 403, token'sız istek 401.
-  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
+  - [x] **Gün 3/3:** Frontend'de audit log görüntüleme sayfası. Yeni
+        `AuditLogPage.jsx` - eylem/tarih aralığı filtresi + sayfalama,
+        `WikiBoard.jsx`'e sadece Admin'in gördüğü bir "Audit Log" linki
+        eklendi (gerçek yetkilendirme zaten backend'de `RequireRole
+        ("Admin")` - buradaki kontrol WikiPageTable'daki "Sil" butonuyla
+        aynı desen, sadece UI kararı). Tarayıcıda uçtan uca doğrulandı:
+        Admin girişiyle liste/filtre çalışıyor, Member hesabıyla sayfa
+        "yetkin yok" mesajı gösteriyor.
+  - [x] **PR incelemesinde bulunan eksiklik - `Details` alanı:** `AuditLogEntry`
+        sadece bir `ResourceId` (GUID) tutuyordu - özellikle `WikiPage.Deleted`
+        kayıtlarında bu anlamsız kalıyordu, çünkü sayfa gerçekten silindiği
+        için title'a başka HİÇBİR yerden erişilemiyordu ("ne silindiğini nereden
+        bileceğiz" sorusu PR incelemesi sırasında ortaya çıktı). `WikiPageEmbedding`'in
+        Title denormalizasyonuyla AYNI gerekçeyle yeni bir `Details` alanı
+        eklendi. `IAuditableCommand.AuditDetails` BİLEREK settable (get-only
+        değil) - `AuditResourceId`'nin aksine, title çoğu zaman Command
+        oluşturulduğu anda değil (Delete'te SADECE PageId var), Handler
+        içinde (silmeden ÖNCE ilgili kaydı çektikten sonra) ortaya çıkıyor;
+        Handler `Handle()` içinde bu alanı dolduruyor, `AuditBehavior`
+        `next()` sonrası okuyor - aynı Command nesnesi pipeline boyunca
+        taşındığı için bu mutasyon güvenle görülüyor. Migration uygulandı,
+        frontend'e "Detay" sütunu eklendi. Canlı doğrulandı: bir sayfa
+        oluşturulup silindi, hem Created hem Deleted audit satırında doğru
+        başlık (`"Detail Alani Testi"`) göründü.
+
+**Portföy sertleştirme yol haritası artık TAMAMLANDI (1-4).** Audit log
+özelliği baştan sona bitti: domain modeli → pipeline behavior → endpoint →
+frontend sayfası.
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım, Gün 3/3:** Frontend'de
-   audit log görüntüleme sayfası (Admin-only route, filtreleme formu).
-2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
+2. Portföy sertleştirme yol haritası tamamlandı - yeni bir yön/özellik
+   kullanıcıyla birlikte kararlaştırılacak.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →

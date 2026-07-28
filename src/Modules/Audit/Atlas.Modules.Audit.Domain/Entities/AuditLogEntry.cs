@@ -25,26 +25,37 @@ public class AuditLogEntry : Entity<Guid>
     // her eylemde anlamlı bir "kaynak" olmayabilir.
     public string? ResourceId { get; private set; }
 
+    // Kaynağın o ANKİ insan-okunur özeti (ör. WikiPage.Title) - BİLEREK
+    // denormalize (ResourceId ile AYNI gerekçe). Özellikle silme işleminde
+    // kritik: sayfa silindikten sonra Wiki'nin kendi veritabanında title'a
+    // erişecek hiçbir yer kalmıyor - ResourceId tek başına anlamsız bir GUID'e
+    // dönüşürdü. Bu alan olmadan "ne silindi" sorusuna audit log'un kendisi
+    // cevap veremezdi (canlı kullanım sırasında fark edilen bir eksiklik).
+    public string? Details { get; private set; }
+
     public DateTime OccurredAtUtc { get; private set; }
 
     private AuditLogEntry() { }
 
     private AuditLogEntry(
-        Guid id, Guid? userId, string? userEmail, string action, string? resourceId, DateTime occurredAtUtc)
+        Guid id, Guid? userId, string? userEmail, string action, string? resourceId, string? details,
+        DateTime occurredAtUtc)
         : base(id)
     {
         UserId = userId;
         UserEmail = userEmail;
         Action = action;
         ResourceId = resourceId;
+        Details = details;
         OccurredAtUtc = occurredAtUtc;
     }
 
-    public static AuditLogEntry Create(Guid? userId, string? userEmail, string action, string? resourceId)
+    public static AuditLogEntry Create(
+        Guid? userId, string? userEmail, string action, string? resourceId, string? details)
     {
         if (string.IsNullOrWhiteSpace(action))
             throw new ArgumentException("Action boş olamaz.", nameof(action));
 
-        return new AuditLogEntry(Guid.NewGuid(), userId, userEmail, action, resourceId, DateTime.UtcNow);
+        return new AuditLogEntry(Guid.NewGuid(), userId, userEmail, action, resourceId, details, DateTime.UtcNow);
     }
 }
