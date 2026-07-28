@@ -1,6 +1,7 @@
 using Atlas.Modules.Wiki.Application.Abstractions;
 using Atlas.Modules.Wiki.Application.WikiPages;
 using Atlas.Modules.Wiki.Application.WikiPages.Queries;
+using Atlas.Modules.Wiki.Infrastructure.Outbox;
 using Atlas.Modules.Wiki.Infrastructure.Persistence;
 using Atlas.Shared.Contracts;
 using Atlas.Shared.CQRS.Behaviors;
@@ -38,6 +39,11 @@ public static class WikiModule
         // Gün 2: WikiPage + OutboxMessage yazmalarını TEK bir SaveChanges'te
         // (atomik) birleştiren "unit of work" - bkz. IUnitOfWork'teki not.
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
+        // Gün 3: Outbox'a yazılan mesajları periyodik okuyup gerçekten
+        // yayınlayan arka plan işleyici - bkz. OutboxProcessor'daki not.
+        // AddHostedService, uygulama başlarken otomatik başlatıyor.
+        services.AddHostedService<OutboxProcessor>();
 
         services.AddMediatR(cfg =>
         {

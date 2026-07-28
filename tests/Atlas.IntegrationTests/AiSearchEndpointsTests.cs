@@ -20,6 +20,13 @@ namespace Atlas.IntegrationTests;
 /// olmasa her çalıştırma geride "yetim" embedding bırakırdı (canlı doğrulanmış
 /// bir sorun - IAsyncLifetime.DisposeAsync güvenilir çalışmadığı için burada
 /// bilerek try/finally kullanılıyor, daha öngörülebilir).
+///
+/// Outbox Pattern Gün 3'ten (2026-07-28) itibaren ingestion artık SENKRON DEĞİL -
+/// OutboxProcessor 5 saniyede bir çalışan bir arka plan işleyici, sayfa
+/// oluşturma isteği döner dönmez embedding hazır OLMAYABİLİR. Bu yüzden
+/// SearchTitlesWithRetryAsync ile "eventual consistency" bekleniyor (poll
+/// interval'dan biraz fazla bir timeout ile) - bu testleri öncekinden yavaş
+/// yapıyor ama gerçek davranışı doğru yansıtıyor.
 /// </summary>
 public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
 {
@@ -77,13 +84,26 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         return results.EnumerateArray().Select(r => r.GetProperty("title").GetString()).ToList();
     }
 
-    // GEÇİCİ OLARAK ATLANDI (Outbox Pattern Gün 2, 2026-07-28): CreateWikiPageCommandHandler
-    // artık event'i doğrudan yayınlamıyor, Outbox'a yazıyor - ama henüz o satırı
-    // okuyup gerçekten yayınlayacak bir arka plan işleyici yok (Gün 3'te gelecek).
-    // Yani şu an sayfa oluşturma AI'ı hiç tetiklemiyor - bu bilinçli, geçici bir
-    // ara durum (canlıya bu haliyle ÇIKILMAZ, Gün 2+3 birlikte deploy edilmeli).
-    // Gün 3 bitince bu iki [Skip] kaldırılmalı.
-    [Fact(Skip = "Outbox Gün 3 (arka plan işleyici) bitene kadar - bkz. CLAUDE.md")]
+    // OutboxProcessor'ın PollInterval'ı (5sn) + biraz pay - embedding hazır olana
+    // kadar 500ms aralıklarla tekrar arıyor. Süre dolduğunda son sonucu döndürüyor,
+    // testin kendi Assert'i (Contains/DoesNotContain) anlamlı bir hata verecek.
+    private async Task<List<string?>> SearchTitlesWithRetryAsync(string token, string queryText, string expectedTitle)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        List<string?> titles;
+        do
+        {
+            titles = await SearchTitlesAsync(token, queryText);
+            if (titles.Contains(expectedTitle))
+                return titles;
+
+            await Task.Delay(500);
+        } while (DateTime.UtcNow < deadline);
+
+        return titles;
+    }
+
+    [Fact]
     public async Task SayfaOlusturulunca_OtomatikEmbedEdilirVeAramadaCikar()
     {
         var token = await RegisterAndLoginAsync("IT");
@@ -96,10 +116,7 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
             pageId = await CreateWikiPageAsync(
                 token, title, $"Bu sayfa {uniqueTerm} konusunda detaylı bilgi içeriyor.", "IT", "Public");
 
-            // Best-effort embedding senkron (await ile) çalışıyor - bkz.
-            // WikiPageCreatedEventHandler notu - bu yüzden ekstra bir bekleme/polling
-            // gerekmiyor, HTTP yanıtı dönene kadar embedding zaten yazılmış olmalı.
-            var titles = await SearchTitlesAsync(token, uniqueTerm);
+            var titles = await SearchTitlesWithRetryAsync(token, uniqueTerm, title);
 
             Assert.Contains(title, titles);
         }
@@ -109,7 +126,7 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         }
     }
 
-    [Fact(Skip = "Outbox Gün 3 (arka plan işleyici) bitene kadar - bkz. CLAUDE.md")]
+    [Fact]
     public async Task DepartmentOnlySayfa_AramaSonucunda_FarkliDepartmandakiKullanicidanGizlenir()
     {
         var ownerToken = await RegisterAndLoginAsync("IK");
@@ -122,12 +139,16 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
             pageId = await CreateWikiPageAsync(
                 ownerToken, title, $"{uniqueTerm} sadece IK departmanına özeldir.", "IK", "DepartmentOnly");
 
+            // Önce indekslendiğini KANITLIYORUZ (sahibi görebilmeli) - aksi halde
+            // aşağıdaki "başkası göremiyor" kontrolü YANLIŞ sebepten (henüz
+            // işlenmediği için) geçmiş olabilirdi, gerçek görünürlük filtresini
+            // değil.
+            var ownerTitles = await SearchTitlesWithRetryAsync(ownerToken, uniqueTerm, title);
+            Assert.Contains(title, ownerTitles);
+
             var otherDepartmentToken = await RegisterAndLoginAsync("IT");
             var otherTitles = await SearchTitlesAsync(otherDepartmentToken, uniqueTerm);
             Assert.DoesNotContain(title, otherTitles);
-
-            var ownerTitles = await SearchTitlesAsync(ownerToken, uniqueTerm);
-            Assert.Contains(title, ownerTitles);
         }
         finally
         {

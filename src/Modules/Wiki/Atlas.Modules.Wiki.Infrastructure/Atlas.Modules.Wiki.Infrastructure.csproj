@@ -17,6 +17,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+    <!-- OutboxProcessor (Gün 3) bir BackgroundService - bu tip
+         Microsoft.Extensions.Hosting.Abstractions'da yaşıyor. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
   </ItemGroup>
 
 </Project>
