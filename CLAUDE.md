@@ -753,10 +753,28 @@ SignalR bildirim UX düzeltmesi, rate limiting. Cuma'ya kadar hedefleniyor.
       brute-force'a karşı) `Microsoft.AspNetCore.RateLimiting` ile basit bir
       sınır eklenecek.
 
+## Portföy yol haritası bitince açılan ek işler (2026-07-28)
+
+Kullanıcıyla birlikte üç aday belirlendi: Docker Compose tam paketleme,
+SignalR bildirim UX düzeltmesi, rate limiting. Cuma'ya kadar hedefleniyor.
+(Bu üçü paralel/bağımsız branch'lerde ilerledi - Docker Compose PR #2,
+audit log Gün 3 + Details düzeltmesi PR #1 - bu yüzden merge sırasına göre
+CLAUDE.md'de küçük çakışmalar çıkabilir, normal.)
+
+- [x] **SignalR bildirim UX düzeltmesi:** Yeni wiki sayfası bildirimi eskiden
+      akışı tamamen kilitleyen bir `alert()` popup'ıydı - `sonner` tabanlı bir
+      toast'a geçirildi (`Web/packages/ui/src/sonner.jsx`, Ders #11'deki
+      alışılmış shadcn-CLI-sonra-taşı akışıyla eklendi). `next-themes`
+      bağımlılığı BİLEREK kaldırıldı - proje Next.js değil, sabit tek bir
+      koyu tema kullanıyor, `Toaster`'da doğrudan `theme="dark"` sabitlendi.
+      Tarayıcıda uçtan uca doğrulandı. (PR #3)
+- [ ] Rate limiting - en azından `/api/ai/search`'e (belki login'e de,
+      brute-force'a karşı) `Microsoft.AspNetCore.RateLimiting` ile basit bir
+      sınır eklenecek.
+
 ## Sırada ne var
 
-1. SignalR bildirim UX düzeltmesi ve rate limiting - ayrı PR'larda (#3, #4)
-   tamamlandı, merge sırası bekleniyor (bu branch'te henüz görünmüyorlar).
+1. Rate limiting - ayrı bir PR'da (#4) tamamlandı, merge sırası bekleniyor.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).

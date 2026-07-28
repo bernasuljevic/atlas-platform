@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { Toaster } from "@atlas/ui/sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./components/Login";
@@ -50,6 +51,10 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        {/* Tek bir yerde, kök seviyede - herhangi bir component toast()
+            çağırdığında (ör. ProtectedRoute'taki SignalR bildirimi) burada
+            render edilir. */}
+        <Toaster position="top-right" />
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginRoute />} />
