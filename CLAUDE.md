@@ -684,7 +684,7 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         ile (ikisi de AYNI sayfanın ID'siyle eşleşen) iki satır oluştu.
   - [x] **Gün 2/3 - `GET /api/audit-log` endpoint'i (Admin) + filtreleme:**
         Yeni `Atlas.Modules.Audit.Application` katmanı - `GetAuditLogQuery`
-        (Action/FromUtc/ToUtc HEPSİ opsiyonel, PageNumber/PageSize) +
+        (Details/FromUtc/ToUtc HEPSİ opsiyonel, PageNumber/PageSize) +
         `IAuditLogRepository` soyutlaması. `EfAuditLogRepository` filtre/
         sayfalamayı DB SEVİYESİNDE yapıyor (Wiki'nin `GetWikiPagesQueryHandler`'ının
         "tüm veriyi çek, bellekte filtrele" yaklaşımının BİLEREK aksine) -
@@ -692,10 +692,17 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         belleğe çekmenin mantıklı olmadığı bir tablo. Endpoint sadece Admin
         rolü (`AuthEndpoints`'teki `GET /users` ile aynı desen - audit log'un
         kendisi "kim ne yaptı" taşıdığı için normal bir kullanıcının başkasının
-        işlemlerini görmesi ayrı bir gizlilik sorunu olurdu). Canlı doğrulandı:
+        işlemlerini görmesi ayrı bir gizlilik sorunu olurdu). **Gün 3'ten sonra
+        değişti (2026-07-28, kullanıcı geri bildirimi):** filtre başlangıçta
+        Action'a (tam eşleşme) göreydi, ama Action sadece iki sabit değerden
+        biri olduğu için pratik değildi - "hangi sayfa" sorusuna cevap
+        vermiyordu. `Details` (sayfa başlığı) üzerinden KISMİ eşleşme
+        (`Contains`) aramaya çevrildi - "bu sayfayla ilgili tüm işlemleri
+        göster" gibi gerçek bir ihtiyaca karşılık geliyor. Canlı doğrulandı:
         filtresiz liste (en yeni önce, doğru `totalCount`/`totalPages`),
-        `?action=WikiPage.Created` filtresi doğru daraltıyor, Admin olmayan
-        kullanıcı 403, token'sız istek 401.
+        `?details=...` kısmi eşleşmesi 28 kayıt arasından ilgili sayfanın
+        Created+Deleted satırlarını doğru buldu, Admin olmayan kullanıcı 403,
+        token'sız istek 401.
   - [x] **Gün 3/3:** Frontend'de audit log görüntüleme sayfası. Yeni
         `AuditLogPage.jsx` - eylem/tarih aralığı filtresi + sayfalama,
         `WikiBoard.jsx`'e sadece Admin'in gördüğü bir "Audit Log" linki
@@ -816,9 +823,10 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   değişikliği sonrası kullanılacak bir admin aracı.
 - `GET /api/ai/search?q=...&topN=5` (topN opsiyonel, varsayılan 5) → token
   gerektirir, sonuçlar departman görünürlük kuralına göre filtrelenir (Admin bypass eder).
-- `GET /api/audit-log?action=...&fromUtc=...&toUtc=...&pageNumber=1&pageSize=20`
-  (hepsi opsiyonel) → sadece Admin rolü. `WikiPage.Created`/`WikiPage.Deleted`
-  eylemlerini kaydediyor (bkz. AuditBehavior, Shared.CQRS).
+- `GET /api/audit-log?details=...&fromUtc=...&toUtc=...&pageNumber=1&pageSize=20`
+  (hepsi opsiyonel, `details` kısmi eşleşme/`Contains`) → sadece Admin rolü.
+  `WikiPage.Created`/`WikiPage.Deleted` eylemlerini kaydediyor (bkz.
+  AuditBehavior, Shared.CQRS).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
