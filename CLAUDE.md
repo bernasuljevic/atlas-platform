@@ -472,6 +472,24 @@ gerçek bir mimari değişiklik olduğu için.
       tracker'a ekliyor; asıl atomiklik Gün 2'de Handler'ların WikiPage için
       zaten yapacağı `SaveChangesAsync` ile AYNI anda sağlanacak.
 
+- [x] **Gün 2/5:** `CreateWikiPageCommandHandler`/`DeleteWikiPageCommandHandler`
+      artık `IPublisher.Publish` kullanmıyor - `IOutboxWriter.Enqueue` ile AYNI
+      değişiklik kümesine bir `OutboxMessage` ekliyor. `IWikiPageRepository.AddAsync`/
+      `DeleteAsync` artık kendi `SaveChangesAsync()`'ini ÇAĞIRMIYOR (sadece stage
+      ediyor) - yeni `IUnitOfWork`/`EfUnitOfWork`, WikiPage + Outbox mesajını TEK
+      bir `SaveChanges`'te (atomik) yazıyor.
+
+  ⚠️ **BİLİNÇLİ, GEÇİCİ ARA DURUM (2026-07-28'den itibaren, Gün 3 bitene
+  kadar geçerli):** Outbox'taki mesajları okuyup gerçekten yayınlayacak arka
+  plan işleyici HENÜZ YOK (Gün 3). Yani şu an **wiki sayfası oluşturma/silme
+  AI'ı ve Notifications'ı hiç tetiklemiyor** - yeni sayfalar aranamıyor, anlık
+  bildirim gelmiyor, HİÇBİR hata da fırlamıyor (mesaj sessizce Outbox'ta
+  bekliyor). Bu bilerek böyle bırakıldı - kullanıcı testleri kırmızıyken
+  commit'lemek yerine iki integration testi `[Skip]` ile işaretleyip burada
+  durmayı tercih etti. **Gün 3 bitmeden bu durumu "bug" sanıp debug etmeye
+  başlama** - önce Gün 3'ü (arka plan işleyici) tamamla, sonra
+  `AiSearchEndpointsTests.cs`'teki iki `[Skip]`'i kaldır.
+
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
 - `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
@@ -492,12 +510,13 @@ gerçek bir mimari değişiklik olduğu için.
 
 ## Sırada ne var
 
-1. **Transactional Outbox Pattern - Gün 2/5:** Atomik yazma - `CreateWikiPageCommandHandler`/
-   `DeleteWikiPageCommandHandler`, `IPublisher.Publish` yerine `IOutboxWriter.Enqueue`
-   kullanacak. Kritik tasarım kararı burada netleşecek: her repository metodu
-   şu an kendi `SaveChangesAsync()`'ini çağırıyor - WikiPage yazması ile Outbox
-   satırının AYNI transaction'da, tek bir `SaveChanges` ile atomik olması için
-   bunu yeniden düşünmek gerekecek.
+1. **Transactional Outbox Pattern - Gün 3/5 (ACİL - uygulama şu an yarım kalmış
+   durumda, bkz. Gün 2'deki ⚠️ notu):** Arka plan işleyici (`IHostedService`,
+   polling) - işlenmemiş `OutboxMessage`'ları okuyup `Payload`'ı `EventType`'a
+   göre deserialize edip gerçek `IPublisher.Publish`'i tetikleyecek, başarılıysa
+   `MarkProcessed()` çağıracak. Bu bitene kadar wiki sayfası oluşturma/silme
+   AI'ı ve Notifications'ı hiç tetiklemiyor - bu Gün'ü atlayıp başka bir işe
+   geçme.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
