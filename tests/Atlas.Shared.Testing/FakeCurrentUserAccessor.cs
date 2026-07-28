@@ -1,7 +1,13 @@
 using Atlas.Shared.Contracts;
 
-namespace Atlas.Modules.Wiki.Application.Tests.Fakes;
+namespace Atlas.Shared.Testing;
 
+// Wiki.Application.Tests ve AI.Application.Tests'te neredeyse birebir aynı
+// (tek fark opsiyonel userId parametresiydi) iki ayrı kopya olarak yaşıyordu
+// - "üç kural" eşiği aşıldığında (bkz. CLAUDE.md "İzlenecek teknik borç")
+// buraya, paylaşılan bir test projesine taşındı. Superset (userId parametreli)
+// versiyon korundu - AI tarafındaki testler bu parametreyi kullanmıyor,
+// varsayılan (yeni bir Guid) yeterli.
 public class FakeCurrentUserAccessor : ICurrentUserAccessor
 {
     public FakeCurrentUserAccessor(string? department, bool isAdmin = false, Guid? userId = null)

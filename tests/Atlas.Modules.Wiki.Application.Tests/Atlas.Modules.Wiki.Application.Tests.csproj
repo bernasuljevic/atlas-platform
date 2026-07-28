@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Wiki\Atlas.Modules.Wiki.Application\Atlas.Modules.Wiki.Application.csproj" />
+    <ProjectReference Include="..\Atlas.Shared.Testing\Atlas.Shared.Testing.csproj" />
   </ItemGroup>
 
 </Project>

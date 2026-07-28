@@ -1,4 +1,5 @@
 using Atlas.Modules.Wiki.Application.Tests.Fakes;
+using Atlas.Shared.Testing;
 using Atlas.Modules.Wiki.Application.WikiPages.Commands;
 using Atlas.Shared.Contracts;
 

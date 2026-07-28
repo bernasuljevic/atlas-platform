@@ -1,5 +1,6 @@
 using Atlas.Modules.AI.Application.Abstractions;
 using Atlas.Modules.AI.Application.Tests.Fakes;
+using Atlas.Shared.Testing;
 using Atlas.Modules.AI.Application.WikiPages.Queries;
 using Atlas.Modules.AI.Domain.Entities;
 
