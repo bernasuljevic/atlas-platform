@@ -32,7 +32,17 @@ public class EfAuditLogRepository : IAuditLogRepository
             query = query.Where(e => e.OccurredAtUtc >= fromUtc.Value);
 
         if (toUtc is not null)
-            query = query.Where(e => e.OccurredAtUtc <= toUtc.Value);
+        {
+            // BULUNAN GERÇEK BUG (2026-07-28): frontend'deki <input type="date">
+            // saat bilgisi olmadan (00:00:00) bir DateTime gönderiyor - "<= toUtc"
+            // ile karşılaştırınca o günün SADECE gece yarısı anını kapsıyordu,
+            // o gün içindeki (ör. 15:51) hiçbir kayıt eşleşmiyordu (canlı
+            // doğrulandı - "Bitiş: bugün" seçilince her zaman "Kayıt bulunamadı"
+            // dönüyordu). "Bitiş" tarihi seçildiğinde kullanıcı o günün TAMAMINI
+            // kastediyor - bir sonraki günün başlangıcına kadar (hariç) genişletiyoruz.
+            var exclusiveUpperBound = toUtc.Value.Date.AddDays(1);
+            query = query.Where(e => e.OccurredAtUtc < exclusiveUpperBound);
+        }
 
         // Sayı ve sayfa AYRI sorgular - filtrelenmiş satırların TAMAMINI belleğe
         // çekmeden toplam sayıyı öğrenmek için (tablo büyüdükçe önemli).

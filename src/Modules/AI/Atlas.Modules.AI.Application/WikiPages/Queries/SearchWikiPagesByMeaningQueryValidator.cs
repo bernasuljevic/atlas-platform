@@ -15,5 +15,12 @@ public class SearchWikiPagesByMeaningQueryValidator : AbstractValidator<SearchWi
 
         RuleFor(x => x.TopN)
             .InclusiveBetween(1, 50).WithMessage("TopN 1 ile 50 arasında olmalı.");
+
+        When(x => x.FromUtc is not null && x.ToUtc is not null, () =>
+        {
+            RuleFor(x => x)
+                .Must(x => x.FromUtc <= x.ToUtc)
+                .WithMessage("FromUtc, ToUtc'den sonra olamaz.");
+        });
     }
 }

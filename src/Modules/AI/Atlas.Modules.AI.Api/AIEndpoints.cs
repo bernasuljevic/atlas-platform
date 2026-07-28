@@ -16,9 +16,10 @@ public static class AIEndpoints
         // ICurrentUserAccessor.Department/IsAdmin'e göre filtreliyor (bkz.
         // IWikiVisibilityChecker); anonim bir istek sadece Public sonuçları
         // görürdü, bu da kafa karıştırıcı olurdu - net bir kural: giriş şart.
-        group.MapGet("/search", async (string q, IMediator mediator, int topN = 5) =>
+        group.MapGet("/search", async (
+            string q, IMediator mediator, int topN = 5, DateTime? fromUtc = null, DateTime? toUtc = null) =>
         {
-            var results = await mediator.Send(new SearchWikiPagesByMeaningQuery(q, topN));
+            var results = await mediator.Send(new SearchWikiPagesByMeaningQuery(q, topN, fromUtc, toUtc));
             return Results.Ok(results);
         })
         .WithName("SearchWikiPages")

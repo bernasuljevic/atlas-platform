@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { searchWikiPages, getWikiPageById } from "../api";
+import { formatUtcTimestamp } from "../dateUtils";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
+import { Label } from "@atlas/ui/label";
 import { Badge } from "@atlas/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@atlas/ui/dialog";
 
@@ -11,6 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@atlas/ui/dial
 // onu daha da büyütürdü (bkz. CLAUDE.md "İzlenecek teknik borç").
 function WikiSearch({ token }) {
   const [queryText, setQueryText] = useState("");
+  // İsteğe bağlı, normal aramaya EK bir daraltma - boş bırakılırsa arama
+  // eskisi gibi tarih filtresiz çalışır (bkz. api.js'teki searchWikiPages).
+  const [fromUtc, setFromUtc] = useState("");
+  const [toUtc, setToUtc] = useState("");
   const [results, setResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState(null);
@@ -28,7 +34,7 @@ function WikiSearch({ token }) {
     setError(null);
     setIsSearching(true);
     try {
-      const found = await searchWikiPages(token, queryText);
+      const found = await searchWikiPages(token, queryText, 5, { fromUtc, toUtc });
       setResults(found);
     } catch (err) {
       setError(err.message);
@@ -54,14 +60,35 @@ function WikiSearch({ token }) {
   return (
     <Card className="mb-6 border-[var(--border)] bg-[var(--bg)] text-[var(--text)]">
       <CardContent>
-        <form onSubmit={handleSearch} className="flex gap-2">
+        <form onSubmit={handleSearch} className="flex flex-wrap items-end gap-2">
           <Input
             value={queryText}
             onChange={(e) => setQueryText(e.target.value)}
             placeholder="Anlamına göre ara... (örn. sunucu bakım prosedürü)"
             disabled={isSearching}
-            className="flex-1"
+            className="min-w-48 flex-1"
           />
+          {/* İsteğe bağlı tarih daraltması - normal aramaya EK, boş bırakılabilir. */}
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="search-from" className="text-xs">Başlangıç</Label>
+            <Input
+              id="search-from"
+              type="date"
+              value={fromUtc}
+              onChange={(e) => setFromUtc(e.target.value)}
+              disabled={isSearching}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="search-to" className="text-xs">Bitiş</Label>
+            <Input
+              id="search-to"
+              type="date"
+              value={toUtc}
+              onChange={(e) => setToUtc(e.target.value)}
+              disabled={isSearching}
+            />
+          </div>
           <Button
             type="submit"
             disabled={isSearching || !queryText.trim()}
@@ -100,6 +127,9 @@ function WikiSearch({ token }) {
                   </div>
                   <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--text)" }}>
                     {r.chunkText}
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+                    {formatUtcTimestamp(r.createdAtUtc)}
                   </p>
                 </div>
               ))

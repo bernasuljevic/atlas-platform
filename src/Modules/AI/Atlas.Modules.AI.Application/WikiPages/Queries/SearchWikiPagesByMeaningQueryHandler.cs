@@ -42,7 +42,8 @@ public class SearchWikiPagesByMeaningQueryHandler
         var queryVector = queryVectors[0];
 
         var candidatePoolSize = Math.Max(MinimumCandidatePool, request.TopN * CandidatePoolMultiplier);
-        var candidates = await _repository.FindNearestAsync(queryVector, candidatePoolSize, cancellationToken);
+        var candidates = await _repository.FindNearestAsync(
+            queryVector, candidatePoolSize, request.FromUtc, request.ToUtc, cancellationToken);
 
         // Aynı departman güvenlik kuralı burada da geçerli (bkz. CLAUDE.md
         // "Öğrenilen dersler #10") - GetWikiPagesQueryHandler'ın Wiki tarafında
@@ -66,7 +67,8 @@ public class SearchWikiPagesByMeaningQueryHandler
                 hit.Embedding.Title,
                 hit.Embedding.DepartmentName,
                 hit.Embedding.ChunkText,
-                Score: 1 - hit.Distance))
+                Score: 1 - hit.Distance,
+                hit.Embedding.CreatedAtUtc))
             .ToList();
     }
 }

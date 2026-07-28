@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { deleteWikiPage } from "../api";
+import { formatUtcTimestamp } from "../dateUtils";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Badge } from "@atlas/ui/badge";
@@ -77,6 +78,7 @@ function WikiPageTable({
                   <TableHead>Departman</TableHead>
                   <TableHead>Görünürlük</TableHead>
                   <TableHead className="hidden md:table-cell">İçerik</TableHead>
+                  <TableHead className="hidden lg:table-cell">Oluşturulma</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -105,6 +107,9 @@ function WikiPageTable({
                         Dialog'unda var, bu sütun sadece bir önizleme. */}
                     <TableCell className="hidden max-w-[280px] truncate text-[var(--text)]/70 md:table-cell">
                       {truncateContent(p.content)}
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-sm text-[var(--text)]/70 lg:table-cell">
+                      {formatUtcTimestamp(p.createdAtUtc)}
                     </TableCell>
                     <TableCell>
                       {/* Silme yetkisi istemcide "gösterme" kararı - gerçek
@@ -159,12 +164,17 @@ function WikiPageTable({
         <DialogContent className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle style={{ color: "var(--text-h)" }}>{selectedPage?.title}</DialogTitle>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Badge variant="outline">{selectedPage?.departmentName}</Badge>
               {selectedPage?.visibility === "Public" ? (
                 <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">Herkese Açık</Badge>
               ) : (
                 <Badge variant="outline">Sadece Departman</Badge>
+              )}
+              {selectedPage && (
+                <span className="text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+                  {formatUtcTimestamp(selectedPage.createdAtUtc)}
+                </span>
               )}
             </div>
           </DialogHeader>

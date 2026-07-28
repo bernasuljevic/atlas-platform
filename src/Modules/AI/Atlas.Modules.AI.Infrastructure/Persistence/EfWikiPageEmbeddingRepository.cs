@@ -22,15 +22,46 @@ public class EfWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
     }
 
     public async Task<IReadOnlyList<WikiPageEmbeddingSearchHit>> FindNearestAsync(
-        float[] queryEmbedding, int limit, CancellationToken cancellationToken = default)
+        float[] queryEmbedding, int limit, DateTime? fromUtc = null, DateTime? toUtc = null,
+        CancellationToken cancellationToken = default)
     {
         var vector = new Vector(queryEmbedding);
+
+        var query = _context.WikiPageEmbeddings.AsQueryable();
+
+        // BULUNAN GERÇEK BUG (2026-07-28): ASP.NET Core'un query string
+        // binder'ı "2026-07-29" gibi bir DateTime'ı Kind=Unspecified olarak
+        // üretiyor. Npgsql, "timestamp with time zone" (WikiPageEmbedding.
+        // CreatedAtUtc) sütunuyla karşılaştırırken Kind=Unspecified bir
+        // DateTime'ı KABUL ETMİYOR - "only UTC is supported" hatasıyla 400
+        // dönüyordu (canlı doğrulandı). SQL Server'daki Audit log'un AYNI
+        // deseni sorun ÇIKARMADI çünkü SQL Server'ın datetime2 tipi Kind'ı
+        // hiç umursamıyor - bu, Postgres/Npgsql'e özgü bir katılık. Çözüm:
+        // Kind'ı burada AÇIKÇA Utc olarak işaretlemek (değeri DEĞİŞTİRMİYOR,
+        // sadece .NET'e "bu zaten UTC" diyor - ki öyle, JWT/istemciden başka
+        // bir zaman dilimi hiç gelmiyor).
+        if (fromUtc is not null)
+        {
+            var from = DateTime.SpecifyKind(fromUtc.Value, DateTimeKind.Utc);
+            query = query.Where(e => e.CreatedAtUtc >= from);
+        }
+
+        if (toUtc is not null)
+        {
+            // Audit log'daki AYNI düzeltme (bkz. EfAuditLogRepository) - tarih
+            // seçici saatsiz bir değer gönderiyor, "Bitiş" o günün TAMAMINI
+            // kapsamalı, sadece gece yarısını değil.
+            var exclusiveUpperBound = DateTime.SpecifyKind(toUtc.Value.Date.AddDays(1), DateTimeKind.Utc);
+            query = query.Where(e => e.CreatedAtUtc < exclusiveUpperBound);
+        }
 
         // CosineDistance, Pgvector.EntityFrameworkCore'un LINQ'ü Postgres'in
         // "<=>" operatörüne çeviren extension metodu - sıralama VE mesafe
         // hesaplaması Postgres tarafında yapılıyor, .NET tarafına sadece
         // zaten sıralı "limit" kadar satır (mesafesiyle birlikte) geliyor.
-        var rows = await _context.WikiPageEmbeddings
+        // Tarih filtresi BURADA, mesafe sıralamasından ÖNCE uygulanıyor -
+        // "bu tarih aralığındaki sayfalar arasında en alakalı olanı bul".
+        var rows = await query
             .Select(e => new { Embedding = e, Distance = e.Embedding.CosineDistance(vector) })
             .OrderBy(x => x.Distance)
             .Take(limit)

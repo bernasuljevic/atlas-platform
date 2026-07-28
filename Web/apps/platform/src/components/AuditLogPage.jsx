@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router";
 import { getAuditLog } from "../api";
 import { getUserInfoFromToken } from "../jwt";
+import { formatUtcTimestamp } from "../dateUtils";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
@@ -160,7 +161,7 @@ function AuditLogPage({ token }) {
                       {entry.resourceId ?? "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
-                      {new Date(entry.occurredAtUtc + "Z").toLocaleString()}
+                      {formatUtcTimestamp(entry.occurredAtUtc)}
                     </TableCell>
                   </TableRow>
                 ))}

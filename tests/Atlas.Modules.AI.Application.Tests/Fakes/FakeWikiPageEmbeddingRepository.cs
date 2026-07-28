@@ -24,8 +24,15 @@ public class FakeWikiPageEmbeddingRepository : IWikiPageEmbeddingRepository
         => Task.CompletedTask;
 
     public Task<IReadOnlyList<WikiPageEmbeddingSearchHit>> FindNearestAsync(
-        float[] queryEmbedding, int limit, CancellationToken cancellationToken = default)
-        => Task.FromResult(_hits.Take(limit).ToList() as IReadOnlyList<WikiPageEmbeddingSearchHit>);
+        float[] queryEmbedding, int limit, DateTime? fromUtc = null, DateTime? toUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        var filtered = _hits.Where(h =>
+            (fromUtc is null || h.Embedding.CreatedAtUtc >= fromUtc) &&
+            (toUtc is null || h.Embedding.CreatedAtUtc < toUtc.Value.Date.AddDays(1)));
+
+        return Task.FromResult(filtered.Take(limit).ToList() as IReadOnlyList<WikiPageEmbeddingSearchHit>);
+    }
 
     public Task DeleteByWikiPageIdAsync(Guid wikiPageId, CancellationToken cancellationToken = default)
     {

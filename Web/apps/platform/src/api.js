@@ -103,9 +103,15 @@ export async function getWikiPageById(accessToken, pageId) {
   return response.json();
 }
 
-export async function searchWikiPages(accessToken, queryText, topN = 5) {
+// fromUtc/toUtc opsiyonel - normal semantik aramaya EK, isteğe bağlı bir
+// tarih daraltması (bkz. SearchWikiPagesByMeaningQuery'deki not).
+export async function searchWikiPages(accessToken, queryText, topN = 5, { fromUtc, toUtc } = {}) {
+  const params = new URLSearchParams({ q: queryText, topN });
+  if (fromUtc) params.set("fromUtc", fromUtc);
+  if (toUtc) params.set("toUtc", toUtc);
+
   const doRequest = (token) =>
-    fetch(`${API_URL}/api/ai/search?q=${encodeURIComponent(queryText)}&topN=${topN}`, {
+    fetch(`${API_URL}/api/ai/search?${params.toString()}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 

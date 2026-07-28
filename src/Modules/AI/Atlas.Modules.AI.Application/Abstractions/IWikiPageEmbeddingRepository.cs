@@ -15,8 +15,12 @@ public interface IWikiPageEmbeddingRepository
     /// Handler'da IWikiVisibilityChecker ile yapılıyor (bkz.
     /// SearchWikiPagesByMeaningQueryHandler).
     /// </summary>
+    // fromUtc/toUtc opsiyonel - verilirse mesafe sıralamasından ÖNCE (bkz.
+    // implementasyon) tarih aralığına göre daraltıyor: "bu tarih aralığındaki
+    // sayfalar arasında en alakalı olanı bul".
     Task<IReadOnlyList<WikiPageEmbeddingSearchHit>> FindNearestAsync(
-        float[] queryEmbedding, int limit, CancellationToken cancellationToken = default);
+        float[] queryEmbedding, int limit, DateTime? fromUtc = null, DateTime? toUtc = null,
+        CancellationToken cancellationToken = default);
 
     // WikiPageDeletedEvent geldiğinde çağrılıyor - bir sayfanın TÜM chunk'larını
     // (WikiPageId eşleşen her satırı) temizliyor. Bunsuz, silinen bir sayfanın
