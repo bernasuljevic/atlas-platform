@@ -704,6 +704,22 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         aynı desen, sadece UI kararı). Tarayıcıda uçtan uca doğrulandı:
         Admin girişiyle liste/filtre çalışıyor, Member hesabıyla sayfa
         "yetkin yok" mesajı gösteriyor.
+  - [x] **PR incelemesinde bulunan eksiklik - `Details` alanı:** `AuditLogEntry`
+        sadece bir `ResourceId` (GUID) tutuyordu - özellikle `WikiPage.Deleted`
+        kayıtlarında bu anlamsız kalıyordu, çünkü sayfa gerçekten silindiği
+        için title'a başka HİÇBİR yerden erişilemiyordu ("ne silindiğini nereden
+        bileceğiz" sorusu PR incelemesi sırasında ortaya çıktı). `WikiPageEmbedding`'in
+        Title denormalizasyonuyla AYNI gerekçeyle yeni bir `Details` alanı
+        eklendi. `IAuditableCommand.AuditDetails` BİLEREK settable (get-only
+        değil) - `AuditResourceId`'nin aksine, title çoğu zaman Command
+        oluşturulduğu anda değil (Delete'te SADECE PageId var), Handler
+        içinde (silmeden ÖNCE ilgili kaydı çektikten sonra) ortaya çıkıyor;
+        Handler `Handle()` içinde bu alanı dolduruyor, `AuditBehavior`
+        `next()` sonrası okuyor - aynı Command nesnesi pipeline boyunca
+        taşındığı için bu mutasyon güvenle görülüyor. Migration uygulandı,
+        frontend'e "Detay" sütunu eklendi. Canlı doğrulandı: bir sayfa
+        oluşturulup silindi, hem Created hem Deleted audit satırında doğru
+        başlık (`"Detail Alani Testi"`) göründü.
 
 **Portföy sertleştirme yol haritası artık TAMAMLANDI (1-4).** Audit log
 özelliği baştan sona bitti: domain modeli → pipeline behavior → endpoint →
