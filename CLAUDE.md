@@ -602,17 +602,11 @@ teslimatı crash-safe ve atomik.
 
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
-- `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
-  `Atlas.Modules.Wiki.Application.Tests`'te neredeyse birebir kopya (tek fark
-  opsiyonel `userId` parametresi). 2 kopya - henüz "üç kural" eşiğine gelmedi,
-  ama üçüncü bir test projesi (örn. Auth.Application.Tests) aynı fake'i
-  isterse, paylaşılan bir `Atlas.Shared.Testing` projesine taşınmalı.
-- `WikiBoard.jsx` hâlâ ~350 satır - liste, oluşturma, silme, detay dialogu ve
-  JWT çözme tek component'te (arama özelliği BİLEREK ayrı bir component'e,
-  `WikiSearch.jsx`'e konuldu, bu dosyayı büyütmedi). Yine de bu dört
-  sorumluluk tek component'te kalmaya devam ediyor - ileride bir değişiklik
-  gerektiğinde (örn. Yeni Sayfa formu genişlerse) ayrı `WikiPageTable`/
-  `CreateWikiPageDialog` component'lerine bölünmesi düşünülmeli.
+- ~~`FakeCurrentUserAccessor` kopyası~~ - 2026-07-28'de `Atlas.Shared.Testing`'e
+  taşınarak ÇÖZÜLDÜ (bkz. Portföy sertleştirme yol haritası, 3. adım).
+- ~~`WikiBoard.jsx`'in tek component'te dört sorumluluğu~~ - 2026-07-28'de
+  `CreateWikiPageDialog`/`WikiPageTable`'a bölünerek ÇÖZÜLDÜ (bkz. Portföy
+  sertleştirme yol haritası, 3. adım).
 - `WikiVisibilityRules.IsVisibleTo`'ya eklenen `viewerIsAdmin` bool parametresi
   şu an temiz ama ölçeklenmiyor - ÜÇÜNCÜ bir rol (örn. "Departman Yöneticisi")
   eklenirse bir `UserRole` enum'ı ya da capability seti'ne geçmek gerekir
@@ -648,16 +642,22 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
       method/path/status/süre içeren tek bir özet satır da ekleniyor.
       appsettings üzerinden değil kod içinde yapılandırıldı (tek ortam için
       appsettings şeması eklemek şimdilik gereksiz karmaşıklık olurdu).
-- [ ] 3) Teknik borç ödeme: WikiBoard.jsx bölünmesi, FakeCurrentUserAccessor
-      birleştirilmesi
+- [x] **3) Teknik borç ödeme:** `WikiBoard.jsx` (~350 satır) `CreateWikiPageDialog`/
+      `WikiPageTable`'a bölündü - her biri kendi form/dialog/hata state'ini
+      kendi yönetiyor, parent'a sadece "liste değişti, yenile" callback'iyle
+      haber veriyor. Yan etki: silme/listeleme hataları artık kullanıcıya
+      gösteriliyor (eskiden aynı error state'i sadece oluşturma dialogunun
+      içinde render ediliyordu). Tarayıcıda uçtan uca doğrulandı. Ayrıca
+      `FakeCurrentUserAccessor` kopyası yeni `Atlas.Shared.Testing` projesine
+      taşındı (diğer test-özel fake'ler kendi projelerinde kaldı, sadece bu
+      genuinely aynı olan implementasyon paylaşıldı).
 - [ ] 4) Yeni kullanıcı-görünür özellik: audit log ya da üçüncü bir rol
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 3. adım (Teknik borç ödeme):**
-   `WikiBoard.jsx`'i (~350 satır) `WikiPageTable`/`CreateWikiPageDialog` gibi
-   alt component'lere böl, `FakeCurrentUserAccessor` kopyasını paylaşılan bir
-   test projesine taşı.
+1. **Portföy sertleştirme yol haritası - 4. adım (Yeni kullanıcı-görünür
+   özellik):** Audit log (Admin işlemleri: kim, ne zaman, ne yaptı) ya da
+   üçüncü bir rol (Departman Yöneticisi) - kullanıcıyla birlikte kararlaştırılacak.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
