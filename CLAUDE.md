@@ -651,13 +651,45 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
       `FakeCurrentUserAccessor` kopyası yeni `Atlas.Shared.Testing` projesine
       taşındı (diğer test-özel fake'ler kendi projelerinde kaldı, sadece bu
       genuinely aynı olan implementasyon paylaşıldı).
-- [ ] 4) Yeni kullanıcı-görünür özellik: audit log ya da üçüncü bir rol
+- [ ] **4) Yeni kullanıcı-görünür özellik: Audit log** (üçüncü rol yerine
+      seçildi - daha net kapsamlı, mevcut mimariyle - CachingBehavior/
+      CacheInvalidationBehavior deseniyle - doğal örtüştüğü için tercih
+      edildi; üçüncü rol daha büyük bir ürün kararı gerektirdiği için
+      YAGNI gerekçesiyle ertelenmeye devam ediyor).
+  - [x] **Gün 1/3 - Domain modeli + pipeline behavior:** Yeni
+        `Atlas.Modules.Audit` modülü (Domain/Infrastructure/Api, `audit.*`
+        şeması - Auth/Wiki ile AYNI SQL Server veritabanı, ayrı bir DB
+        gerekmedi). `AuditLogEntry` entity - UserId/UserEmail BİLEREK
+        denormalize (WikiPageEmbedding'in Title/DepartmentName'i
+        denormalize etmesiyle aynı gerekçe - kullanıcı silinse/değişse
+        bile audit kaydı o anki gerçeği göstermeye devam etsin).
+        Cross-module iletişim `ICurrentUserAccessor`/`IWikiVisibilityChecker`
+        ile AYNI desen: `IAuditLogWriter` (Shared.Contracts) + yeni bir
+        marker interface `IAuditableCommand` (Shared.CQRS/Behaviors,
+        `ICacheInvalidatingCommand` ile aynı yapı) + `AuditBehavior`
+        (`CacheInvalidationBehavior` ile birebir aynı iskelet - generic
+        constraint `where TRequest : notnull, IAuditableCommand` sayesinde
+        MediatR bu behavior'ı SADECE işaretlenen komutlar için pipeline'a
+        sokuyor). `CreateWikiPageCommand`/`DeleteWikiPageCommand` ilk
+        denetlenen eylemler oldu - Create'te `AuditResourceId` BİLEREK null
+        (yeni sayfanın ID'si Handler çalışana kadar bilinmiyor), bu durumda
+        `AuditBehavior` `TResponse`'un kendisini (Guid dönüyorsa) kaynak
+        ID'si sayıyor; Delete'te ID zaten Command'da olduğu için doğrudan
+        dolduruluyor. Audit yazımı BEST-EFFORT - `AuditBehavior`'daki
+        try/catch, başarısız bir audit yazımının asıl işlemi (Handler zaten
+        tamamlandı) etkilemesini/istemciye 500 dönmesini engelliyor (AI'ın
+        `WikiPageCreatedEventHandler`'ının kendi hatasını yutmasıyla aynı
+        gerekçe). Canlı doğrulandı: bir sayfa oluşturulup silindi,
+        `audit.AuditLogEntries`'de doğru `UserEmail`/`Action`/`ResourceId`
+        ile (ikisi de AYNI sayfanın ID'siyle eşleşen) iki satır oluştu.
+  - [ ] Gün 2/3: Admin'e özel `GET /api/audit-log` endpoint'i + filtreleme
+        (Action/tarih aralığı).
+  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası.
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım (Yeni kullanıcı-görünür
-   özellik):** Audit log (Admin işlemleri: kim, ne zaman, ne yaptı) ya da
-   üçüncü bir rol (Departman Yöneticisi) - kullanıcıyla birlikte kararlaştırılacak.
+1. **Portföy sertleştirme yol haritası - 4. adım, Gün 2/3:** Admin'e özel
+   `GET /api/audit-log` endpoint'i + filtreleme.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
