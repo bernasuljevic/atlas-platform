@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import WikiBoard from "./components/WikiBoard";
+import AuditLogPage from "./components/AuditLogPage";
 
 // Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
 function LoginRoute() {
@@ -33,6 +34,11 @@ function WikiRoute() {
   return <WikiBoard token={token} onLogout={logout} />;
 }
 
+function AuditLogRoute() {
+  const { token } = useAuth();
+  return <AuditLogPage token={token} />;
+}
+
 // "/" hiçbir zaman kendi başına bir sayfa değil - sadece giriş durumuna göre
 // doğru yere yönlendiren bir trafik yönlendiricisi.
 function RootRedirect() {
@@ -50,6 +56,7 @@ function App() {
           <Route path="/register" element={<RegisterRoute />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/wiki" element={<WikiRoute />} />
+            <Route path="/audit-log" element={<AuditLogRoute />} />
           </Route>
         </Routes>
       </AuthProvider>
