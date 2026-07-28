@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .NET 10 kur
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Atlas.sln
+
+      - name: Build
+        run: dotnet build Atlas.sln --no-restore --configuration Release
+
+      # Atlas.IntegrationTests derleniyor (build hatası burada da yakalanır)
+      # ama ÇALIŞTIRILMIYOR - gerçek SQL Server/Postgres/Redis'e ihtiyaç
+      # duyuyor, henüz servis container'larıyla CI'a taşınmadı (bkz.
+      # AtlasApiFactory.cs'teki not, tests/*.cs'teki [Trait("Category",
+      # "Integration")] işaretleri). Domain/Application/Infrastructure
+      # testlerinin hepsi fake/in-memory - dış bağımlılık yok.
+      - name: Test (Integration hariç)
+        run: dotnet test Atlas.sln --no-build --configuration Release --filter "Category!=Integration"
+
+  frontend:
+    name: Frontend (build + lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: Web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --workspace=web
+
+      - name: Build
+        run: npm run build --workspace=web

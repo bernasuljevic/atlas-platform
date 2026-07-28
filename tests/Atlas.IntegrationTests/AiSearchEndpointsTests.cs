@@ -28,6 +28,7 @@ namespace Atlas.IntegrationTests;
 /// interval'dan biraz fazla bir timeout ile) - bu testleri öncekinden yavaş
 /// yapıyor ama gerçek davranışı doğru yansıtıyor.
 /// </summary>
+[Trait("Category", "Integration")]
 public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
 {
     private readonly AtlasApiFactory _factory;

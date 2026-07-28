@@ -1,5 +1,7 @@
 # Atlas Platform — Öğrenme Notları
 
+[![CI](https://github.com/bernasuljevic/atlas-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/bernasuljevic/atlas-platform/actions/workflows/ci.yml)
+
 Modüler monolith mimarisiyle sıfırdan kurulan, .NET 10 + React tabanlı bir öğrenme
 projesi. Kurumsal wiki + AI fikrine dayanıyor (orijinal ilham: SubMed Platform
 mimarisi - departman bazlı wiki + AI katmanı). Şu an **Auth**, **Wiki**,

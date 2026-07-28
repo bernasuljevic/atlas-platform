@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace Atlas.IntegrationTests;
 
+[Trait("Category", "Integration")]
 public class AuthEndpointsTests : IClassFixture<AtlasApiFactory>
 {
     private readonly HttpClient _client;

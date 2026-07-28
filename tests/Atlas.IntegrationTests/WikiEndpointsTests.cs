@@ -5,6 +5,10 @@ using System.Text.Json;
 
 namespace Atlas.IntegrationTests;
 
+// CI'da bu kategori atlanıyor (bkz. .github/workflows/ci.yml) - gerçek
+// SQL Server/Postgres/Redis'e ihtiyaç duyduğu için, henüz servis
+// container'larıyla CI'a taşınmadı (bkz. AtlasApiFactory'deki not).
+[Trait("Category", "Integration")]
 public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
 {
     private readonly AtlasApiFactory _factory;

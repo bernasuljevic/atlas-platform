@@ -24,6 +24,7 @@ namespace Atlas.IntegrationTests;
 /// sadece satırın DOĞRU EventType/Payload ile VAR OLDUĞUNU doğruluyor, HTTP
 /// yanıtı döner dönmez.
 /// </summary>
+[Trait("Category", "Integration")]
 public class OutboxIntegrationTests : IClassFixture<AtlasApiFactory>
 {
     private readonly AtlasApiFactory _factory;
