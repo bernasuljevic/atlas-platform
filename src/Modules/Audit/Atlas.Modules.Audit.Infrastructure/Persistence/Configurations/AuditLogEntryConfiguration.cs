@@ -13,6 +13,7 @@ public class AuditLogEntryConfiguration : IEntityTypeConfiguration<AuditLogEntry
         builder.Property(e => e.UserEmail).HasMaxLength(256);
         builder.Property(e => e.Action).IsRequired().HasMaxLength(200);
         builder.Property(e => e.ResourceId).HasMaxLength(200);
+        builder.Property(e => e.Details).HasMaxLength(500);
 
         // Admin ekranı (Gün 2) muhtemelen "en yeni önce" sıralayacak ve/veya
         // Action'a göre filtreleyecek - ikisi de sık kullanılacak sorgu yolları.

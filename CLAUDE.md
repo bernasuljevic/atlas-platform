@@ -696,7 +696,62 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         filtresiz liste (en yeni önce, doğru `totalCount`/`totalPages`),
         `?action=WikiPage.Created` filtresi doğru daraltıyor, Admin olmayan
         kullanıcı 403, token'sız istek 401.
-  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
+  - [x] **Gün 3/3:** Frontend'de audit log görüntüleme sayfası. Yeni
+        `AuditLogPage.jsx` - eylem/tarih aralığı filtresi + sayfalama,
+        `WikiBoard.jsx`'e sadece Admin'in gördüğü bir "Audit Log" linki
+        eklendi (gerçek yetkilendirme zaten backend'de `RequireRole
+        ("Admin")` - buradaki kontrol WikiPageTable'daki "Sil" butonuyla
+        aynı desen, sadece UI kararı). Tarayıcıda uçtan uca doğrulandı:
+        Admin girişiyle liste/filtre çalışıyor, Member hesabıyla sayfa
+        "yetkin yok" mesajı gösteriyor.
+  - [x] **PR incelemesinde bulunan eksiklik - `Details` alanı:** `AuditLogEntry`
+        sadece bir `ResourceId` (GUID) tutuyordu - özellikle `WikiPage.Deleted`
+        kayıtlarında bu anlamsız kalıyordu, çünkü sayfa gerçekten silindiği
+        için title'a başka HİÇBİR yerden erişilemiyordu ("ne silindiğini nereden
+        bileceğiz" sorusu PR incelemesi sırasında ortaya çıktı). `WikiPageEmbedding`'in
+        Title denormalizasyonuyla AYNI gerekçeyle yeni bir `Details` alanı
+        eklendi. `IAuditableCommand.AuditDetails` BİLEREK settable (get-only
+        değil) - `AuditResourceId`'nin aksine, title çoğu zaman Command
+        oluşturulduğu anda değil (Delete'te SADECE PageId var), Handler
+        içinde (silmeden ÖNCE ilgili kaydı çektikten sonra) ortaya çıkıyor;
+        Handler `Handle()` içinde bu alanı dolduruyor, `AuditBehavior`
+        `next()` sonrası okuyor - aynı Command nesnesi pipeline boyunca
+        taşındığı için bu mutasyon güvenle görülüyor. Migration uygulandı,
+        frontend'e "Detay" sütunu eklendi. Canlı doğrulandı: bir sayfa
+        oluşturulup silindi, hem Created hem Deleted audit satırında doğru
+        başlık (`"Detail Alani Testi"`) göründü.
+
+**Portföy sertleştirme yol haritası artık TAMAMLANDI (1-4).** Audit log
+özelliği baştan sona bitti: domain modeli → pipeline behavior → endpoint →
+frontend sayfası.
+
+## Portföy yol haritası bitince açılan ek işler (2026-07-28)
+
+Kullanıcıyla birlikte üç aday belirlendi: Docker Compose tam paketleme,
+SignalR bildirim UX düzeltmesi, rate limiting. Cuma'ya kadar hedefleniyor.
+
+- [x] **Docker Compose tam paketleme:** `docker compose up --build` artık
+      HER ŞEYİ (SQL Server, Postgres+pgvector, Redis, backend API, frontend)
+      tek komutla ayağa kaldırıyor - önceden sadece Redis+Postgres vardı,
+      SQL Server Express native kurulu olmalıydı, `npm install`/User Secrets
+      elle ayarlanmalıydı. Yeni `Dockerfile`'lar (Atlas.Api + Web/apps/platform),
+      `docker-compose.yml`'ye `sqlserver`/`atlas-api`/`atlas-web` servisleri
+      eklendi. **Native dev kurulumuna (appsettings.json, User Secrets) hiç
+      dokunulmadı** - konteyner servisi kendi bağlantı dizelerini/JWT
+      anahtarını ortam değişkenleriyle (`ConnectionStrings__*`, `Jwt__*`)
+      override ediyor, ikisi tamamen bağımsız. Host portları (5173/5000)
+      native kurulumla AYNI tutuldu ki CORS hiç değişmesin. Canlı doğrulandı:
+      sıfırdan (boş volume) başlatıldı, migration'lar otomatik uygulandı,
+      admin otomatik seed edildi, giriş/wiki/audit log uçtan uca çalıştı.
+      (PR #2, henüz merge edilmedi - `master`'a değil `docker-compose-full-stack`
+      branch'ine gitti çünkü audit log Gün 3 PR'ı (#1) da henüz merge
+      edilmemişti, ikisi paralel/bağımsız branch'lerde.)
+- [ ] SignalR bildirim UX düzeltmesi - şu an yeni sayfa geldiğinde çirkin bir
+      `alert()` popup'ı çıkıyor (`ProtectedRoute.jsx`), gerçek bir toast/bildirim
+      bileşenine geçirilecek.
+- [ ] Rate limiting - en azından `/api/ai/search`'e (belki login'e de,
+      brute-force'a karşı) `Microsoft.AspNetCore.RateLimiting` ile basit bir
+      sınır eklenecek.
 
 ## Portföy yol haritası bitince açılan ek işler (2026-07-28)
 
@@ -719,10 +774,12 @@ CLAUDE.md'de küçük çakışmalar çıkabilir, normal.)
 
 ## Sırada ne var
 
-1. Rate limiting (yukarıda) - Cuma'ya kadar hedefleniyor.
+1. Rate limiting - ayrı bir PR'da (#4) tamamlandı, merge sırası bekleniyor.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
+3. Portföy sertleştirme yol haritası tamamlandı - yeni bir yön/özellik
+   kullanıcıyla birlikte kararlaştırılacak.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
