@@ -8,14 +8,19 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
 {
     private readonly IWikiPageRepository _wikiPageRepository;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IPublisher _publisher;
+    private readonly IOutboxWriter _outboxWriter;
+    private readonly IUnitOfWork _unitOfWork;
 
     public DeleteWikiPageCommandHandler(
-        IWikiPageRepository wikiPageRepository, ICurrentUserAccessor currentUser, IPublisher publisher)
+        IWikiPageRepository wikiPageRepository,
+        ICurrentUserAccessor currentUser,
+        IOutboxWriter outboxWriter,
+        IUnitOfWork unitOfWork)
     {
         _wikiPageRepository = wikiPageRepository;
         _currentUser = currentUser;
-        _publisher = publisher;
+        _outboxWriter = outboxWriter;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task Handle(DeleteWikiPageCommand request, CancellationToken cancellationToken)
@@ -35,12 +40,13 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
         if (!_currentUser.IsAdmin && !isOwner)
             throw new UnauthorizedAccessException("Bu sayfayı silme yetkiniz yok.");
 
+        // Outbox Pattern (Gün 2): CreateWikiPageCommandHandler'daki AYNI desen -
+        // DeleteAsync artık kalıcı yazmıyor (stage), event doğrudan yayınlanmıyor,
+        // AYNI SaveChanges'e bir OutboxMessage ekleniyor (atomiklik).
         await _wikiPageRepository.DeleteAsync(page, cancellationToken);
 
-        // WikiPageCreatedEvent'teki AYNI desen - Wiki, AI'ın var olduğundan
-        // habersiz, sadece "bu sayfa silindi" diye duyuruyor. Bunsuz, AI'ın
-        // Postgres'teki embedding'leri sonsuza kadar yetim kalırdı (bkz. bu
-        // event'in kendi XML yorumu).
-        await _publisher.Publish(new WikiPageDeletedEvent(page.Id), cancellationToken);
+        _outboxWriter.Enqueue(new WikiPageDeletedEvent(page.Id));
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

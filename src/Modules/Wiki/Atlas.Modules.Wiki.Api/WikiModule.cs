@@ -35,6 +35,10 @@ public static class WikiModule
         // yerine bunu kullanmaya başlayacak.
         services.AddScoped<IOutboxWriter, EfOutboxWriter>();
 
+        // Gün 2: WikiPage + OutboxMessage yazmalarını TEK bir SaveChanges'te
+        // (atomik) birleştiren "unit of work" - bkz. IUnitOfWork'teki not.
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<GetWikiPagesQuery>();

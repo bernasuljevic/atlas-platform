@@ -19,15 +19,16 @@ public class EfWikiPageRepository : IWikiPageRepository
     public async Task<WikiPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _context.WikiPages.FindAsync([id], ct);
 
-    public async Task AddAsync(WikiPage page, CancellationToken ct = default)
+    public Task AddAsync(WikiPage page, CancellationToken ct = default)
     {
+        // SaveChangesAsync BİLEREK burada yok - bkz. IWikiPageRepository'deki not.
         _context.WikiPages.Add(page);
-        await _context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 
-    public async Task DeleteAsync(WikiPage page, CancellationToken ct = default)
+    public Task DeleteAsync(WikiPage page, CancellationToken ct = default)
     {
         _context.WikiPages.Remove(page);
-        await _context.SaveChangesAsync(ct);
+        return Task.CompletedTask;
     }
 }

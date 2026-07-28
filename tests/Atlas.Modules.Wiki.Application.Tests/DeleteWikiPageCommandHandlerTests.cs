@@ -2,14 +2,23 @@ using Atlas.Modules.Wiki.Application.Tests.Fakes;
 using Atlas.Modules.Wiki.Application.WikiPages.Commands;
 using Atlas.Modules.Wiki.Domain.Entities;
 using Atlas.Modules.Wiki.Domain.Enums;
+using Atlas.Shared.Contracts;
 
 namespace Atlas.Modules.Wiki.Application.Tests;
 
 public class DeleteWikiPageCommandHandlerTests
 {
     private static DeleteWikiPageCommandHandler CreateHandler(
-        FakeWikiPageRepository repository, Guid? viewerUserId = null, bool viewerIsAdmin = false)
-        => new(repository, new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId), new FakePublisher());
+        FakeWikiPageRepository repository,
+        FakeOutboxWriter? outboxWriter = null,
+        FakeUnitOfWork? unitOfWork = null,
+        Guid? viewerUserId = null,
+        bool viewerIsAdmin = false)
+        => new(
+            repository,
+            new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId),
+            outboxWriter ?? new FakeOutboxWriter(),
+            unitOfWork ?? new FakeUnitOfWork());
 
     [Fact]
     public async Task SayfayiOlusturanKullanici_KendiSayfasiniSilebilir()
@@ -60,5 +69,24 @@ public class DeleteWikiPageCommandHandlerTests
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => handler.Handle(new DeleteWikiPageCommand(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SayfaSilininceOutboxaWikiPageDeletedEventEklenirVeTekBirKezKaydedilir()
+    {
+        var ownerId = Guid.NewGuid();
+        var repository = new FakeWikiPageRepository();
+        var page = WikiPage.Create("Başlık", "İçerik", "IT", WikiVisibility.Public, ownerId);
+        repository.AddedPages.Add(page);
+
+        var outboxWriter = new FakeOutboxWriter();
+        var unitOfWork = new FakeUnitOfWork();
+        var handler = CreateHandler(repository, outboxWriter, unitOfWork, viewerUserId: ownerId);
+
+        await handler.Handle(new DeleteWikiPageCommand(page.Id), CancellationToken.None);
+
+        var enqueued = Assert.Single(outboxWriter.Enqueued);
+        Assert.IsType<WikiPageDeletedEvent>(enqueued);
+        Assert.Equal(1, unitOfWork.SaveChangesCallCount);
     }
 }

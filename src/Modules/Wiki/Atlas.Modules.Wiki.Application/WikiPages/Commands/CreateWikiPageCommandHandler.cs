@@ -10,7 +10,8 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
 {
     private readonly IWikiPageRepository _wikiPageRepository;
     private readonly ICurrentUserAccessor _currentUser;
-    private readonly IPublisher _publisher;
+    private readonly IOutboxWriter _outboxWriter;
+    private readonly IUnitOfWork _unitOfWork;
 
     // ICurrentUserAccessor, Wiki.Application'ın Shared.Contracts'tan tanıdığı bir
     // interface. Gerçek implementasyonu KİM sağlıyor? Wiki'nin haberi yok, umurunda değil.
@@ -18,11 +19,13 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
     public CreateWikiPageCommandHandler(
         IWikiPageRepository wikiPageRepository,
         ICurrentUserAccessor currentUser,
-        IPublisher publisher)
+        IOutboxWriter outboxWriter,
+        IUnitOfWork unitOfWork)
     {
         _wikiPageRepository = wikiPageRepository;
         _currentUser = currentUser;
-        _publisher = publisher;
+        _outboxWriter = outboxWriter;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Guid> Handle(CreateWikiPageCommand request, CancellationToken cancellationToken)
@@ -48,14 +51,19 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
             request.Title, request.Content, departmentName,
             visibility, _currentUser.UserId.Value);
 
+        // Outbox Pattern (Gün 2): AddAsync artık kalıcı yazmıyor, sadece
+        // ekliyor (stage). Event'i de doğrudan yayınlamıyoruz (IPublisher.Publish
+        // KALDIRILDI) - onun yerine AYNI değişiklik kümesine bir OutboxMessage
+        // ekliyoruz. Sonraki SaveChangesAsync çağrısı İKİSİNİ DE (WikiPage +
+        // OutboxMessage) TEK bir transaction'da, atomik olarak yazıyor - biri
+        // yazılıp diğeri yazılmadan process çökemez. Gerçek yayın (Notifications/
+        // AI'ın haberdar olması) Gün 3'teki arka plan işleyicinin işi.
         await _wikiPageRepository.AddAsync(page, cancellationToken);
 
-        // Sayfa kaydedildikten SONRA event'i yayınlıyoruz - "olan bitmiş bir şeyi"
-        // duyuruyoruz. Wiki, bunu kimin dinlediğini bilmiyor (şu an Notifications
-        // dinleyecek, yarın AI modülü de dinleyebilir - Wiki'de hiçbir şey değişmez).
-        await _publisher.Publish(
-            new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString()),
-            cancellationToken);
+        _outboxWriter.Enqueue(
+            new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString()));
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return page.Id;
     }
