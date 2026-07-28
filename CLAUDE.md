@@ -634,15 +634,30 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
       olmayan, ~70 test) çalıştırıyor - bu sayede yeni bir test projesi
       eklendiğinde CI dosyasını elle güncellemeye gerek kalmıyor, sadece
       doğru trait'i eklemek yeterli. README'ye durum rozeti eklendi.
-- [ ] 2) Observability: Serilog + correlation ID
+- [x] **2) Observability:** Serilog (`Serilog.AspNetCore`) varsayılan
+      `Microsoft.Extensions.Logging`'in yerini aldı. Yeni `CorrelationIdMiddleware`
+      (Atlas.Api/Observability) - pipeline'ın EN BAŞINDA, her isteğe bir
+      `X-Correlation-Id` kazandırıyor (istemci gönderirse onu kullanır, yoksa
+      üretir, yanıta da geri yazar) ve `LogContext.PushProperty` ile Serilog'un
+      "ambient" bağlamına ekliyor. Sonuç: o istek sırasında oluşan HER log
+      satırı (EF Core sorguları, `LoggingBehavior`'ın CQRS logları, Exception
+      Handler) hiçbir mevcut log çağrısı DEĞİŞTİRİLMEDEN aynı ID'yi otomatik
+      taşıyor - canlı doğrulandı (`X-Correlation-Id: login-test-456` gönderilen
+      bir login isteğinin TÜM log satırları, DB sorgularından CQRS'e kadar,
+      bu ID'yi taşıdı). `UseSerilogRequestLogging()` ile her isteğin sonunda
+      method/path/status/süre içeren tek bir özet satır da ekleniyor.
+      appsettings üzerinden değil kod içinde yapılandırıldı (tek ortam için
+      appsettings şeması eklemek şimdilik gereksiz karmaşıklık olurdu).
 - [ ] 3) Teknik borç ödeme: WikiBoard.jsx bölünmesi, FakeCurrentUserAccessor
       birleştirilmesi
 - [ ] 4) Yeni kullanıcı-görünür özellik: audit log ya da üçüncü bir rol
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 2. adım (Observability):** Serilog'a
-   geçiş + her isteğe bir correlation/trace ID ekleyip loglara işlemek.
+1. **Portföy sertleştirme yol haritası - 3. adım (Teknik borç ödeme):**
+   `WikiBoard.jsx`'i (~350 satır) `WikiPageTable`/`CreateWikiPageDialog` gibi
+   alt component'lere böl, `FakeCurrentUserAccessor` kopyasını paylaşılan bir
+   test projesine taşı.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
