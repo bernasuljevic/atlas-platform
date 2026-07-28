@@ -219,6 +219,61 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     edilmiyordu). Genel ders: bir embedding/vektör pipeline'ında "anlamsız
     girdi" (boş, sadece noktalama) durumunu HER ZAMAN düşün - normalize
     etmemek yetmez, o veriyi hiç kaydetmemek gerekir.
+16. **Claude Code'un araç (Bash/PowerShell) üzerinden yazdığı bir User Secret,
+    kullanıcının KENDİ interaktif terminaline görünmeyebilir:** 2026-07-28'de
+    saatlerce süren bir "Jwt:Key bulunamıyor" teşhisinin GERÇEK kök sebebi bu
+    çıktı - Claude'un Bash aracından çalıştırdığı `dotnet user-secrets set`
+    diskteki `secrets.json`'ı doğru yazıyordu ve Claude'un KENDİ açtığı
+    Bash/PowerShell process'lerinden (`dotnet user-secrets list`, `dotnet run`)
+    her seferinde doğru okunuyordu (aynı `%APPDATA%` yolu, aynı Windows
+    kullanıcısı görünmesine rağmen) - ama kullanıcının GERÇEK, kendi açtığı
+    interaktif PowerShell penceresinden çalıştırılan `dotnet user-secrets list`
+    "No secrets configured" diyordu, `dotnet run` da tutarlı biçimde
+    `Encoding.UTF8.GetBytes(null)` hatasıyla çöküyordu - basit bir "stale
+    process" ya da "eksik derleme" değildi, defalarca doğrulandı. Kesin çözüm:
+    kullanıcının secret'ı KENDİ terminalinden (`dotnet user-secrets set ...`)
+    yeniden yazması - bundan sonra kendi `dotnet run`'ı da sorunsuz çalıştı.
+    Olası açıklama (bu ortama özgü, doğrulanmadı ama en olası): bu kurumun
+    (nku.edu.tr) OneDrive/profil politikası zaten Masaüstü'nü OneDrive'a
+    yönlendiriyor (proje yolu `OneDrive - nku.edu.tr\Masaüstü\...`) - böyle bir
+    kurumsal Klasör Yönlendirme (Folder Redirection) politikası bazen
+    `%APPDATA%\Roaming`'i de senkronize/redirect eder, bu da araç tarafından
+    başlatılan process'lerle kullanıcının kendi kabuğu arasında GEÇİCİ bir
+    tutarsızlık penceresi açabiliyor. Genel ders: "Claude bir dosyayı X yoluna
+    yazdı ve KENDİ komutuyla doğruladı" DEMEK, "kullanıcının kendi terminali de
+    aynı şeyi görecek" DEMEK DEĞİLDİR - özellikle User Secrets gibi kullanıcı
+    profiline bağlı, kurumsal senkronizasyon politikalarının araya girebileceği
+    bir mekanizma söz konusuysa. Böyle bir tutarsızlık şüphesi varsa, en hızlı
+    kesin teşhis: kullanıcıdan AYNI doğrulama komutunu KENDİ terminalinde
+    çalıştırmasını istemek (Claude'un kendi doğrulaması yeterli kanıt değil).
+
+    (Bu araştırma sırasında DENENİP GERİ ALINAN bir yan yol: `.AddJwtBearer(
+    options => {...})` içindeki `configuration["Jwt:Key"]` okumasını "lazy"den
+    "eager"e (AddAuthModule çağrılırken, `Build()`'den önce) çevirmek - teoride
+    `IOptionsMonitor`'ın `Lazy<T>` önbelleklemesinin İLK hatayı kalıcı hale
+    getirme riskini ortadan kaldıracaktı, ama PRATİKTE integration testlerini
+    KIRDI: `WebApplicationFactory`nin test için enjekte ettiği `Jwt:Key`
+    override'ı bu erken noktada henüz `configuration`'a uygulanmamış oluyor -
+    `JwtTokenGenerator` (lazy, request zamanında okuyan) token'ı DOĞRU test
+    anahtarıyla imzalarken, eager okunan bu lambda YANLIŞ/eksik bir anahtarla
+    doğruluyordu, imza uyuşmazlığı her korumalı endpoint'te 401 üretiyordu.
+    Geri alındı - lazy okuma orijinal haliyle korundu. Genel ders: teorik bir
+    kırılganlığı "sağlamlaştırmak" için yapılan bir değişikliği, o
+    kırılganlığın gerçek kanıtı OLMADAN (sadece "olabilir" diye) uygulamak
+    riskli - burada gerçek kanıt zaten farklı bir yerdeydi (User Secrets
+    görünürlüğü), o yüzden bu "sağlamlaştırma" hem gereksizdi hem de kendi
+    başına yeni, gerçek bir regresyona yol açtı. Böyle bir değişiklik
+    yapılacaksa mutlaka integration test suite'i (`dotnet test
+    tests/Atlas.IntegrationTests`) çalıştırılıp doğrulanmalı - sadece
+    Domain testleriyle yetinmek bu regresyonu YAKALAYAMADI.)
+
+    (Yan not: bu araştırma sırasında `bin`/`obj`'un OneDrive senkronize
+    klasörünün içinde yaşamasının ayrı, gerçek bir risk olduğu da görüldü -
+    büyük ölçekli bir "clean rebuild" sırasında bir kez MSB3030 dosya
+    kopyalama hatası da alınmıştı. Bu yüzden `Directory.Build.props` eklenip
+    `bin`/`obj` `%LOCALAPPDATA%\AtlasPlatformBuild\`'a taşındı - bu JWT
+    hatasının asıl sebebi değildi ama yine de kalıcı, faydalı bir hijyen
+    iyileştirmesi olarak korundu.)
 
 ## Şu ana kadar tamamlananlar
 
@@ -497,6 +552,54 @@ gerçek bir mimari değişiklik olduğu için.
       doğrulandı: sayfa oluşturulduktan hemen sonra aramada yok, ~6 saniye sonra
       tam skoruyla çıkıyor.
 
+- [x] **Gün 4/5:** Hata/retry stratejisi - "dead letter" mantığı eklendi.
+      Yeni migration/kolon GEREKMEDİ - `Attempts` zaten vardı. `OutboxMessage`'a
+      `MaxAttempts = 5` sabiti + `IsDeadLettered` (hesaplanan, `ProcessedAtUtc
+      is null && Attempts >= MaxAttempts`) eklendi. `OutboxProcessor`'ın sorgusu
+      `Attempts < MaxAttempts` filtresiyle daraltıldı - eşiği aşan bir mesaj
+      sorgudan düşüyor (bir daha hiç denenmiyor) ama satır DB'de SİLİNMEDEN,
+      `Attempts`/`LastError` ile hâlâ görünür/incelenebilir duruyor (istenen
+      tam olarak buydu: "bir daha hiç denenmesin, sadece görünür kalsın").
+      Dead letter'a düşen mesaj için ayrı bir `LogWarning` eklendi ("artık
+      sessizce kayboldu değil, birinin bakması gerekiyor" sinyali). Backoff
+      (bekleme süresini kademeli artırma) BİLEREK eklenmedi - 5sn'lik sabit
+      poll interval'ın kendisi zaten denemeler arasına doğal bir boşluk
+      koyuyor, ek karmaşıklık şimdilik YAGNI.
+
+- [x] **Gün 5/5:** Integration test + wrap-up. Yeni `OutboxIntegrationTests.cs` -
+      gerçek bir "process SaveChanges ortasında çöktü" senaryosu integration
+      testte simüle edilemez, ama HTTP isteği 200 döndüğü anda hem `WikiPage`
+      hem `OutboxMessage`'ın (doğru `EventType`/`Payload` ile) DB'de var
+      olduğunu doğrudan doğruluyor - bu, atomikliğin test edilebilir kısmı.
+      **Bilinçli tasarım kararı:** Test, mesajın `ProcessedAtUtc`'sinin NULL
+      OLMASINI beklemiyor - `OutboxProcessor` test host'unda da gerçek bir
+      `BackgroundService` olarak çalıştığı için mesaj birkaç saniye içinde
+      işlenebilir, bunu bekleyen bir assertion flaky olurdu. Sadece satırın
+      doğru içerikle VAR OLDUĞUNU kontrol ediyor.
+
+      **Bu günün asıl bulgusu bir regresyondu:** Gün 4 sırasında (üretimdeki
+      "Jwt:Key bulunamıyor" krizini araştırırken, bkz. Ders #16) `AddAuthModule`
+      içinde `configuration["Jwt:Key"]`'i lazy'den eager okumaya çeviren bir
+      "sağlamlaştırma" denenmişti - bu integration testleri SESSİZCE kırmıştı
+      (`WikiEndpointsTests` dahil, sadece Domain testleri çalıştırıldığı için
+      fark edilmemişti). `dotnet test tests/Atlas.IntegrationTests` çalıştırılınca
+      hepsi 401 ile başarısız oldu - kök sebep bulunup (`WebApplicationFactory`'nin
+      test config override'ı o erken noktada henüz uygulanmamış oluyordu) eager
+      okuma geri alındı, testler tekrar yeşile döndü (bkz. Ders #16'nın sonundaki
+      not). **Genel ders:** bir config/DI değişikliğinden sonra sadece ilgili
+      Domain testlerini değil, TÜM solution'ı (`dotnet test Atlas.sln`) çalıştırmak
+      gerekiyor - regresyon başka bir katmanda (burada: test host'un HTTP
+      pipeline'ında) çıkabiliyor.
+
+      Tüm solution (`dotnet test Atlas.sln`) yeşil: Domain/Application/
+      Infrastructure testleri + 10 integration test, toplam ~70+ test.
+
+**Transactional Outbox Pattern artık TAMAMLANDI (Gün 1-5):** OutboxMessage
+entity → atomik yazma (IUnitOfWork) → arka plan işleyici (OutboxProcessor) →
+dead-letter/retry sınırı → integration test. Wiki artık AI'ın (veya
+Notifications'ın) var olduğundan habersiz kalmaya devam ederken, event
+teslimatı crash-safe ve atomik.
+
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
 - `FakeCurrentUserAccessor`, `Atlas.Modules.AI.Application.Tests` ve
@@ -517,17 +620,10 @@ gerçek bir mimari değişiklik olduğu için.
 
 ## Sırada ne var
 
-1. **Transactional Outbox Pattern - Gün 4/5:** Hata/retry stratejisi.
-   `OutboxMessage.Attempts`/`LastError` şu an dolduruluyor ama henüz hiçbir
-   üst sınır/backoff yok - `OutboxProcessor` başarısız bir mesajı her turda
-   (5sn'de bir) SONSUZA KADAR yeniden dener. En azından bir max-attempt sonrası
-   "dead letter" (bir daha hiç denenmesin, sadece görünür kalsın) mantığı
-   eklenmeli.
-2. **Transactional Outbox Pattern - Gün 5/5:** Integration test (crash-safety
-   senaryosu tam simüle edilemez ama en azından outbox satırının gerçekten
-   atomik yazıldığı doğrulanabilir) + wrap-up.
-3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
+2. Transactional Outbox Pattern TAMAMLANDI - yeni bir özellik başlığı bekleniyor,
+   kullanıcıyla birlikte kararlaştırılacak.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
