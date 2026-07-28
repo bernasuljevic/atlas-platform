@@ -682,14 +682,26 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         gerekçe). Canlı doğrulandı: bir sayfa oluşturulup silindi,
         `audit.AuditLogEntries`'de doğru `UserEmail`/`Action`/`ResourceId`
         ile (ikisi de AYNI sayfanın ID'siyle eşleşen) iki satır oluştu.
-  - [ ] Gün 2/3: Admin'e özel `GET /api/audit-log` endpoint'i + filtreleme
-        (Action/tarih aralığı).
-  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası.
+  - [x] **Gün 2/3 - `GET /api/audit-log` endpoint'i (Admin) + filtreleme:**
+        Yeni `Atlas.Modules.Audit.Application` katmanı - `GetAuditLogQuery`
+        (Action/FromUtc/ToUtc HEPSİ opsiyonel, PageNumber/PageSize) +
+        `IAuditLogRepository` soyutlaması. `EfAuditLogRepository` filtre/
+        sayfalamayı DB SEVİYESİNDE yapıyor (Wiki'nin `GetWikiPagesQueryHandler`'ının
+        "tüm veriyi çek, bellekte filtrele" yaklaşımının BİLEREK aksine) -
+        audit log zamanla büyümesi beklenen, tüm satırlarını cache'lemenin/
+        belleğe çekmenin mantıklı olmadığı bir tablo. Endpoint sadece Admin
+        rolü (`AuthEndpoints`'teki `GET /users` ile aynı desen - audit log'un
+        kendisi "kim ne yaptı" taşıdığı için normal bir kullanıcının başkasının
+        işlemlerini görmesi ayrı bir gizlilik sorunu olurdu). Canlı doğrulandı:
+        filtresiz liste (en yeni önce, doğru `totalCount`/`totalPages`),
+        `?action=WikiPage.Created` filtresi doğru daraltıyor, Admin olmayan
+        kullanıcı 403, token'sız istek 401.
+  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım, Gün 2/3:** Admin'e özel
-   `GET /api/audit-log` endpoint'i + filtreleme.
+1. **Portföy sertleştirme yol haritası - 4. adım, Gün 3/3:** Frontend'de
+   audit log görüntüleme sayfası (Admin-only route, filtreleme formu).
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
@@ -722,6 +734,9 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   değişikliği sonrası kullanılacak bir admin aracı.
 - `GET /api/ai/search?q=...&topN=5` (topN opsiyonel, varsayılan 5) → token
   gerektirir, sonuçlar departman görünürlük kuralına göre filtrelenir (Admin bypass eder).
+- `GET /api/audit-log?action=...&fromUtc=...&toUtc=...&pageNumber=1&pageSize=20`
+  (hepsi opsiyonel) → sadece Admin rolü. `WikiPage.Created`/`WikiPage.Deleted`
+  eylemlerini kaydediyor (bkz. AuditBehavior, Shared.CQRS).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
