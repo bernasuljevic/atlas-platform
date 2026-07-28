@@ -134,7 +134,7 @@ function WikiBoard({ token, onLogout }) {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "40px auto" }} className="px-4">
+    <div style={{ maxWidth: 1100, margin: "40px auto" }} className="px-4">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-medium" style={{ color: "var(--text-h)" }}>
           Atlas Wiki
@@ -251,7 +251,7 @@ function WikiBoard({ token, onLogout }) {
                   <TableHead>Başlık</TableHead>
                   <TableHead>Departman</TableHead>
                   <TableHead>Görünürlük</TableHead>
-                  <TableHead>İçerik</TableHead>
+                  <TableHead className="hidden md:table-cell">İçerik</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -262,7 +262,9 @@ function WikiBoard({ token, onLogout }) {
                     onClick={() => setSelectedPage(p)}
                     className="cursor-pointer hover:bg-[var(--brand-accent)]/10"
                   >
-                    <TableCell className="font-medium">{p.title}</TableCell>
+                    <TableCell className="max-w-[110px] truncate font-medium sm:max-w-[220px]" title={p.title}>
+                      {p.title}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{p.departmentName}</Badge>
                     </TableCell>
@@ -273,7 +275,10 @@ function WikiBoard({ token, onLogout }) {
                         <Badge variant="outline">Sadece Departman</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-xs whitespace-normal text-[var(--text)]/70">
+                    {/* Dar ekranlarda (bölünmüş pencere) tamamen gizleniyor -
+                        tam içerik zaten satıra tıklayınca açılan detay
+                        Dialog'unda var, bu sütun sadece bir önizleme. */}
+                    <TableCell className="hidden max-w-[280px] truncate text-[var(--text)]/70 md:table-cell">
                       {truncateContent(p.content)}
                     </TableCell>
                     <TableCell>
