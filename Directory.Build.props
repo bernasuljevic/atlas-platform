@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    bin/ ve obj/ klasörleri OneDrive senkronize edilen bir klasörün içinde
+    (proje kökü "OneDrive - nku.edu.tr\..." altında) yaşıyordu - OneDrive'ın
+    bu klasörlere arka planda müdahale etmesi (senkronizasyon/tarama), derleme
+    çıktısının ARALIKLI olarak bozuk/eksik kalmasına yol açıyordu (canlı
+    doğrulandı, 2026-07-28: aynı `dotnet run` komutu bazen çalışan bazen
+    "Jwt:Key User Secrets'tan hiç yüklenmemiş gibi" davranan bir DLL üretiyordu -
+    bkz. CLAUDE.md Ders #16). Kalıcı çözüm: bin/obj'u OneDrive'ın hiç
+    görmediği yerel bir klasöre (%LOCALAPPDATA%) taşımak.
+  -->
+  <PropertyGroup>
+    <BaseOutputPath>$(LOCALAPPDATA)\AtlasPlatformBuild\$(MSBuildProjectName)\bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(LOCALAPPDATA)\AtlasPlatformBuild\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+
+</Project>
