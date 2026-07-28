@@ -696,15 +696,26 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         filtresiz liste (en yeni önce, doğru `totalCount`/`totalPages`),
         `?action=WikiPage.Created` filtresi doğru daraltıyor, Admin olmayan
         kullanıcı 403, token'sız istek 401.
-  - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
+  - [x] **Gün 3/3:** Frontend'de audit log görüntüleme sayfası. Yeni
+        `AuditLogPage.jsx` - eylem/tarih aralığı filtresi + sayfalama,
+        `WikiBoard.jsx`'e sadece Admin'in gördüğü bir "Audit Log" linki
+        eklendi (gerçek yetkilendirme zaten backend'de `RequireRole
+        ("Admin")` - buradaki kontrol WikiPageTable'daki "Sil" butonuyla
+        aynı desen, sadece UI kararı). Tarayıcıda uçtan uca doğrulandı:
+        Admin girişiyle liste/filtre çalışıyor, Member hesabıyla sayfa
+        "yetkin yok" mesajı gösteriyor.
+
+**Portföy sertleştirme yol haritası artık TAMAMLANDI (1-4).** Audit log
+özelliği baştan sona bitti: domain modeli → pipeline behavior → endpoint →
+frontend sayfası.
 
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım, Gün 3/3:** Frontend'de
-   audit log görüntüleme sayfası (Admin-only route, filtreleme formu).
-2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
+2. Portföy sertleştirme yol haritası tamamlandı - yeni bir yön/özellik
+   kullanıcıyla birlikte kararlaştırılacak.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
