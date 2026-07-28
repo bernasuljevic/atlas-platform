@@ -37,7 +37,38 @@ ve endpoint'lerini barındırır. Modüller birbirinin Domain/Application/
 Infrastructure'ına asla referans vermez - sadece `Shared.Contracts`'taki
 interface'ler ve domain event'ler üzerinden konuşurlar.
 
-## Çalıştırmak için
+## Hızlı başlangıç (tek komut, Docker Compose)
+
+Projeyi sadece denemek/incelemek istiyorsan (aktif geliştirme yapmayacaksan)
+en hızlı yol bu - SQL Server Express kurmana, User Secrets ayarlamana ya da
+`npm install` çalıştırmana gerek yok. Tek gereksinim
+[Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+docker compose up --build
+```
+
+Bu tek komut şunların HEPSİNİ ayağa kaldırır: SQL Server (Auth+Wiki+Audit),
+PostgreSQL+pgvector (AI), Redis, backend API (migration'ları otomatik uygular)
+ve derlenmiş React frontend'i (nginx ile sunuluyor). İlk çalıştırmada image'ları
+indirip derlemek birkaç dakika sürebilir, sonrakiler çok daha hızlı.
+
+Hazır olduğunda:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:5000/health → `{"status":"Healthy",...}` görmelisin
+- Varsayılan admin: `admin@atlas.local` / `Admin123!` (tablo ilk kez boşken otomatik oluşuyor)
+
+Durdurmak için `Ctrl+C`, tamamen kaldırmak (volume'ler dahil) için
+`docker compose down -v`.
+
+**Not:** `docker-compose.yml`'deki SQL Server şifresi ve JWT imzalama anahtarı
+BİLEREK bu compose stack'ine özel, gerçek bir sır DEĞİL (native geliştirme
+kurulumundaki User Secrets'tan tamamen bağımsız) - sadece yerel/demo amaçlı.
+
+## Çalıştırmak için (aktif geliştirme için - yerel kurulum)
+
+Kod üzerinde çalışacaksan (debug, hızlı iterasyon, testler) bu yerel kurulum
+daha pratik - IDE'nin debugger'ını doğrudan kullanabilirsin.
 
 ### 1. Gereksinimler
 
