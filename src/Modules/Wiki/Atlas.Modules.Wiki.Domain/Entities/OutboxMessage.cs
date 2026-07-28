@@ -18,6 +18,14 @@ namespace Atlas.Modules.Wiki.Domain.Entities;
 /// </summary>
 public class OutboxMessage : Entity<Guid>
 {
+    // Gün 4: bir mesaj bu kadar denemeden sonra hâlâ başarısızsa "dead letter"
+    // sayılır - OutboxProcessor bir daha hiç denemez (kalıcı olarak bozuk bir
+    // payload/event tipi, sonsuza kadar her 5sn'de bir yeniden denenip
+    // log'ları/CPU'yu boşuna meşgul etmesin diye). Satır DB'de SİLİNMEDEN
+    // duruyor - Attempts/LastError üzerinden hâlâ görünür ve incelenebilir,
+    // sadece OutboxProcessor'ın sorgusuna bir daha girmiyor (bkz. IsDeadLettered).
+    public const int MaxAttempts = 5;
+
     // Event'in .NET tipinin tam adı (AssemblyQualifiedName) - arka plan işleyici
     // Payload'ı JSON'dan geri bu tipe deserialize edip gerçek Publish'i yapacak.
     public string EventType { get; private set; } = default!;
@@ -35,6 +43,11 @@ public class OutboxMessage : Entity<Guid>
     public int Attempts { get; private set; }
 
     public string? LastError { get; private set; }
+
+    // İşlenmemiş (henüz başarılı olmamış) VE deneme hakkı tükenmiş - bir daha
+    // hiç denenmeyecek. İşlendikten (ProcessedAtUtc dolduktan) sonra Attempts
+    // ne olursa olsun artık "dead letter" değildir, başarıyla tamamlanmıştır.
+    public bool IsDeadLettered => ProcessedAtUtc is null && Attempts >= MaxAttempts;
 
     private OutboxMessage() { }
 

@@ -66,8 +66,11 @@ public class OutboxProcessor : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<WikiDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IPublisher>();
 
+        // Gün 4: Attempts < MaxAttempts filtresi - dead letter'a düşmüş bir
+        // mesaj artık bu sorguya hiç girmiyor, bir daha denenmiyor (bkz.
+        // OutboxMessage.IsDeadLettered'daki not).
         var pendingMessages = await context.OutboxMessages
-            .Where(m => m.ProcessedAtUtc == null)
+            .Where(m => m.ProcessedAtUtc == null && m.Attempts < OutboxMessage.MaxAttempts)
             .OrderBy(m => m.OccurredAtUtc)
             .Take(BatchSize)
             .ToListAsync(cancellationToken);
@@ -102,11 +105,19 @@ public class OutboxProcessor : BackgroundService
         }
         catch (Exception ex)
         {
-            // Gün 4'te retry/backoff stratejisi bu Attempts/LastError alanlarını
-            // kullanacak - şimdilik sadece kaydediyoruz, satır ProcessedAtUtc
-            // dolmadığı için bir sonraki turda TEKRAR denenecek.
             _logger.LogError(ex, "OutboxMessage {MessageId} ({EventType}) işlenemedi.", message.Id, message.EventType);
             message.MarkFailed(ex.Message);
+
+            if (message.IsDeadLettered)
+            {
+                // MaxAttempts'e tam bu denemede ulaştı - bir daha hiç
+                // denenmeyecek, ama satır (Attempts/LastError ile) DB'de
+                // görünür kalıyor. Ayrı bir uyarı logu, "bu artık sessizce
+                // kayboldu değil, birinin bakması gerekiyor" sinyali veriyor.
+                _logger.LogWarning(
+                    "OutboxMessage {MessageId} ({EventType}) {MaxAttempts} denemeden sonra dead letter'a düştü, bir daha denenmeyecek.",
+                    message.Id, message.EventType, OutboxMessage.MaxAttempts);
+            }
         }
     }
 }

@@ -60,4 +60,38 @@ public class OutboxMessageTests
         Assert.Equal("Yine başarısız oldu.", message.LastError);
         Assert.Null(message.ProcessedAtUtc);
     }
+
+    [Fact]
+    public void MaxAttemptsAltinda_DeadLetterDegildir()
+    {
+        var message = OutboxMessage.Create("SomeEvent", "{}");
+
+        for (var i = 0; i < OutboxMessage.MaxAttempts - 1; i++)
+            message.MarkFailed("hata");
+
+        Assert.False(message.IsDeadLettered);
+    }
+
+    [Fact]
+    public void MaxAttemptsUlasinca_DeadLetterOlur()
+    {
+        var message = OutboxMessage.Create("SomeEvent", "{}");
+
+        for (var i = 0; i < OutboxMessage.MaxAttempts; i++)
+            message.MarkFailed("hata");
+
+        Assert.True(message.IsDeadLettered);
+    }
+
+    [Fact]
+    public void MaxAttemptsUlassaBile_IslenmisseDeadLetterDegildir()
+    {
+        var message = OutboxMessage.Create("SomeEvent", "{}");
+
+        for (var i = 0; i < OutboxMessage.MaxAttempts; i++)
+            message.MarkFailed("hata");
+        message.MarkProcessed();
+
+        Assert.False(message.IsDeadLettered);
+    }
 }
