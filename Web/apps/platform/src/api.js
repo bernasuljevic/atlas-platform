@@ -156,9 +156,9 @@ export async function deleteWikiPage(accessToken, pageId) {
 // filtreleri (hepsi opsiyonel) query string'e çeviriyoruz. Boş/undefined
 // filtreler hiç query string'e eklenmiyor (backend'in "hiç filtre yok"
 // varsayılan davranışını tetiklemesi için).
-export async function getAuditLog(accessToken, { action, fromUtc, toUtc, pageNumber = 1, pageSize = 20 } = {}) {
+export async function getAuditLog(accessToken, { details, fromUtc, toUtc, pageNumber = 1, pageSize = 20 } = {}) {
   const params = new URLSearchParams({ pageNumber, pageSize });
-  if (action) params.set("action", action);
+  if (details) params.set("details", details);
   if (fromUtc) params.set("fromUtc", fromUtc);
   if (toUtc) params.set("toUtc", toUtc);
 

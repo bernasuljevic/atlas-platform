@@ -14,7 +14,7 @@ public class EfAuditLogRepository : IAuditLogRepository
     }
 
     public async Task<PagedResult<AuditLogEntryDto>> GetPagedAsync(
-        string? action,
+        string? details,
         DateTime? fromUtc,
         DateTime? toUtc,
         int pageNumber,
@@ -23,8 +23,10 @@ public class EfAuditLogRepository : IAuditLogRepository
     {
         var query = _context.AuditLogEntries.AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(action))
-            query = query.Where(e => e.Action == action);
+        // Tam eşleşme değil, KISMİ eşleşme (Contains) - "bu başlığı içeren
+        // kayıtları göster" senaryosu için (bkz. GetAuditLogQuery'deki not).
+        if (!string.IsNullOrWhiteSpace(details))
+            query = query.Where(e => e.Details != null && e.Details.Contains(details));
 
         if (fromUtc is not null)
             query = query.Where(e => e.OccurredAtUtc >= fromUtc.Value);

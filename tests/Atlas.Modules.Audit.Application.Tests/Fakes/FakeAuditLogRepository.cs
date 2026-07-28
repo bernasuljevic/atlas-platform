@@ -9,17 +9,17 @@ namespace Atlas.Modules.Audit.Application.Tests.Fakes;
 // integration test seviyesinde doğrulanıyor).
 public class FakeAuditLogRepository : IAuditLogRepository
 {
-    public string? LastAction { get; private set; }
+    public string? LastDetails { get; private set; }
     public DateTime? LastFromUtc { get; private set; }
     public DateTime? LastToUtc { get; private set; }
     public int LastPageNumber { get; private set; }
     public int LastPageSize { get; private set; }
 
     public Task<PagedResult<AuditLogEntryDto>> GetPagedAsync(
-        string? action, DateTime? fromUtc, DateTime? toUtc, int pageNumber, int pageSize,
+        string? details, DateTime? fromUtc, DateTime? toUtc, int pageNumber, int pageSize,
         CancellationToken cancellationToken)
     {
-        LastAction = action;
+        LastDetails = details;
         LastFromUtc = fromUtc;
         LastToUtc = toUtc;
         LastPageNumber = pageNumber;

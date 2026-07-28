@@ -18,13 +18,13 @@ public static class AuditEndpoints
         // GET /users ile aynı desen).
         group.MapGet("/", async (
             IMediator mediator,
-            string? action,
+            string? details,
             DateTime? fromUtc,
             DateTime? toUtc,
             int pageNumber = 1,
             int pageSize = 20) =>
         {
-            var result = await mediator.Send(new GetAuditLogQuery(action, fromUtc, toUtc, pageNumber, pageSize));
+            var result = await mediator.Send(new GetAuditLogQuery(details, fromUtc, toUtc, pageNumber, pageSize));
             return Results.Ok(result);
         })
         .WithName("GetAuditLog")

@@ -18,6 +18,6 @@ public class GetAuditLogQueryHandler : IRequestHandler<GetAuditLogQuery, PagedRe
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
 
         return _repository.GetPagedAsync(
-            request.Action, request.FromUtc, request.ToUtc, pageNumber, pageSize, cancellationToken);
+            request.Details, request.FromUtc, request.ToUtc, pageNumber, pageSize, cancellationToken);
     }
 }

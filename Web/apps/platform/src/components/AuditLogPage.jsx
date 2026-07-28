@@ -31,13 +31,13 @@ function AuditLogPage({ token }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [actionFilter, setActionFilter] = useState("");
+  const [detailsFilter, setDetailsFilter] = useState("");
   const [fromUtc, setFromUtc] = useState("");
   const [toUtc, setToUtc] = useState("");
   // Filtre formundaki değerler her tuşta değil, sadece "Filtrele"ye basılınca
   // uygulanıyor - appliedFilters ayrı tutuluyor ki her karakterde yeni bir
   // istek atılmasın.
-  const [appliedFilters, setAppliedFilters] = useState({ action: "", fromUtc: "", toUtc: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ details: "", fromUtc: "", toUtc: "" });
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -62,7 +62,7 @@ function AuditLogPage({ token }) {
   function handleFilterSubmit(e) {
     e.preventDefault();
     setPageNumber(1);
-    setAppliedFilters({ action: actionFilter.trim(), fromUtc, toUtc });
+    setAppliedFilters({ details: detailsFilter.trim(), fromUtc, toUtc });
   }
 
   if (!isAdmin) {
@@ -91,12 +91,12 @@ function AuditLogPage({ token }) {
         <CardContent>
           <form onSubmit={handleFilterSubmit} className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="filter-action">Eylem</Label>
+              <Label htmlFor="filter-details">Detay (sayfa başlığı)</Label>
               <Input
-                id="filter-action"
-                placeholder="ör. WikiPage.Created"
-                value={actionFilter}
-                onChange={(e) => setActionFilter(e.target.value)}
+                id="filter-details"
+                placeholder="ör. Sunucu Bakım"
+                value={detailsFilter}
+                onChange={(e) => setDetailsFilter(e.target.value)}
                 className="w-56"
               />
             </div>

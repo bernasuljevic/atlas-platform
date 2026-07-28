@@ -13,9 +13,9 @@ public class GetAuditLogQueryHandlerTests
         var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc);
 
-        await handler.Handle(new GetAuditLogQuery("WikiPage.Created", from, to, 2, 30), CancellationToken.None);
+        await handler.Handle(new GetAuditLogQuery("Gizli Maas Bilgisi", from, to, 2, 30), CancellationToken.None);
 
-        Assert.Equal("WikiPage.Created", repository.LastAction);
+        Assert.Equal("Gizli Maas Bilgisi", repository.LastDetails);
         Assert.Equal(from, repository.LastFromUtc);
         Assert.Equal(to, repository.LastToUtc);
         Assert.Equal(2, repository.LastPageNumber);
