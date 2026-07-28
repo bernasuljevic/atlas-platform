@@ -22,9 +22,9 @@ public class EfAuditLogWriter : IAuditLogWriter
         _currentUser = currentUser;
     }
 
-    public async Task LogAsync(string action, string? resourceId, CancellationToken cancellationToken)
+    public async Task LogAsync(string action, string? resourceId, string? details, CancellationToken cancellationToken)
     {
-        var entry = AuditLogEntry.Create(_currentUser.UserId, _currentUser.Email, action, resourceId);
+        var entry = AuditLogEntry.Create(_currentUser.UserId, _currentUser.Email, action, resourceId, details);
 
         _context.AuditLogEntries.Add(entry);
         await _context.SaveChangesAsync(cancellationToken);

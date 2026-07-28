@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Outlet } from "react-router";
 import * as signalR from "@microsoft/signalr";
+import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 
 // Bu component iki işi birden yapıyor:
@@ -25,9 +26,15 @@ function ProtectedRoute() {
     // Backend'deki WikiPageCreatedEventHandler'ın gönderdiği "WikiPageCreated"
     // adlı mesajı dinliyoruz - isim BİREBİR eşleşmeli, aksi halde hiçbir şey olmaz
     // (sessizce yok sayılır, hata da vermez - bu yüzden isim tutarlılığı önemli).
+    // alert() eskiden akışı tamamen kilitleyen (kullanıcı "Tamam"a basana kadar
+    // sayfayla hiçbir etkileşim kurulamayan) çirkin bir tarayıcı popup'ıydı -
+    // sonner'ın toast'u aynı bilgiyi kesintisiz, kendiliğinden kapanan bir
+    // bildirimle veriyor.
     connection.on("WikiPageCreated", (data) => {
       console.log("[SignalR] Yeni bildirim:", data);
-      alert(`Yeni wiki sayfası eklendi: "${data.title}" (${data.departmentName})`);
+      toast(`Yeni wiki sayfası eklendi: "${data.title}"`, {
+        description: data.departmentName,
+      });
     });
 
     connection

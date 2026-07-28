@@ -28,4 +28,10 @@ public record CreateWikiPageCommand(
     // olarak kaynak ID'si sayıyor (bkz. IAuditableCommand'daki not).
     public string AuditAction => "WikiPage.Created";
     public string? AuditResourceId => null;
+
+    // Title zaten Command'ın kendisinde var - Handler yine de AYNI deseni
+    // (AuditDetails'i Handle() içinde elle set etmek) kullanıyor, Delete'teki
+    // ile tutarlı kalsın diye (aksi halde "bazen computed property, bazen
+    // Handler'da set" gibi iki farklı kural olurdu).
+    public string? AuditDetails { get; set; }
 }

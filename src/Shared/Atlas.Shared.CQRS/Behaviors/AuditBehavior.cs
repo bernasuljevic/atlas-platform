@@ -39,7 +39,7 @@ public class AuditBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TR
             // Id'si) kaynak ID'si olarak kullanılıyor.
             var resourceId = request.AuditResourceId ?? (response as Guid?)?.ToString();
 
-            await _auditLogWriter.LogAsync(request.AuditAction, resourceId, cancellationToken);
+            await _auditLogWriter.LogAsync(request.AuditAction, resourceId, request.AuditDetails, cancellationToken);
         }
         catch (Exception ex)
         {

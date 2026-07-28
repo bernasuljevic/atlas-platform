@@ -51,6 +51,10 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
             request.Title, request.Content, departmentName,
             visibility, _currentUser.UserId.Value);
 
+        // AuditBehavior, Handler bitince (next() sonrası) bunu okuyacak -
+        // bkz. IAuditableCommand.AuditDetails'teki not.
+        request.AuditDetails = page.Title;
+
         // Outbox Pattern (Gün 2): AddAsync artık kalıcı yazmıyor, sadece
         // ekliyor (stage). Event'i de doğrudan yayınlamıyoruz (IPublisher.Publish
         // KALDIRILDI) - onun yerine AYNI değişiklik kümesine bir OutboxMessage
