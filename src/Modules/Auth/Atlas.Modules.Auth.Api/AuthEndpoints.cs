@@ -39,7 +39,9 @@ public static class AuthEndpoints
                 ? Results.Unauthorized()
                 : Results.Ok(tokens);
         })
-        .WithName("Login");
+        .WithName("Login")
+        // Brute-force şifre denemesine karşı IP bazlı bir sınır (bkz. Program.cs).
+        .RequireRateLimiting("login");
 
         // Access token süresi dolunca (15dk) React tarafı buraya refresh token'ı
         // gönderiyor, karşılığında yeni bir access+refresh token çifti alıyor -
