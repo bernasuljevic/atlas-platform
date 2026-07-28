@@ -698,10 +698,28 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         kullanıcı 403, token'sız istek 401.
   - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
 
+## Portföy yol haritası bitince açılan ek işler (2026-07-28)
+
+Kullanıcıyla birlikte üç aday belirlendi: Docker Compose tam paketleme,
+SignalR bildirim UX düzeltmesi, rate limiting. Cuma'ya kadar hedefleniyor.
+(Bu üçü paralel/bağımsız branch'lerde ilerledi - Docker Compose PR #2,
+audit log Gün 3 + Details düzeltmesi PR #1 - bu yüzden merge sırasına göre
+CLAUDE.md'de küçük çakışmalar çıkabilir, normal.)
+
+- [x] **SignalR bildirim UX düzeltmesi:** Yeni wiki sayfası bildirimi eskiden
+      akışı tamamen kilitleyen bir `alert()` popup'ıydı - `sonner` tabanlı bir
+      toast'a geçirildi (`Web/packages/ui/src/sonner.jsx`, Ders #11'deki
+      alışılmış shadcn-CLI-sonra-taşı akışıyla eklendi). `next-themes`
+      bağımlılığı BİLEREK kaldırıldı - proje Next.js değil, sabit tek bir
+      koyu tema kullanıyor, `Toaster`'da doğrudan `theme="dark"` sabitlendi.
+      Tarayıcıda uçtan uca doğrulandı. (PR #3)
+- [ ] Rate limiting - en azından `/api/ai/search`'e (belki login'e de,
+      brute-force'a karşı) `Microsoft.AspNetCore.RateLimiting` ile basit bir
+      sınır eklenecek.
+
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım, Gün 3/3:** Frontend'de
-   audit log görüntüleme sayfası (Admin-only route, filtreleme formu).
+1. Rate limiting (yukarıda) - Cuma'ya kadar hedefleniyor.
 2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
