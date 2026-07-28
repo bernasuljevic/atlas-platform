@@ -139,6 +139,7 @@ function AuditLogPage({ token }) {
                 <TableRow>
                   <TableHead>Kullanıcı</TableHead>
                   <TableHead>Eylem</TableHead>
+                  <TableHead>Detay</TableHead>
                   <TableHead className="hidden md:table-cell">Kaynak ID</TableHead>
                   <TableHead>Zaman (UTC)</TableHead>
                 </TableRow>
@@ -151,6 +152,9 @@ function AuditLogPage({ token }) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{entry.action}</Badge>
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate" title={entry.details ?? ""}>
+                      {entry.details ?? "—"}
                     </TableCell>
                     <TableCell className="hidden max-w-[220px] truncate font-mono text-xs text-[var(--text)]/70 md:table-cell">
                       {entry.resourceId ?? "—"}

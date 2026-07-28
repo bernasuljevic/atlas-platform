@@ -16,4 +16,12 @@ public interface IAuditableCommand
 {
     string AuditAction { get; }
     string? AuditResourceId { get; }
+
+    // BİLEREK settable - AuditResourceId'nin aksine, insan-okunur özet
+    // (ör. WikiPage.Title) çoğu zaman Command oluşturulduğu anda değil,
+    // Handler içinde (ör. silmeden önce ilgili kaydı çektikten sonra) ortaya
+    // çıkıyor. Handler bu alanı Handle() içinde doldurur, AuditBehavior
+    // Handler bitince (next() sonrası) okur - aynı Command nesnesi pipeline
+    // boyunca taşındığı için bu mutasyon güvenle görülebiliyor.
+    string? AuditDetails { get; set; }
 }

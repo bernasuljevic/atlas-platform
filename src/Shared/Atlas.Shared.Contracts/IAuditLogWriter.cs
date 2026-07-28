@@ -9,5 +9,5 @@ namespace Atlas.Shared.Contracts;
 /// </summary>
 public interface IAuditLogWriter
 {
-    Task LogAsync(string action, string? resourceId, CancellationToken cancellationToken);
+    Task LogAsync(string action, string? resourceId, string? details, CancellationToken cancellationToken);
 }
