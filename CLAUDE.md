@@ -479,16 +479,23 @@ gerçek bir mimari değişiklik olduğu için.
       ediyor) - yeni `IUnitOfWork`/`EfUnitOfWork`, WikiPage + Outbox mesajını TEK
       bir `SaveChanges`'te (atomik) yazıyor.
 
-  ⚠️ **BİLİNÇLİ, GEÇİCİ ARA DURUM (2026-07-28'den itibaren, Gün 3 bitene
-  kadar geçerli):** Outbox'taki mesajları okuyup gerçekten yayınlayacak arka
-  plan işleyici HENÜZ YOK (Gün 3). Yani şu an **wiki sayfası oluşturma/silme
-  AI'ı ve Notifications'ı hiç tetiklemiyor** - yeni sayfalar aranamıyor, anlık
-  bildirim gelmiyor, HİÇBİR hata da fırlamıyor (mesaj sessizce Outbox'ta
-  bekliyor). Bu bilerek böyle bırakıldı - kullanıcı testleri kırmızıyken
-  commit'lemek yerine iki integration testi `[Skip]` ile işaretleyip burada
-  durmayı tercih etti. **Gün 3 bitmeden bu durumu "bug" sanıp debug etmeye
-  başlama** - önce Gün 3'ü (arka plan işleyici) tamamla, sonra
-  `AiSearchEndpointsTests.cs`'teki iki `[Skip]`'i kaldır.
+  ~~⚠️ BİLİNÇLİ, GEÇİCİ ARA DURUM~~ - **Gün 3 ile ÇÖZÜLDÜ**, aşağı bkz.
+
+- [x] **Gün 3/5:** `OutboxProcessor` (Wiki.Infrastructure/Outbox, `BackgroundService`) -
+      5 saniyede bir işlenmemiş `OutboxMessage`'ları okuyup `Payload`'ı `EventType`'a
+      (`AssemblyQualifiedName`) göre deserialize edip gerçek `IPublisher.Publish`'i
+      TETİKLİYOR, başarılıysa `MarkProcessed()` çağırıyor. Notifications/AI'ın
+      event handler'ları HİÇ DEĞİŞMEDİ - Outbox sadece NE ZAMAN yayınlanacağını
+      değiştirdi. Singleton bir `BackgroundService`'in Scoped `WikiDbContext`/
+      `IPublisher`'a erişmesi gerektiği için her turda `IServiceScopeFactory`
+      ile yeni bir scope açılıyor.
+
+      Gün 2'de `[Skip]` edilen 2 integration test geri açıldı - artık "eventual
+      consistency" bekleyen bir retry helper kullanıyorlar (poll interval + pay,
+      10sn timeout) çünkü ingestion artık senkron değil. **Uygulama artık Gün 2'nin
+      bıraktığı yarım kalmış durumdan çıktı, tekrar tam işlevsel** - canlı
+      doğrulandı: sayfa oluşturulduktan hemen sonra aramada yok, ~6 saniye sonra
+      tam skoruyla çıkıyor.
 
 ## İzlenecek teknik borç (henüz aksiyon gerektirmiyor, büyürse ele alınmalı)
 
@@ -510,14 +517,16 @@ gerçek bir mimari değişiklik olduğu için.
 
 ## Sırada ne var
 
-1. **Transactional Outbox Pattern - Gün 3/5 (ACİL - uygulama şu an yarım kalmış
-   durumda, bkz. Gün 2'deki ⚠️ notu):** Arka plan işleyici (`IHostedService`,
-   polling) - işlenmemiş `OutboxMessage`'ları okuyup `Payload`'ı `EventType`'a
-   göre deserialize edip gerçek `IPublisher.Publish`'i tetikleyecek, başarılıysa
-   `MarkProcessed()` çağıracak. Bu bitene kadar wiki sayfası oluşturma/silme
-   AI'ı ve Notifications'ı hiç tetiklemiyor - bu Gün'ü atlayıp başka bir işe
-   geçme.
-2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+1. **Transactional Outbox Pattern - Gün 4/5:** Hata/retry stratejisi.
+   `OutboxMessage.Attempts`/`LastError` şu an dolduruluyor ama henüz hiçbir
+   üst sınır/backoff yok - `OutboxProcessor` başarısız bir mesajı her turda
+   (5sn'de bir) SONSUZA KADAR yeniden dener. En azından bir max-attempt sonrası
+   "dead letter" (bir daha hiç denenmesin, sadece görünür kalsın) mantığı
+   eklenmeli.
+2. **Transactional Outbox Pattern - Gün 5/5:** Integration test (crash-safety
+   senaryosu tam simüle edilemez ama en azından outbox satırının gerçekten
+   atomik yazıldığı doğrulanabilir) + wrap-up.
+3. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
