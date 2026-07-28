@@ -19,7 +19,13 @@ public record CreateWikiPageCommand(
     string Title,
     string Content,
     string DepartmentName,
-    string Visibility) : IRequest<Guid>, ICacheInvalidatingCommand
+    string Visibility) : IRequest<Guid>, ICacheInvalidatingCommand, IAuditableCommand
 {
     public string CacheKeyToInvalidate => "wiki-pages:all";
+
+    // AuditResourceId BİLEREK null - yeni sayfanın ID'si Handler çalışana kadar
+    // bilinmiyor. AuditBehavior, Handler'ın döndürdüğü Guid'i (page.Id) otomatik
+    // olarak kaynak ID'si sayıyor (bkz. IAuditableCommand'daki not).
+    public string AuditAction => "WikiPage.Created";
+    public string? AuditResourceId => null;
 }

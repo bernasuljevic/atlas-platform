@@ -60,6 +60,13 @@ public static class WikiModule
             // implemente eden Command'lar (CreateWikiPageCommand, DeleteWikiPageCommand)
             // bu davranıştan geçer, Handler çalıştıktan sonra ilgili cache anahtarını temizler.
             cfg.AddOpenBehavior(typeof(CacheInvalidationBehavior<,>));
+
+            // Portföy sertleştirme - 4. adım (Audit log): sadece IAuditableCommand'ı
+            // implemente eden Command'lar (CreateWikiPageCommand, DeleteWikiPageCommand)
+            // bu davranıştan geçer, Handler BAŞARIYLA tamamlandıktan sonra Audit
+            // modülüne (IAuditLogWriter üzerinden, Wiki'nin haberi bile olmadan)
+            // bir satır yazdırır.
+            cfg.AddOpenBehavior(typeof(AuditBehavior<,>));
         });
 
         services.AddValidatorsFromAssemblyContaining<GetWikiPagesQuery>();

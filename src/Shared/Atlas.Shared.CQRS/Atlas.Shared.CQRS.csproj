@@ -10,9 +10,11 @@
   <!-- CachingBehavior, Atlas.Shared.Caching'teki ICacheService'i kullanıyor - bu bir
        Shared→Shared referansı, modüller arası izolasyon kuralını (CLAUDE.md) ihlal
        etmiyor çünkü ikisi de "genel altyapı", herhangi bir modülün Domain/Application/
-       Infrastructure'ına referans yok. -->
+       Infrastructure'ına referans yok. AuditBehavior de aynı gerekçeyle
+       Atlas.Shared.Contracts'taki IAuditLogWriter'ı kullanıyor. -->
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Shared.Caching\Atlas.Shared.Caching.csproj" />
+    <ProjectReference Include="..\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

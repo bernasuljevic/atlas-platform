@@ -1,4 +1,5 @@
 using Atlas.IntegrationTests.Fakes;
+using Atlas.Modules.Audit.Infrastructure.Persistence;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
 using Atlas.Modules.Wiki.Infrastructure.Persistence;
 using Atlas.Shared.Caching.Abstractions;
@@ -71,6 +72,15 @@ public class AtlasApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<WikiDbContext>(options =>
             {
                 options.UseInMemoryDatabase($"WikiTestDb-{_dbSuffix}");
+                options.UseInternalServiceProvider(inMemoryProviderServices);
+            });
+
+            // Audit modülü de InMemory'e çevriliyor - Auth/Wiki ile aynı gerekçe,
+            // gerçek SQL Server'a bağımlı olmadan testler izole çalışsın.
+            services.RemoveAll<DbContextOptions<AuditDbContext>>();
+            services.AddDbContext<AuditDbContext>(options =>
+            {
+                options.UseInMemoryDatabase($"AuditTestDb-{_dbSuffix}");
                 options.UseInternalServiceProvider(inMemoryProviderServices);
             });
 
