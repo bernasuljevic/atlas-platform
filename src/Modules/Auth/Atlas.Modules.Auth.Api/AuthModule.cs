@@ -57,6 +57,17 @@ services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
 services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 services.AddScoped<ITokenGenerator, JwtTokenGenerator>();
 
+// Jwt:Key BİLEREK burada değil, aşağıdaki lambda'nın İÇİNDE (lazy) okunuyor.
+// 2026-07-28'de bunu eager'a (AddAuthModule çağrılırken, Build()'den ÖNCE)
+// çevirmeyi denedik - integration testlerini KIRDI: WebApplicationFactory'nin
+// test için enjekte ettiği Jwt:Key override'ı bu noktada henüz uygulanmamış
+// oluyor, bu yüzden JwtTokenGenerator (lazy okuyan, request zamanında çalışan)
+// token'ı BİR anahtarla imzalıyor ama bu lambda (eager, erken okunan) BAŞKA
+// bir anahtarla doğruluyordu - imza uyuşmazlığı, her korumalı endpoint'te
+// 401. Geri alındı. Gerçek prod sorununun (User Secrets'ın kullanıcının kendi
+// oturumunda hiç görünmemesi, bkz. CLAUDE.md Ders #16) asıl çözümü zaten bu
+// değildi - lazy okuma HER ZAMAN doğru çalıştı, tek sorun secret'ın disk
+// üzerinde o oturumdan hiç görünmüyor olmasıydı.
 services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
