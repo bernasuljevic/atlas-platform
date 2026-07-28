@@ -274,6 +274,41 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     `bin`/`obj` `%LOCALAPPDATA%\AtlasPlatformBuild\`'a taşındı - bu JWT
     hatasının asıl sebebi değildi ama yine de kalıcı, faydalı bir hijyen
     iyileştirmesi olarak korundu.)
+17. **HTML `<input type="date">` saatsiz bir DateTime gönderir - "Bitiş" tarihi
+    filtrelerinde `<=` kullanmak o günü SESSİZCE dışlar:** Audit Log'daki
+    "Bitiş" filtresi hiç çalışmıyordu (2026-07-28, kullanıcı bildirdi) -
+    `toUtc` her zaman `00:00:00` ile geliyordu, `OccurredAtUtc <= toUtc`
+    o günün SADECE gece yarısı anını kapsıyordu, gerçek kayıtlar (ör. 15:51)
+    hiç eşleşmiyordu. Düzeltme: `toUtc.Date.AddDays(1)` (bir sonraki günün
+    başlangıcı) ÜST SINIR olarak, `<` (küçüktür, eşit değil) ile kullanılmalı -
+    "Bitiş: X" kullanıcı için her zaman "X gününün TAMAMI" anlamına gelir.
+    Aynı hata AI aramasına tarih filtresi eklenirken tekrar yazılmasın diye
+    aynı düzeltme oraya da baştan uygulandı.
+18. **Npgsql, `Kind=Unspecified` bir `DateTime`'ı `timestamp with time zone`
+    sütunuyla karşılaştırmayı REDDEDİYOR - SQL Server aynı durumda sessizce
+    çalışıyor:** AI aramasına tarih filtresi eklenince (`GET /api/ai/search?
+    fromUtc=...`), ASP.NET Core'un query string binder'ının ürettiği
+    `Kind=Unspecified` bir `DateTime`, Postgres'teki `WikiPageEmbedding.
+    CreatedAtUtc` ("timestamp with time zone") ile karşılaştırılınca "Cannot
+    write DateTime with Kind=Unspecified... only UTC is supported" hatasıyla
+    400 dönüyordu (canlı doğrulandı) - AYNI desen SQL Server'daki Audit log
+    filtresinde HİÇ sorun çıkarmamıştı, çünkü `datetime2` Kind'ı hiç
+    umursamıyor. Düzeltme: `DateTime.SpecifyKind(value, DateTimeKind.Utc)` ile
+    Postgres'e gönderilmeden hemen önce. Genel ders: Postgres/Npgsql, SQL
+    Server'a göre `DateTime.Kind` konusunda çok daha katı - bir filtre/sorgu
+    SQL Server'da sorunsuz çalıştı diye Postgres'te de çalışacağı anlamına
+    gelmiyor, ikisi ayrı ayrı test edilmeli.
+19. **Backend'in serileştirdiği UTC zaman damgaları veritabanına göre TUTARSIZ:**
+    SQL Server kaynaklı alanlar (`AuditLogEntry.OccurredAtUtc`, `WikiPage.
+    CreatedAtUtc`) JSON'a "Z" SİZ yazılıyor (Kind bilgisi SQL Server'da
+    kayboluyor), Postgres kaynaklı alanlar (`WikiPageEmbedding.CreatedAtUtc`,
+    AI arama sonuçlarında) "Z" İLE yazılıyor (Npgsql, Kind=Utc'yi koruyor).
+    Bir yerde işe yarayan sabit bir `+ "Z"` düzeltmesi (bkz. Ders'in üstündeki
+    Audit log çözümü), başka bir yerde (AI arama sonuçları) "...ZZ" üretip
+    tarihi JavaScript'te "Invalid Date"e çeviriyordu (canlı doğrulandı, kod
+    push edilmeden ÖNCE fark edildi). Çözüm: paylaşılan `dateUtils.js` /
+    `formatUtcTimestamp()` - "Z" SADECE stringin sonunda yoksa ekleniyor,
+    her iki kaynaktan gelen değerle de doğru çalışıyor.
 
 ## Şu ana kadar tamamlananlar
 
@@ -821,8 +856,11 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   AI'ın embedding'lerini yeniden üretir (`WikiPageCreatedEvent`'i toplu
   yeniden yayınlayarak) - bir bakım hatası ya da embedding sağlayıcısı
   değişikliği sonrası kullanılacak bir admin aracı.
-- `GET /api/ai/search?q=...&topN=5` (topN opsiyonel, varsayılan 5) → token
-  gerektirir, sonuçlar departman görünürlük kuralına göre filtrelenir (Admin bypass eder).
+- `GET /api/ai/search?q=...&topN=5&fromUtc=...&toUtc=...` (topN/fromUtc/toUtc
+  opsiyonel, varsayılan topN=5) → token gerektirir, sonuçlar departman
+  görünürlük kuralına göre filtrelenir (Admin bypass eder). fromUtc/toUtc
+  verilirse, mesafe sıralamasından ÖNCE sayfanın embedding'inin oluşturulma
+  zamanına göre daraltır - normal semantik aramaya EK, isteğe bağlı bir filtre.
 - `GET /api/audit-log?details=...&fromUtc=...&toUtc=...&pageNumber=1&pageSize=20`
   (hepsi opsiyonel, `details` kısmi eşleşme/`Contains`) → sadece Admin rolü.
   `WikiPage.Created`/`WikiPage.Deleted` eylemlerini kaydediyor (bkz.
