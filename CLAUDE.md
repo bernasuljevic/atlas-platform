@@ -770,7 +770,20 @@ düzeltmesi PR #1), hepsi merge edildi.
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
-   (bu, API key'ler gelene kadar bloklanmış durumda).
+   (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-07-28,
+   kullanıcı gözlemi):** Arama şu an "başlığa göre eşleşiyormuş" hissi
+   verebiliyor - kod tarafında bu YANLIŞ, canlı test edilip kanıtlandı
+   (`SearchWikiPagesByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,
+   `Title` skora hiç girmiyor, sadece görüntüleme alanı - bkz.
+   `GenerateWikiPageEmbeddingsCommandHandler`'daki `TextChunker.Chunk(request.Content)`,
+   Title hiç chunk'lanmıyor). Gerçek sebep `FakeEmbeddingService`'in kaba
+   kelime-hash'leme yöntemi - insanlar başlığı içeriğin özeti gibi yazdığı
+   için başlık/içerik kelimeleri doğal olarak örtüşüyor, bu da "başlık
+   etkisi" gibi GÖRÜNÜYOR ama değil. Gerçek bir embedding sağlayıcısına
+   geçilince (anlam benzerliğine dayanacağı için) bu his kendiliğinden
+   azalacak/netleşecek - bu satırdaki geçişin dışında AYRI bir kod
+   değişikliği GEREKMİYOR, sadece geçiş tamamlanınca doğal olarak düzelecek
+   bir gözlem olarak not düşüldü.
 2. Portföy sertleştirme yol haritası VE Cuma'ya kadar hedeflenen 3 ek iş
    (Docker Compose, SignalR toast, rate limiting) hepsi tamamlanıp merge
    edildi - yeni bir yön/özellik kullanıcıyla birlikte kararlaştırılacak.
