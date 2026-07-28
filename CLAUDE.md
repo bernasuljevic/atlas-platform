@@ -618,12 +618,34 @@ teslimatı crash-safe ve atomik.
   eklenirse bir `UserRole` enum'ı ya da capability seti'ne geçmek gerekir
   (şimdiden yapmak YAGNI ihlali olurdu).
 
+## Portföy sertleştirme yol haritası (2026-07-28, Outbox Pattern bitince açıldı)
+
+Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observability,
+3) Teknik borç ödeme, 4) Yeni kullanıcı-görünür özellik.
+
+- [x] **1) CI/CD pipeline:** `.github/workflows/ci.yml` - push/PR'da otomatik
+      build+test (backend) ve build+lint (frontend). Integration testleri
+      (`Atlas.IntegrationTests`) CI'da ÇALIŞTIRILMIYOR - gerçek SQL Server/
+      Postgres/Redis'e ihtiyaç duyuyorlar, servis container'larıyla CI'a
+      taşımak ayrı bir iş olarak bırakıldı (bilinçli kapsam sınırı). Bunun
+      yerine tüm integration test sınıflarına `[Trait("Category",
+      "Integration")]` eklendi, CI `--filter "Category!=Integration"` ile
+      sadece Domain/Application/Infrastructure testlerini (dış bağımlılığı
+      olmayan, ~70 test) çalıştırıyor - bu sayede yeni bir test projesi
+      eklendiğinde CI dosyasını elle güncellemeye gerek kalmıyor, sadece
+      doğru trait'i eklemek yeterli. README'ye durum rozeti eklendi.
+- [ ] 2) Observability: Serilog + correlation ID
+- [ ] 3) Teknik borç ödeme: WikiBoard.jsx bölünmesi, FakeCurrentUserAccessor
+      birleştirilmesi
+- [ ] 4) Yeni kullanıcı-görünür özellik: audit log ya da üçüncü bir rol
+
 ## Sırada ne var
 
-1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
-   `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı.
-2. Transactional Outbox Pattern TAMAMLANDI - yeni bir özellik başlığı bekleniyor,
-   kullanıcıyla birlikte kararlaştırılacak.
+1. **Portföy sertleştirme yol haritası - 2. adım (Observability):** Serilog'a
+   geçiş + her isteğe bir correlation/trace ID ekleyip loglara işlemek.
+2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+   `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
+   (bu, API key'ler gelene kadar bloklanmış durumda).
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
