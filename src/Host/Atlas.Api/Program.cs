@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Atlas.Api.ExceptionHandling;
 using Atlas.Api.Observability;
 using Atlas.Modules.AI.Api;
@@ -8,6 +10,7 @@ using Atlas.Modules.Notifications.Api;
 using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
@@ -56,6 +59,53 @@ builder.Services.AddCors(options =>
 // ProblemDetails (RFC 7807) formatında JSON döner.
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+// Rate limiting - iki politika, ikisi de İSTEK BAŞINA DEĞİL, bir ANAHTARA
+// (partition) göre sayaç tutuyor, aksi halde tüm kullanıcılar TEK bir ortak
+// sayacı paylaşırdı (biri limiti doldurunca herkes engellenirdi).
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Varsayılan 429 yanıtı boş gövdeyle dönüyor - ProblemDetails formatına
+    // (projenin geri kalanıyla tutarlı) uygun, anlaşılır bir gövde yazıyoruz.
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.ContentType = "application/problem+json";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            type = "https://tools.ietf.org/html/rfc9110#section-15.5.20",
+            title = "Çok fazla istek",
+            status = StatusCodes.Status429TooManyRequests,
+            detail = "Kısa süre içinde çok fazla istek gönderdiniz - lütfen biraz bekleyip tekrar deneyin."
+        }, cancellationToken);
+    };
+
+    // IP bazlı - brute-force şifre denemesine karşı. Kullanıcı bazlı olamaz
+    // çünkü login sırasında henüz kimlik bilinmiyor (tam da doğrulanmaya
+    // çalışılan şey bu).
+    options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    // Kullanıcı bazlı (JWT'deki NameIdentifier) - embedding çağrısı + vector
+    // arama içerdiği için "ucuz" bir endpoint değil, gerçek bir embedding
+    // sağlayıcısına geçilince (şu an sahte) maliyeti daha da artacak.
+    options.AddPolicy("ai-search", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+});
 
 // Swagger/OpenAPI - her modülün MediatR ile MapGet/MapPost dediği minimal API
 // endpoint'lerini otomatik keşfedip belgeliyor. SignalR Hub (Notifications)
@@ -114,6 +164,11 @@ app.UseCors("AllowReactApp");
 // henüz bilinmeyen bir isteği değerlendiremez.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// UseAuthorization'DAN SONRA olmalı - "ai-search" politikası HttpContext.User'ı
+// (JWT'den doldurulan) okuyor, bu ancak Authentication/Authorization
+// çalıştıktan sonra dolu oluyor.
+app.UseRateLimiter();
 
 // ============================================================
 // VERİTABANI MIGRATION'LARI

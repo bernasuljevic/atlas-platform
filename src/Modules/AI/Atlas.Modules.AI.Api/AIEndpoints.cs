@@ -22,7 +22,10 @@ public static class AIEndpoints
             return Results.Ok(results);
         })
         .WithName("SearchWikiPages")
-        .RequireAuthorization();
+        .RequireAuthorization()
+        // Embedding çağrısı + vector arama içeriyor, "ucuz" bir endpoint değil -
+        // kullanıcı bazlı bir sınır (bkz. Program.cs).
+        .RequireRateLimiting("ai-search");
 
         return app;
     }
