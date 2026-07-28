@@ -698,13 +698,36 @@ Kullanıcıyla birlikte kararlaştırıldı - sırayla: 1) CI/CD, 2) Observabili
         kullanıcı 403, token'sız istek 401.
   - [ ] Gün 3/3: Frontend'de audit log görüntüleme sayfası (Admin-only route).
 
+## Portföy yol haritası bitince açılan ek işler (2026-07-28)
+
+Kullanıcıyla birlikte üç aday belirlendi: Docker Compose tam paketleme,
+SignalR bildirim UX düzeltmesi, rate limiting. Cuma'ya kadar hedeflendi,
+üçü de bitti (paralel/bağımsız branch'lerde - Docker Compose PR #2, SignalR
+toast PR #3, rate limiting bu PR #4, audit log Gün 3 + Details düzeltmesi
+PR #1 - merge sırasına göre CLAUDE.md'de küçük çakışmalar çıkabilir, normal).
+
+- [x] **Rate limiting:** ASP.NET Core'un yerleşik
+      `Microsoft.AspNetCore.RateLimiting` middleware'i (ekstra paket
+      gerekmedi). İki anahtar-bazlı (partitioned) politika - `"login"` (IP
+      bazlı, dakikada 5 - brute-force'a karşı, kullanıcı bazlı olamaz çünkü
+      login sırasında kimlik henüz bilinmiyor) ve `"ai-search"` (JWT
+      NameIdentifier bazlı, dakikada 20 - embedding çağrısı + vector arama
+      "ucuz" bir işlem değil). `UseRateLimiter()` BİLİNÇLİ OLARAK
+      `UseAuthorization()`'dan SONRA - `ai-search` politikası
+      `HttpContext.User`'ı okuyor. Canlı doğrulandı: login'e 7 istekten
+      6./7.'si 429, ai-search'e 22 istekten 21./22.'si 429. Entegrasyon
+      testleri etkilenmedi (her test sınıfı kendi rate limiter sayaçlarını
+      alıyor - ayrı `WebApplicationFactory` instance'ı).
+
 ## Sırada ne var
 
-1. **Portföy sertleştirme yol haritası - 4. adım, Gün 3/3:** Frontend'de
-   audit log görüntüleme sayfası (Admin-only route, filtreleme formu).
-2. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
+1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
    (bu, API key'ler gelene kadar bloklanmış durumda).
+2. Açık 4 PR'ın (#1 audit log Gün 3, #2 Docker Compose, #3 SignalR toast,
+   #4 rate limiting) incelenip merge edilmesi - hepsi bağımsız çalışır,
+   herhangi bir sırayla merge edilebilir (CLAUDE.md'de küçük çakışmalar
+   dışında).
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
