@@ -40,7 +40,7 @@ public class EfAuditLogRepository : IAuditLogRepository
             .OrderByDescending(e => e.OccurredAtUtc)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(e => new AuditLogEntryDto(e.Id, e.UserId, e.UserEmail, e.Action, e.ResourceId, e.OccurredAtUtc))
+            .Select(e => new AuditLogEntryDto(e.Id, e.UserId, e.UserEmail, e.Action, e.ResourceId, e.Details, e.OccurredAtUtc))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<AuditLogEntryDto>(items, pageNumber, pageSize, totalCount);

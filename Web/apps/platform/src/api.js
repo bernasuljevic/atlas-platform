@@ -152,6 +152,40 @@ export async function deleteWikiPage(accessToken, pageId) {
   }
 }
 
+// Sadece Admin - backend zaten .RequireRole("Admin") ile koruyor, burada
+// filtreleri (hepsi opsiyonel) query string'e çeviriyoruz. Boş/undefined
+// filtreler hiç query string'e eklenmiyor (backend'in "hiç filtre yok"
+// varsayılan davranışını tetiklemesi için).
+export async function getAuditLog(accessToken, { action, fromUtc, toUtc, pageNumber = 1, pageSize = 20 } = {}) {
+  const params = new URLSearchParams({ pageNumber, pageSize });
+  if (action) params.set("action", action);
+  if (fromUtc) params.set("fromUtc", fromUtc);
+  if (toUtc) params.set("toUtc", toUtc);
+
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/audit-log?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Audit log'u görme yetkin yok.");
+    }
+    throw new Error("Audit log yüklenemedi");
+  }
+
+  return response.json();
+}
+
 export async function createWikiPage(accessToken, page) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pages`, {
