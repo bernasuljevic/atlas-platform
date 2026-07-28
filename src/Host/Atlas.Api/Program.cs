@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Atlas.Api.ExceptionHandling;
+using Atlas.Api.Observability;
 using Atlas.Modules.AI.Api;
 using Atlas.Modules.Auth.Api;
 using Atlas.Modules.Notifications.Api;
@@ -7,8 +8,25 @@ using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Serilog, varsayılan Microsoft.Extensions.Logging'in yerini alıyor -
+// yapılandırılmış (structured) loglama + CorrelationIdMiddleware'in
+// LogContext.PushProperty ile eklediği değerleri otomatik yakalayabilme
+// (Enrich.FromLogContext()) için gerekli. Konsol çıktısına CorrelationId'yi
+// de basan bir şablon kullanıyoruz - appsettings üzerinden yapılandırmıyoruz,
+// tek ortam (Development) için kod içi yapılandırma yeterli, ekstra bir
+// appsettings şeması eklemek şimdilik gereksiz karmaşıklık olurdu.
+builder.Host.UseSerilog((context, configuration) =>
+{
+    configuration
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{CorrelationId}] {Message:lj}{NewLine}{Exception}");
+});
 
 // ============================================================
 // MODÜL KAYITLARI (Dependency Injection)
@@ -70,6 +88,16 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// EN BAŞTA olmalı - bundan sonraki HER middleware'in (Exception Handler dahil)
+// attığı loglar aynı CorrelationId'yi otomatik taşısın diye (bkz.
+// CorrelationIdMiddleware'deki not). UseSerilogRequestLogging, isteğin
+// sonunda (Exception Handler dahil her şey bittikten sonra) method/path/
+// status/süre içeren TEK bir özet log satırı basıyor - EF Core'un ayrıntılı
+// sorgu loglarının yanına, "bu istek genel olarak ne yaptı" sorusuna hızlı
+// cevap veren bir üst seviye satır ekliyor.
+app.UseCorrelationId();
+app.UseSerilogRequestLogging();
 
 app.UseExceptionHandler();
 
