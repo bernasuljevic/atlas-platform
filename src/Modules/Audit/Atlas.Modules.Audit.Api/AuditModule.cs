@@ -1,5 +1,9 @@
+using Atlas.Modules.Audit.Application.Abstractions;
+using Atlas.Modules.Audit.Application.AuditLog.Queries;
 using Atlas.Modules.Audit.Infrastructure.Persistence;
 using Atlas.Shared.Contracts;
+using Atlas.Shared.CQRS.Behaviors;
+using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +25,16 @@ public static class AuditModule
         // IAuditLogWriter (Shared.Contracts) - AuditBehavior (Shared.CQRS) bunu
         // enjekte ediyor, Wiki hangi modülün bunu implemente ettiğini hiç bilmiyor.
         services.AddScoped<IAuditLogWriter, EfAuditLogWriter>();
+
+        services.AddScoped<IAuditLogRepository, EfAuditLogRepository>();
+
+        services.AddMediatR(cfg =>
+        {
+            cfg.RegisterServicesFromAssemblyContaining<GetAuditLogQuery>();
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+        });
+        services.AddValidatorsFromAssemblyContaining<GetAuditLogQuery>();
 
         return services;
     }

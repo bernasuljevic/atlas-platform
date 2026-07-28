@@ -13,7 +13,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Modules.Audit.Infrastructure\Atlas.Modules.Audit.Infrastructure.csproj" />
+    <ProjectReference Include="..\Atlas.Modules.Audit.Application\Atlas.Modules.Audit.Application.csproj" />
     <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.CQRS\Atlas.Shared.CQRS.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
   </ItemGroup>
 
 </Project>

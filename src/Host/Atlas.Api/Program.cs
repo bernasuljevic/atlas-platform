@@ -135,6 +135,7 @@ app.MapAuthEndpoints();
 app.MapWikiEndpoints();
 app.MapNotificationsEndpoints();
 app.MapAIEndpoints();
+app.MapAuditEndpoints();
 
 // Basit bir sağlık kontrolü - "API gerçekten ayakta mı?" sorusuna cevap
 app.MapGet("/", () => Results.Ok(new
