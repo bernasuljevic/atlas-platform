@@ -20,6 +20,7 @@ public record WikiDashboardCardDto(
     string? CreatedByEmail,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
-    string DepartmentName);
+    string DepartmentName,
+    string? CoverImageUrl);
 
 public record WikiTagCountDto(string Tag, int Count);

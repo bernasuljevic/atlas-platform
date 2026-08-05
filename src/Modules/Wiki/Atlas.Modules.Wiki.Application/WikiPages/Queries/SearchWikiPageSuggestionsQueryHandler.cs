@@ -66,9 +66,7 @@ public class SearchWikiPageSuggestionsQueryHandler
         return WikiVisibilityRules.IsVisibleTo(visibility, page.DepartmentName, viewerDepartmentName, viewerIsAdmin);
     }
 
-    private static string Excerpt(string content)
-    {
-        var trimmed = content.Trim();
-        return trimmed.Length <= ExcerptLength ? trimmed : trimmed[..ExcerptLength].TrimEnd() + "…";
-    }
+    // GetWikiDashboardQueryHandler'daki AYNI düzeltme (bkz. MarkdownExcerptHelper) -
+    // arama önerilerinde de ham markdown sızmasın diye paylaşılan yardımcıya taşındı.
+    private static string Excerpt(string content) => MarkdownExcerptHelper.Truncate(content, ExcerptLength);
 }

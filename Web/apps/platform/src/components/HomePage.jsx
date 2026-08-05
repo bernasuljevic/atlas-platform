@@ -16,8 +16,7 @@ import { formatUtcTimestamp } from "../dateUtils";
 
 // Kullanıcının verdiği referans mockup'taki (2026-08-04) "kart" deseni - başlıklı,
 // bir sağ üst köşe eylemi (opsiyonel) olabilen, alt satırları divide-y ile
-// ayrılan bir panel. Hem sağdaki Hızlı Erişim/Popüler Kategoriler panelleri
-// HEM ana kolondaki "Son Eklenen Makaleler" listesi AYNI bu iskeleti kullanıyor.
+// ayrılan bir panel.
 function Panel({ title, action, children }) {
   return (
     <section className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
@@ -53,30 +52,6 @@ function StatCard({ icon, label, value, hint }) {
         </p>
       </div>
     </div>
-  );
-}
-
-function ArticleRow({ article }) {
-  return (
-    <Link
-      to={`/wiki/${article.id}`}
-      className="flex items-start gap-3 px-3.5 py-3 hover:bg-[var(--brand-accent)]/5"
-    >
-      <FileText size={16} className="mt-0.5 shrink-0" style={{ color: "var(--brand-accent)" }} />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold" style={{ color: "var(--text-h)" }}>
-          {article.title}
-        </p>
-        {article.excerpt && (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed" style={{ color: "var(--text)" }}>
-            {article.excerpt}
-          </p>
-        )}
-        <p className="mt-1 text-[11px]" style={{ color: "var(--text)", opacity: 0.6 }}>
-          {formatUtcTimestamp(article.createdAtUtc)} · {article.departmentName}
-        </p>
-      </div>
-    </Link>
   );
 }
 
@@ -118,6 +93,88 @@ function PopularTagRow({ tag, count }) {
   );
 }
 
+// Wikipedia'nın "Tarihte bugün" kutusunun bizdeki karşılığı - tarihsel trivia
+// YERİNE (elimizde böyle bir veri yok), platformdaki GERÇEK son güncellemeleri
+// listeliyoruz. Aynı "kutu + madde listesi + alt bilgi satırı" iskeleti
+// korunuyor, sadece içerik platforma özgü.
+function RecentUpdatesBox({ updates }) {
+  return (
+    <Panel title="Son Güncellemeler">
+      <ul className="flex flex-col gap-2.5 p-4 text-sm" style={{ color: "var(--text)" }}>
+        {updates.map((u) => (
+          <li key={u.id} className="flex items-baseline gap-1.5">
+            <span className="shrink-0" style={{ color: "var(--brand-accent)" }}>
+              •
+            </span>
+            <span>
+              <Link to={`/wiki/${u.id}`} className="font-semibold hover:underline" style={{ color: "var(--brand-accent)" }}>
+                {u.title}
+              </Link>{" "}
+              - {u.departmentName} departmanında güncellendi ({formatUtcTimestamp(u.updatedAtUtc ?? u.createdAtUtc)})
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center gap-3 border-t px-4 py-2 text-xs font-medium" style={{ borderColor: "var(--border)", color: "var(--brand-accent)" }}>
+        <Link to="/wiki/pages" className="hover:underline">
+          Tüm Sayfalar
+        </Link>
+        <span style={{ color: "var(--text)", opacity: 0.4 }}>·</span>
+        <Link to="/wiki/new" className="hover:underline">
+          Yeni sayfa oluştur
+        </Link>
+      </div>
+    </Panel>
+  );
+}
+
+// "Son Eklenen Makaleler" - eskiden düz bir liste (bkz. ArticleRow) iken,
+// kullanıcı geri bildirimiyle (2026-08-05: "görselleri olsun") kapak
+// görselli bir kart ızgarasına dönüştürüldü. Aynı geri bildirimin devamında
+// (2026-08-05: "en yukarıda olsun... yazıları daha büyük olsun") bu bölüm
+// sayfanın EN ÜSTÜNDEKİ ana içerik hâline geldi (eskiden ayrı bir "Haftanın
+// Seçkin Maddesi" kutusu + daha küçük bir liste vardı, ikisi tek, daha
+// büyük yazılı bir ızgarada birleştirildi) - başlık artık text-lg/font-bold,
+// eskisi (text-sm/font-semibold) sayfanın en üst/en önemli içeriği için
+// yetersiz kalıyordu.
+function ArticleGridCard({ article }) {
+  return (
+    <Link
+      to={`/wiki/${article.id}`}
+      className="flex flex-col overflow-hidden rounded-lg border hover:shadow-md"
+      style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+    >
+      {article.coverImageUrl ? (
+        <img src={article.coverImageUrl} alt="" className="h-36 w-full object-cover" />
+      ) : (
+        <div className="flex h-36 w-full items-center justify-center" style={{ background: "var(--code-bg)" }}>
+          <FileText size={28} style={{ color: "var(--text)", opacity: 0.35 }} />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col gap-1.5 p-4">
+        <p className="line-clamp-1 text-lg font-bold" style={{ color: "var(--text-h)" }}>
+          {article.title}
+        </p>
+        <p className="line-clamp-2 flex-1 text-sm leading-relaxed" style={{ color: "var(--text)", opacity: 0.85 }}>
+          {article.excerpt}
+        </p>
+        <p className="text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+          {formatUtcTimestamp(article.createdAtUtc)} · {article.departmentName}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// Giriş yapınca artık doğrudan makale listesine değil buraya (Dashboard)
+// geliniyor (bkz. App.jsx - /wiki index route'u). Düzen, kullanıcının ikinci
+// geri bildirimine göre yeniden sıralandı (2026-08-05: "son eklenenler en
+// yukarıda olsun sağlı sollu... Son güncellemeler/istatistikler sayfanın en
+// sonunda olsun") - önceki sürümde üstte "Haftanın Seçkin Maddesi" + "Son
+// Güncellemeler" yan yana duruyordu, istatistikler onun hemen altındaydı.
+// Şimdiki sıra: (1) Son Eklenen Makaleler ızgarası (EN ÜSTTE, büyük yazı),
+// (2) Hızlı Erişim + Popüler Kategoriler, (3) Son Güncellemeler + istatistik
+// şeridi (EN ALTTA).
 function HomePage({ token }) {
   const { isAdmin, fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
   const [dashboard, setDashboard] = useState(null);
@@ -137,8 +194,15 @@ function HomePage({ token }) {
     };
   }, [token]);
 
-  const [featured, ...rest] = dashboard?.recentlyAdded ?? [];
-  const otherRecentlyAdded = rest.slice(0, 3);
+  // Artık ayrı bir "öne çıkan tek makale" YOK - hepsi (en yeni dahil) AYNI
+  // ızgarada, eşit ağırlıkta gösteriliyor. Kapak görsele sahip sayfalar
+  // hafifçe önceliklendiriliyor (ızgara tamamen görselsiz kartlarla dolmasın
+  // diye), ama görselsiz sayfalar da (bkz. ArticleGridCard'ın placeholder'ı)
+  // listeden hiç ATILMIYOR.
+  const gridArticles = [...(dashboard?.recentlyAdded ?? [])]
+    .sort((a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0))
+    .slice(0, 6);
+  const recentUpdates = (dashboard?.recentlyUpdated ?? []).slice(0, 5);
 
   const [activeTab, setActiveTab] = useState("home");
 
@@ -209,59 +273,32 @@ function HomePage({ token }) {
           </p>
         </div>
       ) : dashboard && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="flex flex-col gap-5 lg:col-span-2">
-            {featured && (
-              <Link
-                to={`/wiki/${featured.id}`}
-                className="block rounded-lg border p-5 transition-shadow hover:shadow-lg"
-                style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-              >
-                <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "var(--brand-accent)" }}>
-                  ⭐ Haftanın Seçkin Maddesi
-                </span>
-                <h2 className="mt-2 text-xl font-bold leading-snug" style={{ color: "var(--text-h)" }}>
-                  {featured.title}
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed font-normal" style={{ color: "var(--text-h)", opacity: 0.9 }}>
-                  {featured.excerpt}
-                </p>
-                <p className="mt-3 text-xs font-medium" style={{ color: "var(--text)", opacity: 0.7 }}>
-                  ✍️ {featured.createdByEmail ?? "Bilinmiyor"} · 📅 {formatUtcTimestamp(featured.createdAtUtc)} · 🏢 {featured.departmentName}
-                </p>
-              </Link>
-            )}
-
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-              <StatCard icon={<FileText size={15} />} label="Toplam Makale" value={dashboard.totalPageCount} hint="Tüm içerikler" />
-              <StatCard icon={<FilePlus2 size={15} />} label="Son Eklenen" value={dashboard.addedThisWeekCount} hint="Bu hafta" />
-              <StatCard icon={<Clock size={15} />} label="Son Güncellenen" value={dashboard.updatedThisWeekCount} hint="Bu hafta" />
-              {ownDepartment && (
-                <StatCard icon={<Users size={15} />} label="Sizin İçerikleriniz" value={dashboard.departmentSpecificCount} hint={ownDepartment} />
-              )}
-            </div>
-
-            {otherRecentlyAdded.length > 0 && (
-              <Panel
-                title="Son Eklenen Makaleler"
-                action={
-                  <Link
-                    to="/wiki/pages"
-                    className="flex items-center gap-1 text-xs font-medium hover:opacity-80"
-                    style={{ color: "var(--brand-accent)" }}
-                  >
-                    Tümünü Gör <ArrowRight size={13} />
-                  </Link>
-                }
-              >
-                {otherRecentlyAdded.map((a) => (
-                  <ArticleRow key={a.id} article={a} />
+        <div className="flex flex-col gap-5">
+          {/* (1) EN ÜSTTE - kapak görselli, büyük yazılı makale ızgarası
+              ("sağlı sollu" - çok sütunlu grid). */}
+          {gridArticles.length > 0 && (
+            <Panel
+              title="Son Eklenen Makaleler"
+              action={
+                <Link
+                  to="/wiki/pages"
+                  className="flex items-center gap-1 text-xs font-medium hover:opacity-80"
+                  style={{ color: "var(--brand-accent)" }}
+                >
+                  Tümünü Gör <ArrowRight size={13} />
+                </Link>
+              }
+            >
+              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                {gridArticles.map((a) => (
+                  <ArticleGridCard key={a.id} article={a} />
                 ))}
-              </Panel>
-            )}
-          </div>
+              </div>
+            </Panel>
+          )}
 
-          <aside className="flex flex-col gap-5">
+          {/* (2) Hızlı Erişim + Popüler Kategoriler, yan yana. */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Panel title="Hızlı Erişim">
               <QuickAccessRow
                 icon={<ListChecks size={15} />}
@@ -292,7 +329,20 @@ function HomePage({ token }) {
                 ))}
               </Panel>
             )}
-          </aside>
+          </div>
+
+          {/* (3) EN SONDA - Son Güncellemeler kutusu + istatistik şeridi
+              (Toplam Makale / Son Eklenen / Son Güncellenen). */}
+          {recentUpdates.length > 0 && <RecentUpdatesBox updates={recentUpdates} />}
+
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+            <StatCard icon={<FileText size={15} />} label="Toplam Makale" value={dashboard.totalPageCount} hint="Tüm içerikler" />
+            <StatCard icon={<FilePlus2 size={15} />} label="Son Eklenen" value={dashboard.addedThisWeekCount} hint="Bu hafta" />
+            <StatCard icon={<Clock size={15} />} label="Son Güncellenen" value={dashboard.updatedThisWeekCount} hint="Bu hafta" />
+            {ownDepartment && (
+              <StatCard icon={<Users size={15} />} label="Sizin İçerikleriniz" value={dashboard.departmentSpecificCount} hint={ownDepartment} />
+            )}
+          </div>
         </div>
       )}
     </div>

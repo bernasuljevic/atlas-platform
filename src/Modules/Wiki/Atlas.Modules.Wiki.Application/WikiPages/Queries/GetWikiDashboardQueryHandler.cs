@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Atlas.Modules.Wiki.Domain.Entities;
 using Atlas.Modules.Wiki.Domain.Enums;
 using Atlas.Shared.Contracts;
@@ -91,14 +92,26 @@ public class GetWikiDashboardQueryHandler : IRequestHandler<GetWikiDashboardQuer
     }
 
     private static WikiDashboardCardDto ToCard(WikiPageDto p) => new(
-        p.Id, p.Title, Excerpt(p.Content), p.CreatedByEmail, p.CreatedAtUtc, p.UpdatedAtUtc, p.DepartmentName);
+        p.Id, p.Title, Excerpt(p.Content), p.CreatedByEmail, p.CreatedAtUtc, p.UpdatedAtUtc, p.DepartmentName,
+        ExtractCoverImageUrl(p.Content));
 
-    // WikiPageTable.jsx'teki truncateContent ile AYNI fikir, sadece backend
-    // tarafında - kart önizlemesi ham içeriğin (henüz markdown olarak render
-    // edilmemiş) ilk birkaç yüz karakteri.
-    private static string Excerpt(string content)
+    // WikiPageTable.jsx'teki truncateContent ile BENZER fikir, sadece backend
+    // tarafında - kart önizlemesi ham içeriğin markdown işaretlerinden
+    // arındırılmış ilk birkaç yüz karakteri (bkz. MarkdownExcerptHelper'daki
+    // not - önceden ham içerik kısaltılıyordu, "[Başlık](wiki:GUID)" gibi
+    // yarım kalmış sözdizimi önizlemeye sızıyordu).
+    private static string Excerpt(string content) => MarkdownExcerptHelper.Truncate(content, ExcerptLength);
+
+    // Ayrı bir "kapak görseli" alanı/yüklemesi YOK - sayfanın içeriğinde
+    // markdown.jsx'in de anladığı AYNI "![alt](url)" söz dizimiyle geçen İLK
+    // görsel, dashboard kartlarında (Haftanın Seçkin Maddesi kutusu, Son
+    // Eklenen Makaleler ızgarası) küçük bir önizleme olarak kullanılıyor -
+    // ekstra bir alan/endpoint eklemeden, zaten var olan içerikten türetiliyor.
+    private static readonly Regex ImageMarkdownPattern = new(@"!\[[^\]]*\]\(([^)]+)\)", RegexOptions.Compiled);
+
+    private static string? ExtractCoverImageUrl(string content)
     {
-        var trimmed = content.Trim();
-        return trimmed.Length <= ExcerptLength ? trimmed : trimmed[..ExcerptLength].TrimEnd() + "…";
+        var match = ImageMarkdownPattern.Match(content);
+        return match.Success ? match.Groups[1].Value : null;
     }
 }
