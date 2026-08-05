@@ -57,4 +57,32 @@ public class UserTests
 
         Assert.Equal(UserRole.Admin, user.Role);
     }
+
+    [Fact]
+    public void VarsayilanOlarak_EmailDogrulanmamisOlarakOlusur()
+    {
+        var user = User.Create("test@atlas.local", "Test Kullanici", "hashli-sifre");
+
+        Assert.False(user.EmailVerified);
+    }
+
+    [Fact]
+    public void EmailVerifiedTrueGecilirse_DogrulanmisOlarakOlusur()
+    {
+        // Admin seed'inin kullandığı yol - doğrulama akışından hiç geçmeden
+        // baştan doğrulanmış sayılması gerekiyor (bkz. AuthModule.MigrateAuthDatabase).
+        var user = User.Create("admin@atlas.local", "Admin", "hashli-sifre", UserRole.Admin, emailVerified: true);
+
+        Assert.True(user.EmailVerified);
+    }
+
+    [Fact]
+    public void MarkEmailVerified_DogrulanmamisKullaniciyiDogrular()
+    {
+        var user = User.Create("test@atlas.local", "Test Kullanici", "hashli-sifre");
+
+        user.MarkEmailVerified();
+
+        Assert.True(user.EmailVerified);
+    }
 }

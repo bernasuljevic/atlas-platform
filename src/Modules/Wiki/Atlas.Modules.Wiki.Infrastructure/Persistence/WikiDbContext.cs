@@ -10,6 +10,7 @@ public class WikiDbContext : DbContext
     }
 
     public DbSet<WikiPage> WikiPages => Set<WikiPage>();
+    public DbSet<WikiFolder> WikiFolders => Set<WikiFolder>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -30,6 +30,14 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokensDto?>
         if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             return null;
 
+        // GÜVENLİK: Başkasının benim adıma hesap açıp kullanabilmesini engellemek
+        // için eklendi (bkz. EmailVerificationCode). Kimlik doğru ama işlem
+        // yapılamıyor - bu yüzden UnauthorizedAccessException (403), yanlış
+        // şifredeki gibi 401 DEĞİL (GlobalExceptionHandler'daki eşleme).
+        if (!user.EmailVerified)
+            throw new UnauthorizedAccessException(
+                "E-posta adresini doğrulamadan giriş yapamazsın. Kayıt sırasında gönderilen kodu gir.");
+
         var accessToken = _tokenGenerator.GenerateAccessToken(user);
 
         // Refresh token 7 gün geçerli - access token'dan (15dk) çok daha uzun ömürlü,

@@ -32,6 +32,24 @@ public static class AuthEndpoints
         })
         .WithName("RegisterUser");
 
+        // Kod yanlış/süresi dolmuş girişimlerinin kaba kuvvetle (1.000.000
+        // olasılık) denenmesine karşı - login'deki AYNI IP bazlı sınırlama deseni.
+        group.MapPost("/verify-email", async (VerifyEmailCommand command, IMediator mediator) =>
+        {
+            await mediator.Send(command);
+            return Results.NoContent();
+        })
+        .WithName("VerifyEmail")
+        .RequireRateLimiting("email-verification");
+
+        group.MapPost("/resend-verification-code", async (ResendVerificationCodeCommand command, IMediator mediator) =>
+        {
+            await mediator.Send(command);
+            return Results.NoContent();
+        })
+        .WithName("ResendVerificationCode")
+        .RequireRateLimiting("resend-verification");
+
         group.MapPost("/login", async (LoginCommand command, IMediator mediator) =>
         {
             var tokens = await mediator.Send(command);

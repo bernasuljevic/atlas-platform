@@ -7,4 +7,8 @@ public record WikiPageDto(
     string DepartmentName,
     string Visibility,
     Guid CreatedByUserId,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    Guid? FolderId,
+    DateTime? UpdatedAtUtc,
+    string? CreatedByEmail,
+    string? Tags);

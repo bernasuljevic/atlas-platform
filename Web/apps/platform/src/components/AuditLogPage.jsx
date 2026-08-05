@@ -119,7 +119,7 @@ function AuditLogPage({ token }) {
                 onChange={(e) => setToUtc(e.target.value)}
               />
             </div>
-            <Button type="submit" className="bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90">
+            <Button type="submit" className="text-white hover:opacity-90" style={{ background: "var(--brand-accent)" }}>
               Filtrele
             </Button>
           </form>

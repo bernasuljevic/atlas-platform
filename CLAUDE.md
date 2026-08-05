@@ -808,6 +808,61 @@ düzeltmesi PR #1), hepsi merge edildi.
       testleri etkilenmedi (her test sınıfı kendi rate limiter sayaçlarını
       alıyor - ayrı `WebApplicationFactory` instance'ı).
 
+## 6 maddelik özellik listesinin eksik kalan 3 parçası (2026-08-04)
+
+Ana sayfa/Wikipedia görünümü işi bittikten sonra kullanıcı orijinal 6 maddelik
+listeyi ("bunlardan eksik olan var mı") tekrar sordu. Denetim sonucu GERÇEK,
+aksiyon gerektiren sadece 3 eksik çıktı (geri kalanı ya tamamlanmıştı ya da
+bilinçli olarak ertelenmişti) - kullanıcı üçüne de "evet" diyerek onayladı,
+önerilen sırayla yapıldı:
+
+- [x] **(a) Link penceresinde arama/filtreleme:** `WikiEditorPage.jsx`'teki
+      link ekleme penceresi eskiden mevcut klasör ağacından çıkarılan SABİT,
+      filtrelenemeyen bir sayfa listesi gösteriyordu - departman büyüdükçe
+      kullanışsız hale geliyordu. Üst bardaki aramayla (bkz. WikiLayout) AYNI
+      hafif öneri endpoint'i (`getWikiSearchSuggestions`, debounce'lu) burada
+      da kullanılmaya başlandı - artık TÜM görünür sayfalar arasında (sadece
+      mevcut departmanın klasör ağacı değil) arama yapılabiliyor, backend'in
+      görünürlük filtresi burada da otomatik uygulanıyor.
+- [x] **(b) Kırmızı link (red link) mekanizması:** Wikipedia'nın "henüz
+      yazılmamış makaleye bağlantı" fikri - link aramasında eşleşen bir sayfa
+      YOKSA, "'X' adında bir sayfa yok - kırmızı bağlantı olarak ekle" seçeneği
+      çıkıyor. Var olan `wiki:GUID` hedefinden FARKLI olarak `wiki-new:Başlık`
+      (URL-encoded) sözdizimi kullanılıyor - hedef sayfa henüz yok, GUID'i de
+      yok. `markdown.jsx`'in render katmanı bu hedefi kırmızı, kesikli alt
+      çizgili bir bağlantı olarak gösteriyor (bkz. `INLINE_PATTERN`'in
+      `wiki-new:` dalı), tıklanınca `/wiki/new?title=...`'a gidiyor.
+      `WikiEditorPage`, `useSearchParams` ile bu `title` parametresini okuyup
+      Başlık alanını ÖNCEDEN dolduruyor (sadece oluşturma modunda anlamlı,
+      edit modunda zaten gerçek başlık fetch'le geliyor). Tamamen frontend -
+      backend değişikliği gerekmedi. Canlı doğrulandı: sayfa oluşturuldu,
+      render edildi, kırmızı linke tıklanınca doğru başlıkla dolu "Yeni Sayfa"
+      ekranına gidildi.
+- [x] **(c) Etiket (tag) sistemi:** Ayrı bir `Tag` entity'si/many-to-many
+      ilişki BİLEREK kurulmadı - tek gerçek ihtiyaç "arama sırasında eşleşme",
+      ilişkisel bir model bunun için YAGNI olurdu. `WikiPage.Tags` (Domain) -
+      virgülle ayrılmış, TEK bir nullable string sütun (`nvarchar(300)`,
+      migration uygulandı). Normalizasyon (`NormalizeTags`) Domain'de TEK
+      yerde: trim + küçük harf + tekrarsız (`"React, react ,DevOps"` →
+      `"react,devops"`) - hem `Create()` hem `Update()` bunu kullanıyor, PUT
+      istediği zaman etiketleri boşaltıp yeniden yazabiliyor. Command/DTO/
+      endpoint/validator zincirinin TAMAMINA (`CreateWikiPageCommand`,
+      `UpdateWikiPageCommand`/`UpdateWikiPageRequest`, `WikiPageDto`,
+      `GetAllWikiPagesRawQueryHandler`, `GetWikiPageByIdQueryHandler`) opsiyonel
+      bir `Tags` alanı eklendi - hiçbiri KIRILMADI çünkü hepsi ya nullable ya
+      da varsayılan değerli. `SearchWikiPageSuggestionsQueryHandler`'a
+      ÜÇÜNCÜ bir eşleşme katmanı eklendi: başlık > ETİKET > içerik (bir etiket
+      eşleşmesi başlıktan daha zayıf ama içerikte geçen bir kelimeden daha
+      güçlü bir sinyal). `WikiEditorPage.jsx`'e "Etiketler" adlı tek bir metin
+      alanı (virgülle ayrılmış ham girdi) eklendi, `WikiArticlePage.jsx`
+      etiketleri küçük badge'ler olarak gösteriyor. Ayrı bir "etikete göre
+      gözat" sayfası BİLEREK eklenmedi - birleşik arama (üst bar) zaten
+      etiketleri kapsıyor, kapsamı gereksiz büyütmemek için. Canlı doğrulandı:
+      `"Kubernetes, DevOps , kubernetes"` girdisi `"kubernetes,devops"`'a
+      normalize edildi, sayfada badge olarak doğru göründü, "devops" (ne
+      başlıkta ne içerikte geçen bir kelime) ile arama yapılınca sayfa doğru
+      şekilde bulundu.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
@@ -826,9 +881,11 @@ düzeltmesi PR #1), hepsi merge edildi.
    azalacak/netleşecek - bu satırdaki geçişin dışında AYRI bir kod
    değişikliği GEREKMİYOR, sadece geçiş tamamlanınca doğal olarak düzelecek
    bir gözlem olarak not düşüldü.
-2. Portföy sertleştirme yol haritası VE Cuma'ya kadar hedeflenen 3 ek iş
-   (Docker Compose, SignalR toast, rate limiting) hepsi tamamlanıp merge
-   edildi - yeni bir yön/özellik kullanıcıyla birlikte kararlaştırılacak.
+2. Portföy sertleştirme yol haritası, Cuma'ya kadar hedeflenen 3 ek iş
+   (Docker Compose, SignalR toast, rate limiting) VE orijinal 6 maddelik
+   özellik listesinin denetimde bulunan 3 gerçek eksiği (link arama, kırmızı
+   link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı - yeni bir
+   yön/özellik kullanıcıyla birlikte kararlaştırılacak.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
@@ -847,9 +904,12 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   (Id'yi bilmek görebilmek anlamına gelmiyor - başka departmanın DepartmentOnly
   sayfasının Id'si tahmin edilse bile 404 döner). Arama sonucuna tıklanınca
   tam sayfayı göstermek için kullanılıyor.
-- `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly) → token gerektirir.
-  departmentName normal kullanıcı için YOK SAYILIR (departman her zaman JWT'den
-  zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
+- `POST /api/wiki/pages` (title, content, departmentName, visibility: Public|DepartmentOnly, folderId?, tags?)
+  → token gerektirir. departmentName normal kullanıcı için YOK SAYILIR (departman
+  her zaman JWT'den zorlanır) - sadece Admin gönderdiği departmanı seçebilir.
+  tags virgülle ayrılmış ham metin, Domain'de normalize edilir (bkz. "6 maddelik
+  özellik listesi" bölümündeki (c) notu). `PUT /api/wiki/pages/{id}` da AYNI
+  tags alanını kabul ediyor (departmentName HARİÇ, geri kalan alanlarla aynı).
 - `DELETE /api/wiki/pages/{id}` → token gerektirir. Admin HER sayfayı, normal
   kullanıcı SADECE kendi oluşturduğunu silebilir (aksi halde 403).
 - `POST /api/wiki/reindex` → sadece Admin rolü. Var olan TÜM sayfalar için

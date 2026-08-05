@@ -32,7 +32,11 @@ function Register() {
 
     try {
       await register(email, fullName, password, department);
-      navigate("/login");
+      // Artık kayıt olur olmaz giriş ekranına DEĞİL, doğrulama koduna gidiyoruz -
+      // hesap e-posta doğrulanana kadar zaten giriş yapamıyor (bkz.
+      // LoginCommandHandler). email'i state ile taşıyoruz ki kullanıcı tekrar
+      // yazmak zorunda kalmasın.
+      navigate("/verify-email", { state: { email } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,7 +98,8 @@ function Register() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
+              className="w-full text-white hover:opacity-90"
+              style={{ background: "var(--brand-accent)" }}
             >
               {isLoading ? "Kayıt olunuyor..." : "Kayıt Ol"}
             </Button>

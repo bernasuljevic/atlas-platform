@@ -30,5 +30,12 @@ public class CreateWikiPageCommandValidator : AbstractValidator<CreateWikiPageCo
             .NotEmpty().WithMessage("Görünürlük boş olamaz.")
             .Must(v => Enum.TryParse<WikiVisibility>(v, ignoreCase: true, out _))
             .WithMessage("Görünürlük 'Public' ya da 'DepartmentOnly' olmalı.");
+
+        // Ham, normalize edilmemiş kullanıcı girdisi üzerinde bir üst sınır -
+        // asıl normalizasyon (trim/küçük harf/tekrarsız) Domain'de (bkz.
+        // WikiPage.NormalizeTags), burada sadece anlamsız derecede uzun bir
+        // string'in DB sütununu (300) aşıp 500'e düşmesini erken kesiyoruz.
+        RuleFor(x => x.Tags)
+            .MaximumLength(300).WithMessage("Etiketler 300 karakteri geçemez.");
     }
 }

@@ -9,6 +9,7 @@ namespace Atlas.Modules.Wiki.Application.WikiPages.Commands;
 public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageCommand, Guid>
 {
     private readonly IWikiPageRepository _wikiPageRepository;
+    private readonly IWikiFolderRepository _wikiFolderRepository;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
@@ -18,11 +19,13 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
     // (Bugün Auth.Infrastructure sağlayacak - ama bu handler bunu asla bilmeyecek.)
     public CreateWikiPageCommandHandler(
         IWikiPageRepository wikiPageRepository,
+        IWikiFolderRepository wikiFolderRepository,
         ICurrentUserAccessor currentUser,
         IOutboxWriter outboxWriter,
         IUnitOfWork unitOfWork)
     {
         _wikiPageRepository = wikiPageRepository;
+        _wikiFolderRepository = wikiFolderRepository;
         _currentUser = currentUser;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
@@ -47,9 +50,28 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
 
         var visibility = Enum.Parse<WikiVisibility>(request.Visibility, ignoreCase: true);
 
+        // Klasörleme (Gün 2): CreateWikiFolderCommandHandler'daki AYNI kural -
+        // bir sayfa sadece KENDİ departmanının klasörüne dosyalanabilir, aksi
+        // halde IT'deki biri HR'ın klasör Id'sini tahmin edip sayfasını oraya
+        // "sızdırabilirdi" (klasör görünürlük taşımasa da, organizasyon şeması
+        // departmana ait bir kaynak).
+        Guid? folderId = null;
+        if (request.FolderId is not null)
+        {
+            var folder = await _wikiFolderRepository.GetByIdAsync(request.FolderId.Value, cancellationToken);
+
+            if (folder is null)
+                throw new ArgumentException("Klasör bulunamadı.", nameof(request.FolderId));
+
+            if (!string.Equals(folder.DepartmentName, departmentName, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Klasör başka bir departmana ait.", nameof(request.FolderId));
+
+            folderId = folder.Id;
+        }
+
         var page = WikiPage.Create(
             request.Title, request.Content, departmentName,
-            visibility, _currentUser.UserId.Value);
+            visibility, _currentUser.UserId.Value, folderId, _currentUser.Email, request.Tags);
 
         // AuditBehavior, Handler bitince (next() sonrası) bunu okuyacak -
         // bkz. IAuditableCommand.AuditDetails'teki not.

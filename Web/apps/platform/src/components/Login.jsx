@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { login } from "../api";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@atlas/ui/card";
@@ -7,6 +7,7 @@ import { Input } from "@atlas/ui/input";
 import { Label } from "@atlas/ui/label";
 
 function Login({ onLoginSuccess }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("admin2@atlas.local");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
@@ -24,6 +25,13 @@ function Login({ onLoginSuccess }) {
       const tokens = await login(email, password);
       onLoginSuccess(tokens);
     } catch (err) {
+      // emailNotVerified: api.js'in 403 (doğrulanmamış hesap) için özel olarak
+      // işaretlediği hata - kullanıcıyı direkt doğrulama ekranına yönlendiriyoruz,
+      // "email veya şifre yanlış" gibi yanıltıcı bir mesaj göstermek yerine.
+      if (err.emailNotVerified) {
+        navigate("/verify-email", { state: { email } });
+        return;
+      }
       setError(err.message);
     } finally {
       // finally: hem başarı hem hata durumunda çalışır - "istek bitti" bilgisini
@@ -69,7 +77,8 @@ function Login({ onLoginSuccess }) {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
+              className="w-full text-white hover:opacity-90"
+              style={{ background: "var(--brand-accent)" }}
             >
               {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </Button>

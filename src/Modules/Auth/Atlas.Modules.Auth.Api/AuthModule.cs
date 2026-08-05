@@ -2,6 +2,7 @@ using System.Text;
 using Atlas.Modules.Auth.Application.Abstractions;
 using Atlas.Modules.Auth.Application.Users.Queries;
 using Atlas.Modules.Auth.Infrastructure.CurrentUser;
+using Atlas.Modules.Auth.Infrastructure.Email;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
 using Atlas.Modules.Auth.Infrastructure.Security;
 using Atlas.Shared.Contracts;
@@ -46,6 +47,10 @@ public static class AuthModule
         // Scoped doğru seçim, her HTTP isteği kendi DbContext'ini (ve bağlantısını) alır.
         services.AddScoped<IUserRepository, EfUserRepository>();
         services.AddScoped<IRefreshTokenRepository, EfRefreshTokenRepository>();
+        services.AddScoped<IEmailVerificationCodeRepository, EfEmailVerificationCodeRepository>();
+
+        // Gerçek bir SMTP sağlayıcısı bağlanana kadar - bkz. LoggingEmailSender'daki not.
+        services.AddScoped<IEmailSender, LoggingEmailSender>();
 
         // Shared.Contracts'taki ICurrentUserAccessor'ın gerçek implementasyonu burada
         // bağlanıyor. Wiki modülü bu sınıfı hiç görmüyor - sadece interface'i biliyor.
@@ -136,7 +141,10 @@ services.AddAuthorization();
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
             var adminPasswordHash = passwordHasher.Hash("Admin123!");
 
-            db.Users.Add(User.Create("admin@atlas.local", "Atlas Admin", adminPasswordHash, UserRole.Admin));
+            // emailVerified: true - admin hesabı doğrulama akışından hiç geçmiyor,
+            // bu yüzden kilitli kalması anlamsız olurdu (bkz. User.cs'teki not).
+            db.Users.Add(User.Create(
+                "admin@atlas.local", "Atlas Admin", adminPasswordHash, UserRole.Admin, emailVerified: true));
             db.SaveChanges();
         }
     }

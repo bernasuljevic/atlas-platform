@@ -1,6 +1,21 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { refreshAccessToken } from "../api";
 
 const AuthContext = createContext(null);
+
+// JWT'nin payload'ını (imza doğrulaması OLMADAN, sadece "exp" alanını okumak
+// için) çözüyor - jwt.js'teki decodeJwtPayload ile aynı iş ama Context burada
+// dairesel bir import'a (jwt.js zaten başka yerlerde bu dosyayı import etmiyor
+// olsa da) girmemek için küçük, tek satırlık kopyası tutuluyor.
+function getTokenExpiryMs(token) {
+  try {
+    const payloadBase64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(payloadBase64));
+    return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+}
 
 // Token state'i ve localStorage senkronizasyonunu tek bir yerde topluyoruz -
 // eskiden bunların hepsi App.jsx'teydi, route'lara bölünce her route'un
@@ -42,6 +57,35 @@ export function AuthProvider({ children }) {
       window.removeEventListener("atlas:auth-expired", handleAuthExpired);
     };
   }, []);
+
+  useEffect(() => {
+    // GERÇEK BUG (canlı doğrulanıp bulundu, 2026-08-03): Wiki modülündeki
+    // "açık" endpoint'ler (ör. GET /api/wiki/pages, /api/wiki/dashboard) hiç
+    // .RequireAuthorization() KULLANMIYOR - giriş yapmamış bir ziyaretçi bile
+    // (sadece Public içerikle) erişebilsin diye bilerek böyle. Ama bu yüzden
+    // süresi dolmuş bir access token'la yapılan istekte ASP.NET Core JWT
+    // middleware'i 401 DÖNDÜRMÜYOR - kimliği sessizce "anonim" sayıp isteğin
+    // devam etmesine izin veriyor. Sonuç: kullanıcı hiçbir hata görmeden
+    // departmana özel içeriği (DepartmentOnly sayfalar, Dashboard'daki
+    // "Departmanına Özel İçerikler" bölümü) aniden kaybolmuş gibi görüyordu -
+    // api.js'teki "401 alınca yenile" deseni bu endpoint'lerde HİÇ
+    // tetiklenmiyordu çünkü 401 hiç gelmiyordu. Kalıcı çözüm: süresi dolmadan
+    // (15dk) ÖNCE, arka planda kendiliğinden yenile - böylece açık/korumalı
+    // hiçbir endpoint süresi dolmuş bir token'la hiç karşılaşmıyor.
+    if (!token) return;
+
+    const expiresAtMs = getTokenExpiryMs(token);
+    if (expiresAtMs === null) return;
+
+    const refreshAtMs = expiresAtMs - 60_000; // süresi dolmadan 1 dakika önce
+    const delayMs = Math.max(0, refreshAtMs - Date.now());
+
+    const timeoutId = setTimeout(() => {
+      refreshAccessToken();
+    }, delayMs);
+
+    return () => clearTimeout(timeoutId);
+  }, [token]);
 
   return (
     <AuthContext.Provider value={{ token, login, logout }}>

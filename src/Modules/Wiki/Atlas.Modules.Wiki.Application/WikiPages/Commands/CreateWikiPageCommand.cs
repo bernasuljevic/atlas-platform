@@ -19,7 +19,9 @@ public record CreateWikiPageCommand(
     string Title,
     string Content,
     string DepartmentName,
-    string Visibility) : IRequest<Guid>, ICacheInvalidatingCommand, IAuditableCommand
+    string Visibility,
+    Guid? FolderId = null,
+    string? Tags = null) : IRequest<Guid>, ICacheInvalidatingCommand, IAuditableCommand
 {
     public string CacheKeyToInvalidate => "wiki-pages:all";
 

@@ -27,12 +27,54 @@ export async function login(email, password) {
     body: JSON.stringify({ email, password }),
   });
 
+  // Backend, doğrulanmamış bir hesapla giriş denemesini 403 ile (yanlış
+  // şifredeki 401'den AYRI) reddediyor (bkz. LoginCommandHandler) - burada da
+  // ayırt ediyoruz ki Login.jsx kullanıcıyı doğrulama ekranına yönlendirebilsin.
+  if (response.status === 403) {
+    const body = await response.json().catch(() => null);
+    const error = new Error(body?.detail ?? "E-postanı doğrulamadan giriş yapamazsın.");
+    error.emailNotVerified = true;
+    throw error;
+  }
+
   if (!response.ok) {
     throw new Error("Email veya şifre yanlış");
   }
 
   // { accessToken, refreshToken } - App.jsx ikisini de localStorage'a yazacak.
   return response.json();
+}
+
+export async function verifyEmail(email, code) {
+  const response = await fetch(`${API_URL}/api/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? body?.detail ?? "Kod doğrulanamadı");
+  }
+}
+
+export async function resendVerificationCode(email) {
+  const response = await fetch(`${API_URL}/api/auth/resend-verification-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  if (response.status === 429) {
+    throw new Error("Çok sık denedin - bir dakika bekleyip tekrar dene.");
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Kod gönderilemedi");
+  }
 }
 
 // GÜVENLİK DÜZELTMESİ: Artık departman filtresi bir query parametresi değil -
@@ -57,12 +99,40 @@ export async function getWikiPages(accessToken, pageNumber = 1, pageSize = 10) {
   return response.json();
 }
 
+// Üst bardaki arama kutusunun harf harf çağırdığı hafif öneri endpoint'i -
+// searchWikiPages'teki (AI/anlam bazlı) aramadan BİLEREK ayrı, bkz.
+// backend'deki SearchWikiPageSuggestionsQuery'nin notu.
+export async function getWikiSearchSuggestions(accessToken, queryText) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(
+    `${API_URL}/api/wiki/search-suggestions?q=${encodeURIComponent(queryText)}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error("Öneriler yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function getWikiDashboard(accessToken) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/wiki/dashboard`, { headers });
+
+  if (!response.ok) {
+    throw new Error("Ana sayfa yüklenemedi");
+  }
+
+  return response.json();
+}
+
 // Access token'ın süresi dolunca (artık 15 dakika - eskiden 8 saatti) sunucudan
 // 401 gelir. Bu fonksiyon, localStorage'daki refresh token'ı kullanarak yeni bir
 // access+refresh token çifti almayı dener. Refresh token da geçersizse (7 gün
 // dolmuş ya da zaten kullanılmışsa - rotation) kullanıcı çıkış yapmış sayılır ve
 // "atlas:auth-expired" event'i yayınlanır, App.jsx bunu dinleyip login ekranına döner.
-async function refreshAccessToken() {
+export async function refreshAccessToken() {
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) return null;
 
@@ -190,6 +260,77 @@ export async function getAuditLog(accessToken, { details, fromUtc, toUtc, pageNu
   }
 
   return response.json();
+}
+
+// GetWikiFolderTree açık bir endpoint (token'sız da çalışır) - ama token varsa
+// gönderiyoruz ki kendi departmanını gezerken TAM erişim (Public+DepartmentOnly)
+// alsın, başka bir departmanı gezerken zaten Handler bunu Public'e budayacak
+// (bkz. GetWikiFolderTreeQueryHandler).
+export async function getWikiFolderTree(accessToken, departmentName) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(
+    `${API_URL}/api/wiki/folders?departmentName=${encodeURIComponent(departmentName)}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error("Klasör ağacı yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function createWikiFolder(accessToken, folder) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/folders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(folder),
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? "Klasör oluşturulamadı");
+  }
+
+  return response.json();
+}
+
+export async function updateWikiPage(accessToken, pageId, page) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(page),
+    });
+
+  let response = await doRequest(accessToken);
+
+  // createWikiPage'deki AYNI 401 -> refresh -> tekrar dene deseni.
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu sayfayı düzenleme yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Sayfa güncellenemedi");
+  }
 }
 
 export async function createWikiPage(accessToken, page) {

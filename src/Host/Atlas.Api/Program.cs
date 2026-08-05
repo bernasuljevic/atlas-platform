@@ -105,6 +105,40 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         }));
+
+    // "login" ile AYNI gerekçe (IP bazlı, kullanıcı henüz giriş yapmamış) -
+    // 6 haneli kodun (1.000.000 olasılık) kaba kuvvetle denenmesine karşı.
+    // Dakikada 10 deneme + kodun kendisi zaten 10 dakikada süresi doluyor
+    // (bkz. EmailVerificationCode) - ikisi birlikte pratik bir brute-force'u
+    // imkansız kılıyor (10dk'da en fazla 100 deneme, 1.000.000'un çok altında).
+    options.AddPolicy("email-verification", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    // "email-verification"dan AYRI, çok daha sıkı bir sınır - amaç farklı:
+    // orada kod TAHMİNİNİ zorlaştırmak, burada bir kullanıcının gerçek gelen
+    // kutusunun "yeniden gönder"le spam'lenmesini engellemek. IP yerine e-posta
+    // bazlı - aynı kişi farklı IP'lerden denese bile aynı gelen kutusu hedefleniyor.
+    options.AddPolicy("resend-verification", httpContext =>
+    {
+        // Body'yi burada okumak (rate limiter, endpoint çalışmadan ÖNCE devreye
+        // girdiği için) pratik değil - IP bazlı bir kısıtlama yeterli bir ilk
+        // savunma hattı, e-posta bazlı bir kısıtlama istenirse ileride
+        // EnableBuffering ile body'yi elle okumak gerekirdi (şimdilik YAGNI).
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 1,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+    });
 });
 
 // Swagger/OpenAPI - her modülün MediatR ile MapGet/MapPost dediği minimal API

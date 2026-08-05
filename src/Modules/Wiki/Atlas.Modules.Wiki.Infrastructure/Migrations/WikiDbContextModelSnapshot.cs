@@ -58,6 +58,40 @@ namespace Atlas.Modules.Wiki.Infrastructure.Migrations
                     b.ToTable("OutboxMessages", "wiki");
                 });
 
+            modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.WikiFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DepartmentName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("ParentFolderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentFolderId");
+
+                    b.HasIndex("DepartmentName", "ParentFolderId");
+
+                    b.ToTable("WikiFolders", "wiki");
+                });
+
             modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.WikiPage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -71,6 +105,9 @@ namespace Atlas.Modules.Wiki.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("CreatedByEmail")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("CreatedByUserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -79,19 +116,47 @@ namespace Atlas.Modules.Wiki.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("FolderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Visibility")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FolderId");
+
                     b.HasIndex("DepartmentName", "Visibility");
 
                     b.ToTable("WikiPages", "wiki");
+                });
+
+            modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.WikiFolder", b =>
+                {
+                    b.HasOne("Atlas.Modules.Wiki.Domain.Entities.WikiFolder", null)
+                        .WithMany()
+                        .HasForeignKey("ParentFolderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.WikiPage", b =>
+                {
+                    b.HasOne("Atlas.Modules.Wiki.Domain.Entities.WikiFolder", null)
+                        .WithMany()
+                        .HasForeignKey("FolderId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 #pragma warning restore 612, 618
         }

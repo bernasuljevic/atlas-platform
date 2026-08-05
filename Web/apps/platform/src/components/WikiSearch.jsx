@@ -1,18 +1,21 @@
-import { useState } from "react";
-import { searchWikiPages, getWikiPageById } from "../api";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
+import { searchWikiPages } from "../api";
 import { formatUtcTimestamp } from "../dateUtils";
 import { Button } from "@atlas/ui/button";
 import { Card, CardContent } from "@atlas/ui/card";
 import { Input } from "@atlas/ui/input";
 import { Label } from "@atlas/ui/label";
 import { Badge } from "@atlas/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@atlas/ui/dialog";
 
 // Ayrı bir component olarak açıldı - WikiBoard.jsx zaten liste/oluşturma/silme/
 // detay dialogu ile 350 satıra yaklaşmıştı, arama özelliğini oraya eklemek
-// onu daha da büyütürdü (bkz. CLAUDE.md "İzlenecek teknik borç").
-function WikiSearch({ token }) {
-  const [queryText, setQueryText] = useState("");
+// onu daha da büyütürdü (bkz. CLAUDE.md "İzlenecek teknik borç"). Sonuca
+// tıklanınca artık ayrıca sayfa çekip bir dialog açmıyoruz - direkt gerçek
+// /wiki/:id sayfasına gidiyoruz (bkz. WikiArticlePage).
+function WikiSearch({ token, initialQuery }) {
+  const navigate = useNavigate();
+  const [queryText, setQueryText] = useState(initialQuery ?? "");
   // İsteğe bağlı, normal aramaya EK bir daraltma - boş bırakılırsa arama
   // eskisi gibi tarih filtresiz çalışır (bkz. api.js'teki searchWikiPages).
   const [fromUtc, setFromUtc] = useState("");
@@ -21,20 +24,13 @@ function WikiSearch({ token }) {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState(null);
 
-  // Arama sonucu sadece bir chunk (kısa parça) içeriyor - tıklanınca tam
-  // sayfayı GET /api/wiki/pages/{id} ile ayrıca çekiyoruz (bkz. api.js).
-  const [selectedPage, setSelectedPage] = useState(null);
-  const [isLoadingPage, setIsLoadingPage] = useState(false);
-  const [pageError, setPageError] = useState(null);
-
-  async function handleSearch(e) {
-    e.preventDefault();
-    if (!queryText.trim()) return;
+  async function runSearch(text) {
+    if (!text.trim()) return;
 
     setError(null);
     setIsSearching(true);
     try {
-      const found = await searchWikiPages(token, queryText, 5, { fromUtc, toUtc });
+      const found = await searchWikiPages(token, text, 5, { fromUtc, toUtc });
       setResults(found);
     } catch (err) {
       setError(err.message);
@@ -44,17 +40,17 @@ function WikiSearch({ token }) {
     }
   }
 
-  async function handleResultClick(wikiPageId) {
-    setPageError(null);
-    setIsLoadingPage(true);
-    try {
-      const page = await getWikiPageById(token, wikiPageId);
-      setSelectedPage(page);
-    } catch (err) {
-      setPageError(err.message);
-    } finally {
-      setIsLoadingPage(false);
-    }
+  // Üst bardaki arama kutusundan (WikiLayout) "searchQuery" ile buraya
+  // yönlendirildiğinde - kutuyu doldurup aramayı KENDİLİĞİNDEN çalıştırıyor,
+  // kullanıcının aynı sorguyu iki kez yazmasına gerek kalmıyor.
+  useEffect(() => {
+    if (initialQuery) runSearch(initialQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
+  async function handleSearch(e) {
+    e.preventDefault();
+    await runSearch(queryText);
   }
 
   return (
@@ -92,14 +88,14 @@ function WikiSearch({ token }) {
           <Button
             type="submit"
             disabled={isSearching || !queryText.trim()}
-            className="bg-[var(--brand-accent)] text-[var(--text-h)] hover:opacity-90"
+            className="text-white hover:opacity-90"
+            style={{ background: "var(--brand-accent)" }}
           >
             {isSearching ? "Aranıyor..." : "Ara"}
           </Button>
         </form>
 
         {error && <p style={{ color: "red" }} className="mt-3 text-sm">{error}</p>}
-        {pageError && <p style={{ color: "red" }} className="mt-3 text-sm">{pageError}</p>}
 
         {results && (
           <div className="mt-4 flex flex-col gap-2">
@@ -111,7 +107,7 @@ function WikiSearch({ token }) {
               results.map((r) => (
                 <div
                   key={r.wikiPageId}
-                  onClick={() => handleResultClick(r.wikiPageId)}
+                  onClick={() => navigate(`/wiki/${r.wikiPageId}`)}
                   className="cursor-pointer rounded-lg border border-[var(--border)] p-3 hover:bg-[var(--brand-accent)]/10"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -120,7 +116,7 @@ function WikiSearch({ token }) {
                       <Badge variant="outline">{r.departmentName}</Badge>
                       {/* Skor 0-1 arası (1'e yakın = daha benzer) - kullanıcıya
                           ham cosine mesafesi yerine yüzde olarak gösteriyoruz. */}
-                      <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">
+                      <Badge className="text-white" style={{ background: "var(--brand-accent)" }}>
                         %{Math.round(r.score * 100)}
                       </Badge>
                     </div>
@@ -137,37 +133,6 @@ function WikiSearch({ token }) {
           </div>
         )}
       </CardContent>
-
-      {/* WikiBoard'daki sayfa detay Dialog'uyla aynı desen - Trigger'sız,
-          kontrollü open state'i. isLoadingPage true iken de dialog açık
-          tutuluyor ki kullanıcı "bir şey oluyor" hissi alsın. */}
-      <Dialog
-        open={selectedPage !== null || isLoadingPage}
-        onOpenChange={(open) => !open && setSelectedPage(null)}
-      >
-        <DialogContent className="border-[var(--border)] bg-[var(--bg)] text-[var(--text)] sm:max-w-lg">
-          {isLoadingPage ? (
-            <p className="text-sm">Yükleniyor...</p>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle style={{ color: "var(--text-h)" }}>{selectedPage?.title}</DialogTitle>
-                <div className="flex gap-2">
-                  <Badge variant="outline">{selectedPage?.departmentName}</Badge>
-                  {selectedPage?.visibility === "Public" ? (
-                    <Badge className="bg-[var(--brand-accent)] text-[var(--text-h)]">Herkese Açık</Badge>
-                  ) : (
-                    <Badge variant="outline">Sadece Departman</Badge>
-                  )}
-                </div>
-              </DialogHeader>
-              <p className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm">
-                {selectedPage?.content}
-              </p>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }

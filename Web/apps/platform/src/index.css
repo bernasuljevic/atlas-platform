@@ -12,179 +12,241 @@
 
 @custom-variant dark (&:is(.dark *));
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: oklch(0.922 0 0);
-  --code-bg: #f4f3ec;
-  /* "brand-accent" - sitenin kendi mor vurgu rengi. shadcn'in kendi "--accent"
-     token'ıyla (aşağıda, hover state'ler için kullanılan nötr gri) aynı isimde
-     olmasın diye önekliyoruz - aksi halde ".dark" class'ı aktifken shadcn'in
-     değeri sitenin morunu sessizce ezerdi (bunu yaşayıp öğrendik). */
-  --brand-accent: oklch(0.97 0 0);
-  --brand-accent-bg: rgba(170, 59, 255, 0.1);
-  --brand-accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --text: #33373b;
+  --text-h: #101418;
+  --bg: #f9f6ef;
+  --page-bg: #f4f0e6;
+  --border: #e2dcd0;
+  --code-bg: #efeae0;
+  --brand-accent: #1b4d3e;
+  --brand-accent-bg: rgba(27, 77, 62, 0.12);
+  --brand-accent-border: rgba(27, 77, 62, 0.4);
+  --social-bg: rgba(239, 234, 224, 0.5);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.05) 0 4px 12px -2px, rgba(0, 0, 0, 0.03) 0 2px 4px -1px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  font: 14px/150% var(--sans);
+  letter-spacing: 0.1px;
   color-scheme: light dark;
   color: var(--text);
-  background: var(--bg);
+  background: var(--page-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: 16px;
+    font-size: 14px;
   }
 
-  --background: oklch(1 0 0);
-
-  --foreground: oklch(0.145 0 0);
-
-  --card: oklch(1 0 0);
-
-  --card-foreground: oklch(0.145 0 0);
-
-  --popover: oklch(1 0 0);
-
-  --popover-foreground: oklch(0.145 0 0);
-
-  --primary: oklch(0.205 0 0);
-
-  --primary-foreground: oklch(0.985 0 0);
-
-  --secondary: oklch(0.97 0 0);
-
-  --secondary-foreground: oklch(0.205 0 0);
-
-  --muted: oklch(0.97 0 0);
-
-  --muted-foreground: oklch(0.556 0 0);
-
-  --accent-foreground: oklch(0.205 0 0);
-
+  --background: #f9f6ef;
+  --foreground: #101418;
+  --card: #f9f6ef;
+  --card-foreground: #101418;
+  --popover: #f9f6ef;
+  --popover-foreground: #101418;
+  --primary: #1b4d3e;
+  --primary-foreground: #f9f6ef;
+  --secondary: #efeae0;
+  --secondary-foreground: #101418;
+  --muted: #efeae0;
+  --muted-foreground: #33373b;
+  --accent-foreground: #101418;
   --destructive: oklch(0.577 0.245 27.325);
-
-  --input: oklch(0.922 0 0);
-
-  --ring: oklch(0.708 0 0);
-
+  --input: #e2dcd0;
+  --ring: #1b4d3e;
   --chart-1: oklch(0.87 0 0);
-
   --chart-2: oklch(0.556 0 0);
-
   --chart-3: oklch(0.439 0 0);
-
   --chart-4: oklch(0.371 0 0);
-
   --chart-5: oklch(0.269 0 0);
-
-  --radius: 0.625rem;
-
-  --sidebar: oklch(0.985 0 0);
-
-  --sidebar-foreground: oklch(0.145 0 0);
-
-  --sidebar-primary: oklch(0.205 0 0);
-
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-
-  --sidebar-accent: oklch(0.97 0 0);
-
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-
-  --sidebar-border: oklch(0.922 0 0);
-
-  --sidebar-ring: oklch(0.708 0 0)
+  --radius: 0.5rem;
+  --sidebar: #f9f6ef;
+  --sidebar-foreground: #101418;
+  --sidebar-primary: #1b4d3e;
+  --sidebar-primary-foreground: #f9f6ef;
+  --sidebar-accent: #efeae0;
+  --sidebar-accent-foreground: #101418;
+  --sidebar-border: #e2dcd0;
+  --sidebar-ring: #1b4d3e;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --brand-accent: #c084fc;
-    --brand-accent-bg: rgba(192, 132, 252, 0.15);
-    --brand-accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+.dark {
+  --text: #cbd5e1;
+  --text-h: #f8fafc;
+  --bg: #1b2025;
+  --page-bg: #121619;
+  --border: #2b333c;
+  --code-bg: #232930;
+  /* DÜZELTME: #34d399 (parlak nane yeşili) beyaz metinle sadece 1.92:1 WCAG
+     kontrastı veriyordu (hesaplanıp doğrulandı) - "Herkese Açık" rozeti gibi
+     üzerinde BEYAZ METİN olan yerlerde neredeyse okunmuyordu. Aynı ton
+     ailesinde (~158° hue), sistematik olarak taranıp beyaz metinle 4.53:1
+     (WCAG AA eşiğini geçiyor) VE sayfa zeminiyle 4.01:1 veren bu koyulaştırılmış
+     değere düşürüldü. */
+  --brand-accent: #1d8660;
+  --brand-accent-bg: rgba(29, 134, 96, 0.18);
+  --brand-accent-border: rgba(29, 134, 96, 0.5);
+  --social-bg: rgba(35, 41, 48, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  --background: #1b2025;
+  --foreground: #f8fafc;
+  --card: #1b2025;
+  --card-foreground: #f8fafc;
+  --popover: #1b2025;
+  --popover-foreground: #f8fafc;
+  --primary: #34d399;
+  --primary-foreground: #121619;
+  --secondary: #232930;
+  --secondary-foreground: #f8fafc;
+  --muted: #232930;
+  --muted-foreground: #cbd5e1;
+  --accent: #232930;
+  --accent-foreground: #f8fafc;
+  --border: #2b333c;
+  --input: #2b333c;
+  --ring: #34d399;
+  --sidebar: #1b2025;
+  --sidebar-foreground: #f8fafc;
+  --sidebar-primary: #34d399;
+  --sidebar-primary-foreground: #121619;
+  --sidebar-accent: #232930;
+  --sidebar-accent-foreground: #f8fafc;
+  --sidebar-border: #2b333c;
+  --sidebar-ring: #34d399;
 }
 
+html,
 body {
   margin: 0;
+  padding: 0;
+  background-color: var(--page-bg);
+  color: var(--text);
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0.9;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.wiki-tab {
+  position: relative;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  transition: all 0.15s ease-in-out;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.wiki-tab:hover {
+  color: var(--text-h);
+}
+
+.wiki-tab.active {
+  color: var(--text-h);
+  font-weight: 600;
+  border-bottom-color: var(--brand-accent);
+}
+
+/* DÜZELTME (2026-08-04, kullanıcı geri bildirimi: "kenarlarda beyazlık
+   kalmasın"): #root eskiden 1126px'te SABİTLENİP ortalanıyordu
+   (max-width:100% sadece dar ekranlarda devreye giriyordu) - 1126px'ten geniş
+   bir ekranda #root'un DIŞINDA kalan alan bu sitenin KENDİ "--page-bg"'sini
+   DEĞİL, en dıştaki ":root" öğesinin arkaplanını gösteriyordu; ikisi aynı
+   değişkene bağlansa bile aradaki "border-inline" çizgisi + geniş ekranlarda
+   içerik sütununun ortada "yüzmesi" referans mockup'taki (Atlas Wiki'nin
+   kendi ekran görüntüsü) UÇTAN UCA (edge-to-edge) yerleşimle uyuşmuyordu.
+   Artık #root tüm genişliği kaplıyor, yapay bir sütun/kenarlık yok - iç
+   düzen (sidebar/içerik/sağ panel) kendi genişliklerini WikiLayout/HomePage
+   içinde yönetiyor. */
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
+  width: 100%;
   text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: var(--page-bg);
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+/* DÜZELTME (kullanıcı geri bildirimiyle bulundu, 2026-08-04): bu blok eskiden
+   HİÇBİR "@layer" içinde değildi - CSS'in kendi kuralına göre, katmansız
+   (unlayered) bir kural, specificity'den TAMAMEN BAĞIMSIZ olarak HER ZAMAN
+   katmanlı bir kuralı ezer. Tailwind v4'ün TÜM utility class'ları (ör.
+   "text-3xl", "text-2xl") "@layer utilities" içinde tanımlı - yani buradaki
+   çıplak "h1 { font-size: 56px }" kuralı, WikiArticlePage/HomePage'deki HER
+   "text-3xl h1" kullanımını sessizce eziyordu (görsel yenileme sırasında
+   yazıların "hâlâ büyük" görünmesinin asıl kök nedeni buydu - component
+   içindeki font-size class'ları hiç işe yaramıyordu). Çözüm: bu bloğu
+   "@layer base" içine almak - Tailwind'in KENDİ önerdiği desen tam olarak bu,
+   "temel element varsayılanları" ile "utility class'lar" arasındaki öncelik
+   sırasını normale döndürüyor (artık class > element, specificity kuralına
+   göre çalışıyor). */
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--heading);
+    font-weight: 500;
+    color: var(--text-h);
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+
+  h1 {
+    font-size: 56px;
+    letter-spacing: -1.68px;
+    margin: 32px 0;
+    @media (max-width: 1024px) {
+      font-size: 36px;
+      margin: 20px 0;
+    }
   }
-}
-p {
-  margin: 0;
-}
+  h2 {
+    font-size: 24px;
+    line-height: 118%;
+    letter-spacing: -0.24px;
+    margin: 0 0 8px;
+    @media (max-width: 1024px) {
+      font-size: 20px;
+    }
+  }
+  p {
+    margin: 0;
+  }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+  code,
+  .counter {
+    font-family: var(--mono);
+    display: inline-flex;
+    border-radius: 4px;
+    color: var(--text-h);
+  }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  code {
+    font-size: 15px;
+    line-height: 135%;
+    padding: 4px 8px;
+    background: var(--code-bg);
+  }
 }
 
 @theme inline {
@@ -231,37 +293,37 @@ code {
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: #1b2025;
+  --foreground: #e6ebf0;
+  --card: #1b2025;
+  --card-foreground: #e6ebf0;
+  --popover: #1b2025;
+  --popover-foreground: #e6ebf0;
+  --primary: #24654f;
+  --primary-foreground: #ffffff;
+  --secondary: #232930;
+  --secondary-foreground: #e6ebf0;
+  --muted: #232930;
+  --muted-foreground: #94a1ac;
+  --accent: #232930;
+  --accent-foreground: #e6ebf0;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: #2b333c;
+  --input: #2b333c;
+  --ring: #24654f;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #1b2025;
+  --sidebar-foreground: #e6ebf0;
+  --sidebar-primary: #24654f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #232930;
+  --sidebar-accent-foreground: #e6ebf0;
+  --sidebar-border: #2b333c;
+  --sidebar-ring: #24654f;
 }
 
 @layer base {

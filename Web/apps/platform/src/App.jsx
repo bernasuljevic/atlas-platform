@@ -4,7 +4,12 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./components/Login";
 import Register from "./components/Register";
+import VerifyEmailPage from "./components/VerifyEmailPage";
+import WikiLayout from "./components/WikiLayout";
+import HomePage from "./components/HomePage";
 import WikiBoard from "./components/WikiBoard";
+import WikiArticlePage from "./components/WikiArticlePage";
+import WikiEditorPage from "./components/WikiEditorPage";
 import AuditLogPage from "./components/AuditLogPage";
 
 // Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
@@ -30,9 +35,36 @@ function RegisterRoute() {
   return <Register />;
 }
 
-function WikiRoute() {
+// Sidebar (klasör ağacı + çıkış/audit-log) artık burada, /wiki altındaki TÜM
+// alt sayfalarda (liste, tam sayfa okuma, editör) sabit kalıyor - bkz.
+// WikiLayout'taki mimari notu.
+function WikiLayoutRoute() {
   const { token, logout } = useAuth();
-  return <WikiBoard token={token} onLogout={logout} />;
+  return <WikiLayout token={token} onLogout={logout} />;
+}
+
+// Artık giriş yapınca doğrudan makale listesine değil buraya (Dashboard)
+// geliniyor - liste eski davranışını /wiki/pages'te koruyor (bkz.
+// WikiPagesRoute), sidebar'daki "Atlas Wiki" başlık linki de zaten /wiki'ye
+// (yani buraya) gidiyor - ayrıca bir "Ana Sayfa" linkine gerek kalmadı.
+function WikiIndexRoute() {
+  const { token } = useAuth();
+  return <HomePage token={token} />;
+}
+
+function WikiPagesRoute() {
+  const { token } = useAuth();
+  return <WikiBoard token={token} />;
+}
+
+function WikiArticleRoute() {
+  const { token } = useAuth();
+  return <WikiArticlePage token={token} />;
+}
+
+function WikiEditorRoute() {
+  const { token } = useAuth();
+  return <WikiEditorPage token={token} />;
 }
 
 function AuditLogRoute() {
@@ -59,8 +91,17 @@ function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/register" element={<RegisterRoute />} />
+          {/* Giriş yapmamış OLMASI gereken bir kullanıcının erişebileceği tek
+              "ara" ekran - kayıt olmuş ama henüz e-postasını doğrulamamış. */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/wiki" element={<WikiRoute />} />
+            <Route path="/wiki" element={<WikiLayoutRoute />}>
+              <Route index element={<WikiIndexRoute />} />
+              <Route path="pages" element={<WikiPagesRoute />} />
+              <Route path="new" element={<WikiEditorRoute />} />
+              <Route path=":id" element={<WikiArticleRoute />} />
+              <Route path=":id/edit" element={<WikiEditorRoute />} />
+            </Route>
             <Route path="/audit-log" element={<AuditLogRoute />} />
           </Route>
         </Routes>

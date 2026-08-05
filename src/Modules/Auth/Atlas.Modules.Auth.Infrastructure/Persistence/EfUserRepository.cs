@@ -29,4 +29,7 @@ public class EfUserRepository : IUserRepository
         _context.Users.Add(user);
         await _context.SaveChangesAsync(ct);
     }
+
+    public Task SaveChangesAsync(CancellationToken ct = default)
+        => _context.SaveChangesAsync(ct);
 }

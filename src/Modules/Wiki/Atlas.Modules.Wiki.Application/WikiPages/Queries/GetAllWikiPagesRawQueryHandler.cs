@@ -19,7 +19,8 @@ public class GetAllWikiPagesRawQueryHandler : IRequestHandler<GetAllWikiPagesRaw
         return pagesFromDb
             .Select(p => new WikiPageDto(
                 p.Id, p.Title, p.Content, p.DepartmentName,
-                p.Visibility.ToString(), p.CreatedByUserId, p.CreatedAtUtc))
+                p.Visibility.ToString(), p.CreatedByUserId, p.CreatedAtUtc,
+                p.FolderId, p.UpdatedAtUtc, p.CreatedByEmail, p.Tags))
             .ToList();
     }
 }

@@ -21,15 +21,24 @@ public class User : Entity<Guid>
     // Nullable: departmansız kullanıcılar sadece Public sayfaları görür.
     public string? Department { get; private set; }
 
+    // Varsayılan false - normal kayıt akışında e-posta doğrulanana kadar
+    // kullanıcı giriş yapamıyor (bkz. LoginCommandHandler). Admin seed'i
+    // (AuthModule.MigrateAuthDatabase) BİLEREK true geçiyor - doğrulama
+    // akışı hiç yaşanmadığı için o hesabın kilitli kalması anlamsız olurdu.
+    public bool EmailVerified { get; private set; }
+
     private User() { }
 
-    private User(Guid id, string email, string fullName, string passwordHash, UserRole role, string? department) : base(id)
+    private User(
+        Guid id, string email, string fullName, string passwordHash, UserRole role, string? department,
+        bool emailVerified) : base(id)
     {
         Email = email;
         FullName = fullName;
         PasswordHash = passwordHash;
         Role = role;
         Department = department;
+        EmailVerified = emailVerified;
     }
 
     /// <summary>
@@ -38,7 +47,9 @@ public class User : Entity<Guid>
     /// hiçbir değişiklik yapmadan derlenmeye devam eder, otomatik olarak Member olur.
     /// Sadece admin seed'inde bilerek Admin geçeceğiz.
     /// </summary>
-    public static User Create(string email, string fullName, string passwordHash, UserRole role = UserRole.Member, string? department = null)
+    public static User Create(
+        string email, string fullName, string passwordHash, UserRole role = UserRole.Member,
+        string? department = null, bool emailVerified = false)
     {
         if (string.IsNullOrWhiteSpace(email))
             throw new ArgumentException("Email boş olamaz.", nameof(email));
@@ -47,6 +58,11 @@ public class User : Entity<Guid>
             throw new ArgumentException("Şifre boş olamaz.", nameof(passwordHash));
 
         return new User(Guid.NewGuid(), email.Trim().ToLowerInvariant(), fullName.Trim(), passwordHash, role,
-            string.IsNullOrWhiteSpace(department) ? null : department.Trim());
+            string.IsNullOrWhiteSpace(department) ? null : department.Trim(), emailVerified);
+    }
+
+    public void MarkEmailVerified()
+    {
+        EmailVerified = true;
     }
 }

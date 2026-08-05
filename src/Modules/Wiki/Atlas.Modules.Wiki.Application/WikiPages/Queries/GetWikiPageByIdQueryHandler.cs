@@ -31,6 +31,7 @@ public class GetWikiPageByIdQueryHandler : IRequestHandler<GetWikiPageByIdQuery,
 
         return new WikiPageDto(
             page.Id, page.Title, page.Content, page.DepartmentName,
-            page.Visibility.ToString(), page.CreatedByUserId, page.CreatedAtUtc);
+            page.Visibility.ToString(), page.CreatedByUserId, page.CreatedAtUtc,
+            page.FolderId, page.UpdatedAtUtc, page.CreatedByEmail, page.Tags);
     }
 }

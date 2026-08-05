@@ -13,6 +13,11 @@ public class FakeWikiPageRepository : IWikiPageRepository
     public Task<WikiPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => Task.FromResult(AddedPages.FirstOrDefault(p => p.Id == id));
 
+    public Task<IReadOnlyList<WikiPage>> GetByDepartmentAsync(string departmentName, CancellationToken ct = default)
+        => Task.FromResult((IReadOnlyList<WikiPage>)AddedPages
+            .Where(p => p.DepartmentName == departmentName)
+            .ToList());
+
     public Task AddAsync(WikiPage page, CancellationToken ct = default)
     {
         AddedPages.Add(page);

@@ -15,16 +15,20 @@ export function decodeJwtPayload(token) {
   return JSON.parse(json);
 }
 
-// JwtTokenGenerator.cs'teki claim isimleriyle BİREBİR eşleşiyor - Role için
-// ClaimTypes.Role kullanıldığı için kısa "role" değil bu uzun URI geliyor,
+// JwtTokenGenerator.cs'teki claim isimleriyle BİREBİR eşleşiyor - Role/Name/Email
+// için ClaimTypes kullanıldığı için kısa isim değil bu uzun URI'ler geliyor,
 // department ise özel bir claim olduğu için kısa isim.
 const ROLE_CLAIM = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
 const NAME_IDENTIFIER_CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+const NAME_CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+const EMAIL_CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
 
 export function getUserInfoFromToken(token) {
   const payload = decodeJwtPayload(token);
   return {
     userId: payload[NAME_IDENTIFIER_CLAIM],
+    fullName: payload[NAME_CLAIM] ?? null,
+    email: payload[EMAIL_CLAIM] ?? null,
     department: payload.department ?? null,
     isAdmin: payload[ROLE_CLAIM] === "Admin",
   };

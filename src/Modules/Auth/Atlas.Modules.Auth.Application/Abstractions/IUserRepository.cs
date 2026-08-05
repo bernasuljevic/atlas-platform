@@ -15,4 +15,9 @@ public interface IUserRepository
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
     Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct = default);
     Task AddAsync(User user, CancellationToken ct = default);
+
+    // GetByIdAsync/GetByEmailAsync'in döndürdüğü tracked entity üzerinde
+    // (ör. MarkEmailVerified()) yapılan mutasyonları kalıcı hale getirmek için -
+    // IRefreshTokenRepository'deki AYNI desen.
+    Task SaveChangesAsync(CancellationToken ct = default);
 }

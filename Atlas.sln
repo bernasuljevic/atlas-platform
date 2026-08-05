@@ -91,6 +91,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Audit.Applica
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Audit.Application.Tests", "tests\Atlas.Modules.Audit.Application.Tests\Atlas.Modules.Audit.Application.Tests.csproj", "{8F6C2616-094A-4561-BB99-6A2044A69D02}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Auth.Application.Tests", "tests\Atlas.Modules.Auth.Application.Tests\Atlas.Modules.Auth.Application.Tests.csproj", "{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -521,6 +523,18 @@ Global
 		{8F6C2616-094A-4561-BB99-6A2044A69D02}.Release|x64.Build.0 = Release|Any CPU
 		{8F6C2616-094A-4561-BB99-6A2044A69D02}.Release|x86.ActiveCfg = Release|Any CPU
 		{8F6C2616-094A-4561-BB99-6A2044A69D02}.Release|x86.Build.0 = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|x64.Build.0 = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Debug|x86.Build.0 = Debug|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|x64.ActiveCfg = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|x64.Build.0 = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|x86.ActiveCfg = Release|Any CPU
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -557,5 +571,6 @@ Global
 		{75CF67D5-C827-4D49-B1C0-8AE1874D03B9} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{65AD9CE9-7FAF-4450-ABDE-C74FF6249101} = {B7504168-2F66-9EF4-E8D7-36B98062A6F8}
 		{8F6C2616-094A-4561-BB99-6A2044A69D02} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{BCF1F490-1B75-4899-A6E9-E5FE2B50B609} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

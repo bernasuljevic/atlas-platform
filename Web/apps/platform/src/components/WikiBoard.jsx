@@ -3,23 +3,26 @@ import { Link } from "react-router";
 import { getWikiPages } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import WikiSearch from "./WikiSearch";
-import CreateWikiPageDialog from "./CreateWikiPageDialog";
 import WikiPageTable from "./WikiPageTable";
 import { Button } from "@atlas/ui/button";
 
-const PAGE_SIZE = 5;
+// Kullanıcı geri bildirimiyle (2026-08-04, "daha aşağı doğru devam ettir") -
+// 5 satır sayfayı gereksiz kısa/boş gösteriyordu, 10'a çıkarıldı.
+const PAGE_SIZE = 10;
 
-// Liste/oluşturma/silme/detay tek component'te (~350 satır) yaşıyordu -
-// CreateWikiPageDialog ve WikiPageTable'a bölündü (bkz. CLAUDE.md "İzlenecek
-// teknik borç"). WikiBoard artık sadece sayfa listesinin state'ini (token'dan
-// türeyen kullanıcı bilgisi dahil) tutan ve alt component'lere dağıtan bir
-// orkestratör - her alt component kendi form/dialog/hata state'ini kendi
-// yönetiyor, sadece "liste değişti, yenile" anlamına gelen bir callback'le
-// (onCreated/onDeleted) parent'a haber veriyor.
-function WikiBoard({ token, onLogout }) {
+// Liste/silme/detay tek component'te (~350 satır) yaşıyordu - WikiPageTable'a
+// bölündü (bkz. CLAUDE.md "İzlenecek teknik borç"). Oluşturma artık bir Dialog
+// DEĞİL - Wikipedia'nın referans ekran görüntüsündeki gibi ayrı bir editör
+// sekmesine (/wiki/new) gidiyor (bkz. WikiEditorPage), bu yüzden
+// CreateWikiPageDialog kaldırıldı. WikiBoard artık sadece sayfa listesinin
+// state'ini tutan bir orkestratör.
+//
+// Başlık/Çıkış Yap/Audit Log burada DEĞİL - WikiLayout'un sidebar'ına taşındı
+// (klasör ağacıyla birlikte /wiki altındaki HER alt sayfada sabit duruyor).
+function WikiBoard({ token }) {
   // JWT'yi sadece UI kararları için okuyoruz (buton/alan göster-gizle) - gerçek
   // yetkilendirme her zaman backend'de. Token değişirse (refresh sonrası) yeniden hesaplanır.
-  const { userId, department: ownDepartment, isAdmin } = useMemo(() => getUserInfoFromToken(token), [token]);
+  const { userId, isAdmin } = useMemo(() => getUserInfoFromToken(token), [token]);
 
   const [pages, setPages] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
@@ -50,43 +53,17 @@ function WikiBoard({ token, onLogout }) {
     }
   }
 
-  async function handlePageCreated() {
-    // Yeni sayfa en yeni olarak 1. sayfada görünecek (backend CreatedAtUtc'ye
-    // göre azalan sırada döndürüyor) - zaten 1. sayfadaysak yeniden yükle,
-    // değilsek 1. sayfaya dön (bu da kendiliğinden yeniden yükletir, bkz. useEffect).
-    if (pageNumber === 1) {
-      await loadPages(1);
-    } else {
-      setPageNumber(1);
-    }
-  }
-
   return (
-    <div style={{ maxWidth: 1100, margin: "40px auto" }} className="px-4">
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-medium" style={{ color: "var(--text-h)" }}>
-          Atlas Wiki
+          Sayfalar
         </h1>
-        <div className="flex gap-2">
-          {/* Sadece Admin görüyor - gerçek yetkilendirme zaten backend'de
-              (GET /api/audit-log, RequireRole("Admin")); bu sadece UI
-              kararı, normal kullanıcı zaten göremeyeceği bir sayfaya
-              gitmeye çalışmasın diye. */}
-          {isAdmin && (
-            <Link to="/audit-log">
-              <Button variant="outline">Audit Log</Button>
-            </Link>
-          )}
-          <CreateWikiPageDialog
-            token={token}
-            isAdmin={isAdmin}
-            ownDepartment={ownDepartment}
-            onCreated={handlePageCreated}
-          />
-          <Button variant="outline" onClick={onLogout}>
-            Çıkış Yap
+        <Link to="/wiki/new">
+          <Button className="text-white hover:opacity-90" style={{ background: "var(--brand-accent)" }}>
+            Yeni Sayfa
           </Button>
-        </div>
+        </Link>
       </div>
 
       <WikiSearch token={token} />

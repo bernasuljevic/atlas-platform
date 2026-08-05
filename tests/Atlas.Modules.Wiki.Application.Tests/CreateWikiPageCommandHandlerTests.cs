@@ -1,6 +1,7 @@
 using Atlas.Modules.Wiki.Application.Tests.Fakes;
 using Atlas.Shared.Testing;
 using Atlas.Modules.Wiki.Application.WikiPages.Commands;
+using Atlas.Modules.Wiki.Domain.Entities;
 using Atlas.Shared.Contracts;
 
 namespace Atlas.Modules.Wiki.Application.Tests;
@@ -12,13 +13,15 @@ public class CreateWikiPageCommandHandlerTests
         out FakeOutboxWriter outboxWriter,
         out FakeUnitOfWork unitOfWork,
         string? viewerDepartment,
-        bool viewerIsAdmin = false)
+        bool viewerIsAdmin = false,
+        FakeWikiFolderRepository? folderRepository = null)
     {
         repository = new FakeWikiPageRepository();
         outboxWriter = new FakeOutboxWriter();
         unitOfWork = new FakeUnitOfWork();
         return new CreateWikiPageCommandHandler(
             repository,
+            folderRepository ?? new FakeWikiFolderRepository(),
             new FakeCurrentUserAccessor(viewerDepartment, viewerIsAdmin),
             outboxWriter,
             unitOfWork);
@@ -78,5 +81,36 @@ public class CreateWikiPageCommandHandlerTests
         var enqueued = Assert.Single(outboxWriter.Enqueued);
         Assert.IsType<WikiPageCreatedEvent>(enqueued);
         Assert.Equal(1, unitOfWork.SaveChangesCallCount);
+    }
+
+    [Fact]
+    public async Task KendiDepartmaninKlasorune_SayfaDosyalanabilir()
+    {
+        var folderRepository = new FakeWikiFolderRepository();
+        var folder = WikiFolder.Create("React", "IT", null, Guid.NewGuid());
+        folderRepository.AddedFolders.Add(folder);
+
+        var handler = CreateHandler(
+            out var repository, out _, out _, viewerDepartment: "IT", folderRepository: folderRepository);
+        var command = new CreateWikiPageCommand("Başlık", "İçerik", "IT", "Public", folder.Id);
+
+        await handler.Handle(command, CancellationToken.None);
+
+        Assert.Single(repository.AddedPages);
+        Assert.Equal(folder.Id, repository.AddedPages[0].FolderId);
+    }
+
+    [Fact]
+    public async Task BaskaDepartmaninKlasorune_SayfaDosyalanamaz()
+    {
+        var folderRepository = new FakeWikiFolderRepository();
+        var folder = WikiFolder.Create("İK Klasörü", "IK", null, Guid.NewGuid());
+        folderRepository.AddedFolders.Add(folder);
+
+        var handler = CreateHandler(
+            out _, out _, out _, viewerDepartment: "IT", folderRepository: folderRepository);
+        var command = new CreateWikiPageCommand("Başlık", "İçerik", "IT", "Public", folder.Id);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.Handle(command, CancellationToken.None));
     }
 }

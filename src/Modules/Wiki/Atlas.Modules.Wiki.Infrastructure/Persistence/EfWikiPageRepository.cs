@@ -19,6 +19,11 @@ public class EfWikiPageRepository : IWikiPageRepository
     public async Task<WikiPage?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _context.WikiPages.FindAsync([id], ct);
 
+    public async Task<IReadOnlyList<WikiPage>> GetByDepartmentAsync(string departmentName, CancellationToken ct = default)
+        => await _context.WikiPages
+            .Where(p => p.DepartmentName == departmentName)
+            .ToListAsync(ct);
+
     public Task AddAsync(WikiPage page, CancellationToken ct = default)
     {
         // SaveChangesAsync BİLEREK burada yok - bkz. IWikiPageRepository'deki not.
