@@ -128,41 +128,61 @@ function RecentUpdatesBox({ updates }) {
   );
 }
 
-// "Son Eklenen Makaleler" - eskiden düz bir liste (bkz. ArticleRow) iken,
-// kullanıcı geri bildirimiyle (2026-08-05: "görselleri olsun") kapak
-// görselli bir kart ızgarasına dönüştürüldü. Aynı geri bildirimin devamında
-// (2026-08-05: "en yukarıda olsun... yazıları daha büyük olsun") bu bölüm
-// sayfanın EN ÜSTÜNDEKİ ana içerik hâline geldi (eskiden ayrı bir "Haftanın
-// Seçkin Maddesi" kutusu + daha küçük bir liste vardı, ikisi tek, daha
-// büyük yazılı bir ızgarada birleştirildi) - başlık artık text-lg/font-bold,
-// eskisi (text-sm/font-semibold) sayfanın en üst/en önemli içeriği için
-// yetersiz kalıyordu.
-function ArticleGridCard({ article }) {
+// "Son Eklenen Makaleler" - referans Wikipedia ekran görüntülerindeki
+// ("Haftanın seçkin maddesi" / "Günün kaliteli maddesi" ikilisi - 2026-08-05
+// geri bildirimi) desene göre kuruldu: her makale kendi kutusunda, görsel
+// SIRAYLA sol/sağ değişiyor (bkz. HomePage'deki imageOnRight hesaplaması),
+// özet artık kısaltılmamış (bkz. backend'deki ExcerptLength 420) ya da
+// GERÇEKTEN uzunsa "(Devamı...)" linkiyle bitiyor - MarkdownExcerptHelper
+// kısaltma yaptıysa sonuna "…" ekliyor, o işareti burada "gerçekten uzun mu"
+// sorusunun cevabı olarak kullanıyoruz (backend'e ayrı bir "isTruncated"
+// alanı eklemeye gerek kalmadı).
+function ArticleFeatureBox({ article, imageOnRight }) {
+  const isTruncated = article.excerpt.endsWith("…");
+  const excerptWithoutEllipsis = isTruncated ? article.excerpt.slice(0, -1) : article.excerpt;
+
   return (
-    <Link
-      to={`/wiki/${article.id}`}
-      className="flex flex-col overflow-hidden rounded-lg border hover:shadow-md"
+    <div
+      className={`flex flex-col gap-4 rounded-lg border p-4 sm:flex-row ${imageOnRight ? "sm:flex-row-reverse" : ""}`}
       style={{ borderColor: "var(--border)", background: "var(--bg)" }}
     >
       {article.coverImageUrl ? (
-        <img src={article.coverImageUrl} alt="" className="h-36 w-full object-cover" />
+        <Link to={`/wiki/${article.id}`} className="shrink-0 sm:w-56">
+          <img
+            src={article.coverImageUrl}
+            alt=""
+            className="h-40 w-full rounded-md border object-cover sm:h-full"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </Link>
       ) : (
-        <div className="flex h-36 w-full items-center justify-center" style={{ background: "var(--code-bg)" }}>
+        <div
+          className="flex h-40 shrink-0 items-center justify-center rounded-md border sm:h-full sm:w-56"
+          style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
+        >
           <FileText size={28} style={{ color: "var(--text)", opacity: 0.35 }} />
         </div>
       )}
-      <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <p className="line-clamp-1 text-lg font-bold" style={{ color: "var(--text-h)" }}>
+      <div className="min-w-0 flex-1">
+        <Link to={`/wiki/${article.id}`} className="text-lg font-bold hover:underline" style={{ color: "var(--text-h)" }}>
           {article.title}
+        </Link>
+        <p className="mt-1.5 text-sm leading-relaxed sm:text-base" style={{ color: "var(--text)" }}>
+          {excerptWithoutEllipsis}
+          {isTruncated && (
+            <>
+              {"… "}
+              <Link to={`/wiki/${article.id}`} className="font-semibold whitespace-nowrap hover:underline" style={{ color: "var(--brand-accent)" }}>
+                (Devamı...)
+              </Link>
+            </>
+          )}
         </p>
-        <p className="line-clamp-2 flex-1 text-sm leading-relaxed" style={{ color: "var(--text)", opacity: 0.85 }}>
-          {article.excerpt}
-        </p>
-        <p className="text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
-          {formatUtcTimestamp(article.createdAtUtc)} · {article.departmentName}
+        <p className="mt-2 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+          {article.createdByEmail ?? "Bilinmiyor"} · {formatUtcTimestamp(article.createdAtUtc)} · {article.departmentName}
         </p>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -289,9 +309,9 @@ function HomePage({ token }) {
                 </Link>
               }
             >
-              <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
-                {gridArticles.map((a) => (
-                  <ArticleGridCard key={a.id} article={a} />
+              <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+                {gridArticles.map((a, idx) => (
+                  <ArticleFeatureBox key={a.id} article={a} imageOnRight={idx % 2 === 1} />
                 ))}
               </div>
             </Panel>

@@ -8,7 +8,12 @@ namespace Atlas.Modules.Wiki.Application.WikiPages.Queries;
 
 public class GetWikiDashboardQueryHandler : IRequestHandler<GetWikiDashboardQuery, WikiDashboardDto>
 {
-    private const int ExcerptLength = 150;
+    // 150 -> 420 (2026-08-05, kullanıcı geri bildirimi: "yazıları daha fazla
+    // gözüksün") - eskiden çoğu paragrafı ilk cümlesinde kesiyordu. Kısa bir
+    // sayfa için bu limit hiç devreye girmiyor (bkz. MarkdownExcerptHelper.
+    // Truncate - kısaltılmadıysa "…" eklenmiyor, frontend bunu "Devamı..."
+    // linkini gösterip göstermeme kararında kullanıyor).
+    private const int ExcerptLength = 420;
     private const int PopularTagsCount = 5;
 
     private readonly ISender _sender;
