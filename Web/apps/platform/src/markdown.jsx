@@ -37,26 +37,34 @@ function renderInline(text, keyPrefix) {
     const key = `${keyPrefix}-${i++}`;
 
     if (imgSrc !== undefined) {
+      // DİKKAT: burada BİLEREK sade bir <img> - <figure>/<figcaption> (blok
+      // seviyesi elemanlar) DEĞİL. Bu fonksiyon her zaman bir <p> içine
+      // gömülüyor (bkz. flushParagraph) - <p> içine <figure> koymak geçersiz
+      // HTML üretiyordu (canlı test sırasında React'ın "cannot be a descendant
+      // of <p>" hydration uyarısıyla yakalandı). Görselin KENDİ satırında tek
+      // başına durduğu (çoğu kullanım) asıl "blok" hâli aşağıdaki
+      // renderWikiMarkdown'da AYRI, gerçek bir blok olarak ele alınıyor - bu
+      // dal sadece bir cümlenin ORTASINA serpiştirilmiş nadir bir görsel için.
       nodes.push(
-        <figure key={key} className="my-3 inline-block max-w-full">
-          <img
-            src={imgSrc}
-            alt={imgAlt || "Görsel"}
-            className="max-h-[480px] w-auto max-w-full rounded-lg border object-contain shadow-sm"
-            style={{ borderColor: "var(--border)" }}
-          />
-          {imgAlt && (
-            <figcaption className="mt-1 text-center text-xs italic opacity-75" style={{ color: "var(--text)" }}>
-              {imgAlt}
-            </figcaption>
-          )}
-        </figure>
+        <img
+          key={key}
+          src={imgSrc}
+          alt={imgAlt || "Görsel"}
+          className="my-1 inline-block max-h-[480px] max-w-full rounded-lg border align-middle object-contain shadow-sm"
+          style={{ borderColor: "var(--border)" }}
+        />
       );
     } else if (linkText !== undefined) {
       if (linkTarget.startsWith("wiki:")) {
         const pageId = linkTarget.slice("wiki:".length);
+        // Kullanıcı geri bildirimi (2026-08-07: "Link renkleri daha yumuşak
+        // yeşil tonlarında olsun") - yeni bir renk EKLENMEDİ (aynı
+        // --brand-accent), sadece varsayılan alt çizgi kaldırıldı (sadece
+        // hover'da çıkıyor) - bir bağlantının her zaman kalın bir çizgiyle
+        // "bağırması" yerine Notion/Confluence'taki gibi sade duruyor,
+        // gerçek renk tonu hiç değişmedi.
         nodes.push(
-          <Link key={key} to={`/wiki/${pageId}`} className="underline" style={{ color: "var(--brand-accent)" }}>
+          <Link key={key} to={`/wiki/${pageId}`} className="hover:underline" style={{ color: "var(--brand-accent)" }}>
             {linkText}
           </Link>
         );
@@ -80,7 +88,7 @@ function renderInline(text, keyPrefix) {
             href={linkTarget}
             target="_blank"
             rel="noreferrer"
-            className="underline"
+            className="hover:underline"
             style={{ color: "var(--brand-accent)" }}
           >
             {linkText}
@@ -102,6 +110,14 @@ function renderInline(text, keyPrefix) {
 
   return nodes;
 }
+
+// Bir satırın TAMAMI tek başına bir görsel söz dizimi mi ("![alt](url)",
+// başında/sonunda başka metin YOK) - editördeki "🖼️ Resim" düğmesinin ürettiği
+// en yaygın durum. Bu satırlar renderInline'ın İÇİNE (bir <p> altına) DEĞİL,
+// diğer blok seviyesi elemanlar (başlık/kod bloğu/tablo) gibi kendi başına,
+// gerçek bir <figure> olarak render ediliyor - bkz. renderInline'daki notla
+// AYNI hydration hatası gerekçesi.
+const STANDALONE_IMAGE_PATTERN = /^!\[([^\]]*)\]\(([^)]+)\)$/;
 
 // Wikipedia'nın "İçindekiler" bölümüne tıklayınca aynı sayfada ilgili başlığa
 // atlaması için her başlığa BENZERSİZ bir #çapa (id) gerekiyor. Türkçe
@@ -128,13 +144,26 @@ function slugify(text, usedSlugs) {
   return slug;
 }
 
+// Kullanıcı geri bildirimi (2026-08-07, BEŞİNCİ geçiş - "başlıklar çok
+// büyük... yarı yarıya küçült") - H1/H2/H3 BİREBİR yarıya indirildi
+// (42/30/24 -> 21/15/12), kenar boşlukları (mt/mb) da AYNI oranda tıraşlandı
+// (küçülen yazının etrafında orantısız BÜYÜK bir boşluk kalmasın diye - aksi
+// halde "küçük metin, dev boşluk" görünümü oluşurdu). Not: 15px/12px artık
+// gövde metninden (varsayılan 17px) DAHA KÜÇÜK - normalde bir başlığın gövde
+// metninden küçük olması bir hiyerarşi hatası sayılırdı, ama burada BİLEREK
+// kabul edildi çünkü kullanıcının açık, sayısal talebi buydu (font-weight
+// hâlâ hiyerarşiyi taşıyor - H2/H3 hâlâ KALIN, gövde metni değil). H4-H6
+// spec'te hiç geçmedi (kullanıcının ekran görüntüsünde görünmüyorlardı) -
+// AYNI oranda yarıya indirmek yerine (bu onları 7-10px'e, okunamaz hale
+// getirirdi) 11-12px'te bir taban değerde tutuldu, H3'ün ALTINDA kalacak
+// şekilde ağırlık/büyük harfle ayrıştırılıyorlar.
 const HEADING_SIZES = {
-  1: "mt-5 mb-2 text-xl font-bold tracking-tight text-[var(--text-h)] border-b pb-1.5 border-[var(--border)]",
-  2: "mt-4 mb-2 text-lg font-semibold tracking-tight text-[var(--text-h)]",
-  3: "mt-3.5 mb-1.5 text-base font-semibold text-[var(--text-h)]",
-  4: "mt-3 mb-1 text-sm font-semibold text-[var(--text-h)]",
-  5: "mt-2.5 mb-1 text-sm font-medium text-[var(--text-h)]",
-  6: "mt-2 mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--text-h)]",
+  1: "mt-4 mb-1.5 text-[21px] leading-[1.25] font-bold tracking-tight text-[var(--text-h)] border-b pb-1 border-[var(--border)]",
+  2: "mt-3.5 mb-1.5 text-[15px] leading-[1.3] font-bold tracking-tight text-[var(--text-h)]",
+  3: "mt-3 mb-1 text-[12px] leading-[1.3] font-semibold text-[var(--text-h)]",
+  4: "mt-2.5 mb-1 text-[12px] font-medium text-[var(--text-h)]",
+  5: "mt-2 mb-1 text-[11px] font-medium text-[var(--text-h)]",
+  6: "mt-2 mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-h)]",
 };
 const HEADING_TAGS = { 1: "h1", 2: "h2", 3: "h3", 4: "h4", 5: "h5", 6: "h6" };
 
@@ -159,9 +188,13 @@ function CodeBlock({ code }) {
   }
 
   return (
-    <div className="mb-4 overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)" }}>
+    // "Daha modern görünsün" (2026-08-07) - hafif bir gölge + biraz daha
+    // yuvarlak köşe, satır numarası sütununa ince bir ayraç eklendi (önceden
+    // sadece boşlukla ayrılıyordu, kod uzunlaştıkça numaralar metne
+    // "yapışık" görünüyordu).
+    <div className="mb-4 overflow-hidden rounded-xl border shadow-sm" style={{ borderColor: "var(--border)" }}>
       <div
-        className="flex items-center justify-end border-b px-3 py-1.5"
+        className="flex items-center justify-end border-b px-3.5 py-2"
         style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
       >
         <button
@@ -174,13 +207,13 @@ function CodeBlock({ code }) {
           {copied ? "Kopyalandı" : "Kopyala"}
         </button>
       </div>
-      <pre className="overflow-x-auto p-3 text-sm" style={{ background: "var(--code-bg)" }}>
+      <pre className="overflow-x-auto p-3.5 text-[15px]" style={{ background: "var(--code-bg)" }}>
         <code className="font-mono">
           {lines.map((line, idx) => (
             <div key={idx} className="flex gap-3">
               <span
-                className="shrink-0 text-right select-none"
-                style={{ minWidth: 22, color: "var(--text)", opacity: 0.4 }}
+                className="shrink-0 border-r text-right select-none"
+                style={{ minWidth: 22, paddingRight: 10, color: "var(--text)", opacity: 0.4, borderColor: "var(--border)" }}
               >
                 {idx + 1}
               </span>
@@ -190,6 +223,38 @@ function CodeBlock({ code }) {
         </code>
       </pre>
     </div>
+  );
+}
+
+// Görselin gerçek "blok" hâli - kendi satırında tek başına duran bir
+// "![alt](url)" için (bkz. STANDALONE_IMAGE_PATTERN). CodeBlock/tablo gibi
+// diğer blok elemanlarla AYNI seviyede, doğrudan blocks[]'a itiliyor.
+function ImageBlock({ src, alt }) {
+  return (
+    // Kullanıcı geri bildirimi (2026-08-07, DOKUZUNCU geçiş - "görsel
+    // hiçbirinde değişmesin, boyutu darda olan kadar kalsın") - ÖNCEKİ
+    // sürümde genişlik YÜZDE'ydi (w-[96%]) - içerik sütunu "Satır
+    // Genişliği" tercihine göre değiştikçe (Dar/Orta/Geniş) görsel de
+    // ORANTILI olarak küçülüp büyüyordu, kullanıcı bunu istemiyor: görsel
+    // HER ZAMAN aynı, SABİT boyutta kalmalı. Yüzde yerine SABİT bir piksel
+    // üst sınırı (max-w-[800px], "Dar"ın 60rem=840px sütununda %96'nın
+    // verdiği ~806px'e denk) - artık hangi Satır Genişliği seçili olursa
+    // olsun (sütun ne kadar büyürse büyüsün) görsel BÜYÜMÜYOR, sadece dar
+    // bir sütunda (mobil, "Dar" vb.) kendi genişliğine SIĞMAK için küçülüyor
+    // (w-full + max-w birlikte - taşma yok, ama büyümüyor da).
+    <figure className="my-4 mx-auto w-full max-w-[800px]">
+      <img
+        src={src}
+        alt={alt || "Görsel"}
+        className="mx-auto max-h-[560px] w-full rounded-lg border object-contain shadow-sm"
+        style={{ borderColor: "var(--border)" }}
+      />
+      {alt && (
+        <figcaption className="mt-1.5 text-center text-[13px] italic opacity-75" style={{ color: "var(--text)" }}>
+          {alt}
+        </figcaption>
+      )}
+    </figure>
   );
 }
 
@@ -240,6 +305,15 @@ export function renderWikiMarkdown(content) {
       continue;
     }
 
+    const standaloneImageMatch = line.trim().match(STANDALONE_IMAGE_PATTERN);
+    if (standaloneImageMatch) {
+      flushParagraph();
+      const [, alt, src] = standaloneImageMatch;
+      blocks.push(<ImageBlock key={`img-${blocks.length}`} src={src} alt={alt} />);
+      i++;
+      continue;
+    }
+
     if (line.startsWith("```")) {
       flushParagraph();
       i++;
@@ -273,15 +347,23 @@ export function renderWikiMarkdown(content) {
         i++;
       }
 
+      // "Tablolar daha okunabilir olsun" (2026-08-07) - dış çerçeveli,
+      // yuvarlak köşeli bir kap + zebra deseni (bir satır atlamalı hafif arka
+      // plan) eklendi - önceden sadece alt çizgilerle ayrılan çıplak satırlar
+      // vardı, geniş bir tabloda gözün doğru satırda kalması zorlaşıyordu.
       blocks.push(
-        <div key={`table-${blocks.length}`} className="mb-4 overflow-x-auto">
+        <div
+          key={`table-${blocks.length}`}
+          className="mb-4 overflow-hidden overflow-x-auto rounded-lg border"
+          style={{ borderColor: "var(--border)" }}
+        >
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr>
+              <tr style={{ background: "var(--code-bg)" }}>
                 {headerCells.map((cell, idx) => (
                   <th
                     key={idx}
-                    className="border-b-2 px-3 py-1.5 text-left font-medium"
+                    className="border-b px-3.5 py-2 text-left font-semibold"
                     style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
                   >
                     {renderInline(cell, `table-${blocks.length}-h-${idx}`)}
@@ -291,9 +373,9 @@ export function renderWikiMarkdown(content) {
             </thead>
             <tbody>
               {dataRows.map((row, rowIdx) => (
-                <tr key={rowIdx}>
+                <tr key={rowIdx} style={{ background: rowIdx % 2 === 1 ? "var(--code-bg)" : "transparent" }}>
                   {row.map((cell, cellIdx) => (
-                    <td key={cellIdx} className="border-b px-3 py-1.5" style={{ borderColor: "var(--border)" }}>
+                    <td key={cellIdx} className="border-b px-3.5 py-2" style={{ borderColor: "var(--border)" }}>
                       {renderInline(cell, `table-${blocks.length}-r${rowIdx}-${cellIdx}`)}
                     </td>
                   ))}

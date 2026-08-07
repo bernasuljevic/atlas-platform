@@ -4,12 +4,11 @@ import {
   Bell,
   ChevronDown,
   FileText,
-  LogOut,
   Menu,
   Moon,
   PanelLeftClose,
+  Plus,
   Search,
-  ShieldCheck,
   Sun,
 } from "lucide-react";
 import { getWikiSearchSuggestions } from "../api";
@@ -227,30 +226,36 @@ function WikiLayout({ token, onLogout }) {
       </header>
 
       <div className="flex flex-1 items-stretch">
+        {/* Kullanıcı spec'i (2026-08-07, DÖRDÜNCÜ geçiş - "7. Sol Sidebar":
+            "Sadece biraz daha dar olabilir - yaklaşık 220-240px") -
+            256px'ten (w-64) 230px'e indirildi, makale alanına birkaç ekstra
+            piksel bırakmak için. */}
         <aside
-          className={`${isSidebarOpen ? "flex" : "hidden"} w-full shrink-0 flex-col gap-4 border-r p-4 md:w-64`}
+          className={`${isSidebarOpen ? "flex" : "hidden"} w-full shrink-0 flex-col gap-4 border-r p-4 md:w-[230px]`}
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
           <WikiFolderTree token={token} ownDepartment={ownDepartment} />
 
-          <div className="mt-auto flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--border)" }}>
-            {isAdmin && (
-              <Link
-                to="/audit-log"
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--brand-accent)]/10"
-                style={{ color: "var(--text)" }}
-              >
-                <ShieldCheck size={15} /> Audit Log
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={onLogout}
-              className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--brand-accent)]/10"
-              style={{ color: "var(--text)" }}
+          {/* Audit Log ve Çıkış Yap BİLEREK burada YOK (2026-08-05, kullanıcı
+              geri bildirimi: "sağ üstte var zaten") - ikisi de zaten üst
+              bardaki kullanıcı menüsünde (avatar dropdown) duruyor, burada
+              tekrarlamak gereksizdi. Referans mockup'ta (2026-08-07,
+              "buna benzer olsun") sidebar'ın en altında "Çıkış Yap" da
+              gösteriliyordu ama o kararı ŞİMDİ tekrar açmak, iki turda önce
+              verilen açık bir "çıkart, tekrarlı" geri bildirimiyle çelişirdi -
+              o yüzden BİLEREK yine eklenmedi. "+ Yeni Sayfa Oluştur" ise
+              referans mockup'ta olup burada hiç OLMAYAN, gerçek bir eksikti
+              (tek yol WikiFolderTree'nin üstündeki genel "Yeni Sayfa" linkiydi,
+              sidebar'ın kendi içinde hiç yoktu) - dolu, vurgulu bir buton
+              olarak eklendi. */}
+          <div className="mt-auto flex flex-col gap-2 border-t pt-3" style={{ borderColor: "var(--border)" }}>
+            <Link
+              to="/wiki/new"
+              className="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+              style={{ background: "var(--brand-accent)" }}
             >
-              <LogOut size={15} /> Çıkış Yap
-            </button>
+              <Plus size={16} /> Yeni Sayfa Oluştur
+            </Link>
             <button
               type="button"
               onClick={() => setIsSidebarOpen(false)}

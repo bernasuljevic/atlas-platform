@@ -1,10 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ChevronRight, Pencil, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import {
+  Building2,
+  ChevronRight,
+  Folder,
+  List,
+  PanelRightClose,
+  PanelRightOpen,
+  Pencil,
+  Pin,
+  Settings2,
+  Share2,
+  Star,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { deleteWikiPage, getWikiFolderTree, getWikiPageById } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
 import { renderWikiMarkdown } from "../markdown";
+import DiscussionPanel from "./DiscussionPanel";
+import ReadingSettingsPanel, { FONT_SIZE_PX, LINE_HEIGHT_VALUE, LINE_WIDTH_VALUE } from "./ReadingSettingsPanel";
 import { Button } from "@atlas/ui/button";
 import { Badge } from "@atlas/ui/badge";
 
@@ -12,14 +31,41 @@ import { Badge } from "@atlas/ui/badge";
 // için) bulmak - klasör ağacı zaten sidebar için çekiliyor (bkz.
 // WikiFolderTree), burada AYNI veri sayfa özelinde tekrar çekilip (departman
 // başına küçük bir liste, maliyeti düşük) yürünüyor.
+// {id, name} çiftleri döndürüyor (SADECE isim değil) - kullanıcı geri
+// bildirimiyle (2026-08-05: "buradaki dosyalama yaptığımız şeylere
+// tıklayabilelim istiyorum") breadcrumb'taki her klasör segmentinin kendi
+// /wiki/browse/... linkine ihtiyacı var, bunun için id şart.
 function findFolderPath(folders, targetFolderId, path = []) {
   for (const folder of folders) {
-    if (folder.id === targetFolderId) return [...path, folder.name];
-    const found = findFolderPath(folder.children, targetFolderId, [...path, folder.name]);
+    if (folder.id === targetFolderId) return [...path, { id: folder.id, name: folder.name }];
+    const found = findFolderPath(folder.children, targetFolderId, [...path, { id: folder.id, name: folder.name }]);
     if (found) return found;
   }
   return null;
 }
+
+// Kullanıcı spec'i (2026-08-07, ÜÇÜNCÜ geçiş - "9. Önemli: Grid sistemini
+// yeniden kur") - üç sütun artık flexbox DEĞİL, gerçek bir CSS Grid. Bunun
+// asıl nedeni: Sağ panel'e (ve İçindekiler'e) bir "collapse/expand" özelliği
+// eklendi, kolon genişliği artık SABİT bir Tailwind sınıfı değil, iki
+// bağımsız state'e (showToc, isPanelCollapsed) göre DEĞİŞEN bir değer.
+// Flexbox'ta bu "içeriğe göre daralt" ile doğal olarak çözülürdü, ama grid'de
+// track genişliği net tanımlanmalı - bu yüzden 4 olası kombinasyon için TAM,
+// LİTERAL Tailwind sınıf string'leri burada tanımlı (Tailwind'in derleme
+// zamanı tarayıcısı `${değişken}` ile İÇİNE interpole edilmiş bir
+// `grid-cols-[...]` sınıfını ASLA bulamaz - sadece kaynak kodda TAM yazılı
+// string'leri görebiliyor, bu yüzden olası her kombinasyon burada ayrı ayrı
+// yazılı duruyor, çalışma zamanında sadece HANGİSİNİN kullanılacağı seçiliyor).
+// DÖRDÜNCÜ geçişte (2026-08-07 - "8. Grid Yapısı: 230px | 1100-1200px |
+// 280px") sağ panel 240/260'tan 260/280'e çıkarıldı - 1650px'lik üst sınırda
+// (bkz. article'ın max-w'si) content track'i böylece TAM istenen aralığa
+// (~1100-1200px) düşüyor: 1650 - 220(TOC) - 280(panel) - 48(2 gap) = 1102px.
+const GRID_TEMPLATES = {
+  "toc-open|panel-open": "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]",
+  "toc-open|panel-closed": "lg:grid-cols-[200px_1fr_44px] xl:grid-cols-[220px_1fr_44px]",
+  "toc-closed|panel-open": "lg:grid-cols-[44px_1fr_260px] xl:grid-cols-[44px_1fr_280px]",
+  "toc-closed|panel-closed": "lg:grid-cols-[44px_1fr_44px] xl:grid-cols-[44px_1fr_44px]",
+};
 
 // Wikipedia'nın makale sayfasıyla aynı fikir: küçük bir dialog yerine,
 // kendi URL'i olan (paylaşılabilir, geri/ileri tuşlarıyla gezilebilir) tam
@@ -41,13 +87,78 @@ function WikiArticlePage({ token }) {
   const [feedbackGiven, setFeedbackGiven] = useState(null);
   // Wikipedia sekmeleri ("Madde"/"Tartışma") + İçindekiler kutusunun aç/kapa
   // durumu - Hooks kuralı gereği BURADA, erken return'lerin (isLoading/error
-  // dallarının, aşağıda) ÖNCESİNDE tanımlanmalı. Bir önceki denemede bu ikisi
-  // yanlışlıkla return'lerden SONRAYA konmuştu - "sayfa henüz yüklenmedi"
-  // render'ında hiç çağrılmayıp "sayfa yüklendi" render'ında çağrılıyorlardı,
-  // bu da React'ın "Hooks kuralları ihlal edildi" hatasına yol açıyordu (bkz.
-  // WikiArticlePage'in daha önceki bir düzeltmesindeki AYNI ders, useMemo için).
+  // dallarının, aşağıda) ÖNCESİNDE tanımlanmalı.
   const [activeTab, setActiveTab] = useState("article");
-  const [showToc, setShowToc] = useState(true);
+  // Kullanıcı geri bildirimi (2026-08-07, ALTINCI geçiş - "içerik ortada dar
+  // bir sütun gibi görünmesin... sağ/sol boşlukları azalt") - önceki
+  // turlarda içerik div'inin İÇ max-width'i kaldırılmıştı (bkz. dördüncü
+  // geçiş) ama GRID TRACK'İNİN KENDİSİ (İçindekiler + Sağ Panel sabit
+  // genişlikleri) hâlâ tipik laptop genişliklerinde (1366-1440px) içerik
+  // sütununu ~600px'e sıkıştırıyordu - "geniş hücrede dar metin" hatası
+  // düzeldi ama "iki sabit yan sütun, ORTA sütunu dar bırakıyor" sorunu
+  // DEVAM ediyordu. Kesin çözüm: İçindekiler VE Sağ Panel artık VARSAYILAN
+  // OLARAK daraltılmış (44px ikon şeridi) - makale varsayılan durumda
+  // neredeyse TÜM 1fr track'ini alıyor, ikisi de hâlâ tek tıkla açılabiliyor
+  // (özellik kaldırılmadı, sadece varsayılanı değişti). localStorage'da
+  // kalıcı - bir kullanıcı bilerek açarsa bir sonraki makalede de açık kalır.
+  const [showToc, setShowToc] = useState(() => localStorage.getItem("wikiShowToc") === "true");
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(
+    () => localStorage.getItem("wikiPanelCollapsed") !== "false"
+  );
+  // Scroll-spy: kullanıcı makaleyi kaydırırken İçindekiler'de o an ekranda
+  // olan başlığı otomatik vurgulamak için (spec, 2026-08-07: "Scroll
+  // sırasında aktif bölüm otomatik değişsin") - aşağıdaki IntersectionObserver
+  // effect'i güncelliyor.
+  const [activeHeadingId, setActiveHeadingId] = useState(null);
+  // Mobil/tablette İçindekiler artık inline stack değil, ayrı bir çekmece
+  // (drawer) - "Okuma Ayarları" çekmecesiyle AYNI desende ama SOLDAN
+  // açılıyor (ikisini görsel olarak ayırt etmek için - biri "menü" hissi,
+  // diğeri "ayar" hissi). ÜÇÜNCÜ geçişte (spec'in "7. Responsive" tablosu -
+  // "Tablet: TOC collapse") bu artık SADECE mobilde değil, tablette de
+  // devrede - eşiği `lg` (1024px), önceki `md`'den yükseltildi.
+  const [isMobileTocOpen, setIsMobileTocOpen] = useState(false);
+
+  // Pinle/Favorilere Ekle (kullanıcı geri bildirimi, 2026-08-07, YEDİNCİ
+  // geçiş: "pinle favorilere ekle ve paylaşta kullanılabilsin" - öncekinde
+  // ikisi de tamamen dekoratifti, tıklanamıyordu). BİLİNÇLİ bir kapsam
+  // kararı: gerçek bir backend tablosu/endpoint YOK henüz (bu, kendi başına
+  // ayrı bir özellik olurdu - yeni entity + migration + endpoint) - bunun
+  // yerine tarayıcının localStorage'ında sayfa id'lerinin bir listesi olarak
+  // tutuluyor, tıpkı Okuma Ayarları tercihleri gibi. Bu GERÇEK ve KALICI
+  // (aynı tarayıcıda bir daha ziyarette de pinli/favori kalıyor) ama
+  // CİHAZLAR ARASI senkron DEĞİL - kullanıcı bunu isterse gerçek bir
+  // backend özelliğine (Favoriler/Pinlenenler anasayfa butonlarının hâlâ
+  // "yakında" olmasının da nedeni bu) geçmek ayrı bir iş olur.
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("wikiPinnedPages") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [favoriteIds, setFavoriteIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("wikiFavoritePages") ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // Okuma Ayarları (kullanıcı spec'i, 2026-08-05: "Sağ Tarafta Yardım Paneli") -
+  // üç tercih de localStorage'da kalıcı (tema tercihinin WikiLayout'ta
+  // kalıcı olmasıyla AYNI desen) - bir kez seçilince başka bir makaleye
+  // geçince de korunuyor. AYNI Hooks kuralı gereği bunlar da erken
+  // return'lerden ÖNCE.
+  const [fontSize, setFontSize] = useState(() => localStorage.getItem("wikiFontSize") || "medium");
+  const [lineWidth, setLineWidth] = useState(() => localStorage.getItem("wikiLineWidth") || "medium");
+  const [lineHeightKey, setLineHeightKey] = useState(() => localStorage.getItem("wikiLineHeight") || "normal");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
+  // WikiLayout'taki toggleTheme ile AYNI desen (bkz. oradaki not) - burada
+  // AYRI bir kopyası duruyor, paylaşılan bir ThemeContext YOK çünkü şu ana
+  // kadar bu iki yerin (üst bar + bu okuma paneli) dışında tema değiştiren
+  // üçüncü bir nokta olmadı, ayrı bir context açmak şimdilik YAGNI olurdu.
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +203,38 @@ function WikiArticlePage({ token }) {
     };
   }, [token, page?.departmentName, page?.folderId]);
 
+  useEffect(() => {
+    localStorage.setItem("wikiFontSize", fontSize);
+  }, [fontSize]);
+  useEffect(() => {
+    localStorage.setItem("wikiLineWidth", lineWidth);
+  }, [lineWidth]);
+  useEffect(() => {
+    localStorage.setItem("wikiLineHeight", lineHeightKey);
+  }, [lineHeightKey]);
+  useEffect(() => {
+    localStorage.setItem("wikiPanelCollapsed", String(isPanelCollapsed));
+  }, [isPanelCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("wikiShowToc", String(showToc));
+  }, [showToc]);
+
+  // İki yönlü bir "tema uygula" fonksiyonu - eski toggleTheme (sadece
+  // "tersine çevir") yerine 2026-08-07'de bu geldi, çünkü Okuma Ayarları
+  // paneli artık bir toggle DEĞİL, "Açık"/"Koyu" iki seçenekli bir
+  // segmented control (bkz. ReadingSettingsPanel) - segmented control'ün
+  // doğrudan HANGİ değerin seçildiğini bilmesi/ayarlaması gerekiyor.
+  function applyTheme(nextDark) {
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+    setIsDark(nextDark);
+  }
+
   async function handleDelete() {
     if (!window.confirm("Bu sayfayı silmek istediğine emin misin?")) return;
 
@@ -117,6 +260,41 @@ function WikiArticlePage({ token }) {
     [page?.content]
   );
 
+  // Scroll-spy - headings render edildikten SONRA, DOM'daki gerçek başlık
+  // elemanlarını gözlemliyor. `isFullscreen` BİLEREK dependency listesinde:
+  // tam ekran moduna geçince/çıkınca bu bileşen aşağıda TAMAMEN FARKLI bir
+  // JSX ağacı döndürüyor (erken return, bkz. altta) - React bu durumda eski
+  // başlık elemanlarını unmount edip yenilerini mount ediyor, effect
+  // yeniden çalışıp YENİ elemanları gözlemlemezse gözlemci "boşta" kalır.
+  useEffect(() => {
+    if (headings.length === 0) return undefined;
+
+    const elements = headings.map((h) => document.getElementById(h.id)).filter(Boolean);
+    if (elements.length === 0) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+        // Ekranda birden fazla başlık görünürse (kısa bölümler) en üstteki
+        // "aktif" sayılıyor - Wikipedia'nın kendi İçindekiler davranışıyla aynı.
+        const topMost = visible.reduce((a, b) => (a.boundingClientRect.top <= b.boundingClientRect.top ? a : b));
+        setActiveHeadingId(topMost.target.id);
+      },
+      // Üstten ~56px içeri girince "geçildi" say, alttan geniş bir pay
+      // bırak (%70) - bu sayede bir başlık ekranın ÇOK altında belli
+      // belirsiz görünürken erken aktif olmuyor. 56px BİLEREK küçük tutuldu:
+      // başlıkların kendi `scroll-mt-20` (80px) çapa payı + üst header'ın
+      // yüksekliği nedeniyle bir başlığa TIKLANINCA gerçekte ~70px'te
+      // sonlanıyor - eşik daha büyük (ör. 96px) olsaydı, tam o anda
+      // "aktif" hiç işaretlenmiyordu (canlı test sırasında yakalandı).
+      { rootMargin: "-56px 0px -70% 0px", threshold: 0 }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [headings, isFullscreen]);
+
   if (isLoading) {
     return <p style={{ color: "var(--text)" }}>Yükleniyor...</p>;
   }
@@ -135,27 +313,205 @@ function WikiArticlePage({ token }) {
   }
 
   const canEdit = isAdmin || page.createdByUserId === userId;
-  const breadcrumbParts = [`${page.departmentName} Departmanı`, ...folderPath, page.title];
+
+  const isPinned = pinnedIds.includes(page.id);
+  const isFavorited = favoriteIds.includes(page.id);
+
+  function togglePin() {
+    setPinnedIds((prev) => {
+      const next = prev.includes(page.id) ? prev.filter((pid) => pid !== page.id) : [...prev, page.id];
+      localStorage.setItem("wikiPinnedPages", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function toggleFavorite() {
+    setFavoriteIds((prev) => {
+      const next = prev.includes(page.id) ? prev.filter((pid) => pid !== page.id) : [...prev, page.id];
+      localStorage.setItem("wikiFavoritePages", JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Web Share API (mobil cihazlarda gerçek bir "paylaş" sayfası açar) varsa
+  // onu, yoksa (çoğu masaüstü tarayıcı) panoya kopyalamayı dene - ikisi de
+  // "yakında" değil, GERÇEK ve şimdi çalışan bir davranış.
+  async function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: page.title, url });
+      } catch {
+        // Kullanıcı paylaşım penceresini iptal etti - sessizce yut, hata değil.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Bağlantı panoya kopyalandı");
+    } catch {
+      toast("Bağlantı kopyalanamadı", { description: "Tarayıcı izni gerekebilir." });
+    }
+  }
+
+  // Departman ve klasör segmentleri artık tıklanabilir (bkz. findFolderPath'teki
+  // not) - /wiki/browse/... ile o klasörün/departmanın içeriğini listeleyen
+  // yeni sayfaya gidiyor (bkz. WikiFolderBrowsePage). Sayfanın kendi başlığı
+  // BİLEREK link DEĞİL - zaten o an görüntülenen sayfa, kendine link vermek
+  // anlamsız olurdu.
+  const breadcrumbParts = [
+    { label: `${page.departmentName} Departmanı`, to: `/wiki/browse/${page.departmentName}` },
+    ...folderPath.map((f) => ({ label: f.name, to: `/wiki/browse/${page.departmentName}/${f.id}` })),
+    { label: page.title, to: null },
+  ];
   // Backend'de virgülle ayrılmış TEK bir string olarak saklanıyor (bkz.
   // WikiPage.cs'teki not) - görüntüleme için burada listeye ayrılıyor.
   const tagList = page.tags ? page.tags.split(",").filter(Boolean) : [];
 
+  // Okuma tercihlerinin GERÇEK CSS karşılığı - normal görünüm + tam ekran
+  // İKİSİNDE de AYNI hesaplama kullanılıyor, tek yerde tutuluyor.
+  const contentStyle = {
+    color: "var(--text)",
+    fontSize: FONT_SIZE_PX[fontSize],
+    lineHeight: LINE_HEIGHT_VALUE[lineHeightKey],
+    maxWidth: LINE_WIDTH_VALUE[lineWidth] === "none" ? "none" : LINE_WIDTH_VALUE[lineWidth],
+  };
+
+  const readingSettingsProps = {
+    fontSize,
+    onFontSizeChange: setFontSize,
+    lineWidth,
+    onLineWidthChange: setLineWidth,
+    lineHeightKey,
+    onLineHeightChange: setLineHeightKey,
+    isFullscreen,
+    onToggleFullscreen: () => setIsFullscreen((f) => !f),
+    theme: isDark ? "dark" : "light",
+    onThemeChange: (value) => applyTheme(value === "dark"),
+  };
+
+  // Kullanıcı geri bildirimi (2026-08-07, DOKUZUNCU geçiş - "genişe
+  // tıklayınca ekranı küçültmesin, biz tekrar küçültmeye tıklarsak
+  // küçülsün") - ÖNCEKİ turdaki çözüm "Geniş" seçilince İçindekiler/Sağ
+  // Paneli OTOMATİK daraltıyordu (showToc/isPanelCollapsed state'ini
+  // DEĞİŞTİRİYORDU) - kullanıcı bunu "elle tıklamadığım hâlde bir şey
+  // küçüldü" olarak yaşadı, üstelik "Orta"ya dönünce panel eski hâline
+  // dönmüyordu (state kalıcı olarak değişmişti). Yeni çözüm state'e HİÇ
+  // DOKUNMUYOR - "Geniş" iken İçindekiler/Sağ Panel grid'den TAMAMEN
+  // ÇIKARILIYOR (aşağıdaki `lineWidth !== "wide"` koşullarına bkz.), ama
+  // showToc/isPanelCollapsed'in KENDİSİ hiç değişmiyor - "Orta"ya
+  // dönüldüğünde ikisi TAM kullanıcının son bıraktığı hâliyle geri geliyor.
+  const gridTemplateClass =
+    lineWidth === "wide"
+      ? "lg:grid-cols-1"
+      : GRID_TEMPLATES[`${showToc ? "toc-open" : "toc-closed"}|${isPanelCollapsed ? "panel-closed" : "panel-open"}`];
+
+  // Tam Ekran Okuma Modu - WikiLayout'un header/sidebar'ını gerçekten
+  // gizlemek yerine (bunun için state'i yukarı taşımak gerekirdi, WikiLayout
+  // bu sayfanın PARENT'ı), TÜM viewport'u kaplayan sabit (fixed) bir katman
+  // olarak üstüne biniyor - aynı içerik (nodes) yeniden kullanılıyor, tek
+  // fark konteyner ve "çık" düğmesi. WikiLayout'a HİÇ dokunmadan çalışıyor.
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: "var(--page-bg)" }}>
+        <div className="mx-auto max-w-3xl px-6 py-8 text-left">
+          <button
+            type="button"
+            onClick={() => setIsFullscreen(false)}
+            className="mb-6 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}
+          >
+            <X size={15} /> Tam ekrandan çık
+          </button>
+          <h1 className="mb-4 text-[32px] leading-tight font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+            {page.title}
+          </h1>
+          <div style={{ ...contentStyle, maxWidth: "none" }} className="font-normal">
+            {nodes}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <article className="mx-auto max-w-5xl text-left text-[15px]">
+    // Kullanıcı spec'i (2026-08-07, ÜÇÜNCÜ geçiş - "1. Genel Yerleşim") -
+    // "Büyük monitörlerde içerik ~1600-1700px'e kadar büyüyebilmeli" - üst
+    // sınır 1500'den 1650'ye çıkarıldı. mx-auto ile AYNI mantık korunuyor:
+    // 1650px'in ALTINDAKİ ekranlarda (neredeyse tüm laptoplar) bu sınır hiç
+    // devreye girmiyor, SADECE 1650px+ monitörlerde makale ortalanıp
+    // sınırlı kalıyor - WikiLayout'un kendi `p-4 md:p-6` dolgusu (16-24px)
+    // zaten spec'in istediği "24-40px kenar boşluğu" aralığında, ayrıca bir
+    // şey eklemeye gerek yok.
+    <article className="mx-auto max-w-[1650px] text-left text-[15px]">
       {/* Breadcrumb */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        {/* Kullanıcı referans mockup'ı (2026-08-07, "buna benzer olsun") -
+            her breadcrumb segmentinin önünde küçük bir ikon (departman ->
+            Building2, klasörler -> Folder). Sayfanın kendi başlığı segmenti
+            zaten link DEĞİL, o yüzden ikon almıyor - sadece "nerede
+            olduğunu" gösteren pasif metin. */}
         <nav className="flex flex-wrap items-center gap-1 text-xs" style={{ color: "var(--text)", opacity: 0.85 }}>
           {breadcrumbParts.map((part, idx) => (
             <span key={idx} className="flex items-center gap-1">
               {idx > 0 && <ChevronRight size={12} className="opacity-60" />}
-              <span className={idx === breadcrumbParts.length - 1 ? "font-semibold" : ""}>{part}</span>
+              {part.to ? (
+                <Link to={part.to} className="flex items-center gap-1 hover:underline" style={{ color: "var(--brand-accent)" }}>
+                  {idx === 0 ? <Building2 size={12} /> : <Folder size={12} />}
+                  {part.label}
+                </Link>
+              ) : (
+                <span className="font-semibold">{part.label}</span>
+              )}
             </span>
           ))}
         </nav>
+
+        {/* Kullanıcı spec'i (2026-08-07, ÜÇÜNCÜ geçiş - "7. Responsive"
+            tablosu): "Tablet: TOC collapse, Sağ panel collapse / Mobil:
+            Sadece makale, diğerleri drawer" - yani TABLET artık MOBİL'le
+            AYNI davranıyor (ikisi de sadece makaleyi inline gösteriyor,
+            İKİ panel de çekmece). Bu yüzden İçindekiler tetikleyicisi
+            ÖNCEKİ turdaki `md:hidden`den `lg:hidden`e yükseltildi - Okuma
+            Ayarları tetikleyicisiyle ARTIK AYNI eşikte. */}
+        <div className="flex items-center gap-2">
+          {headings.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setIsMobileTocOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium lg:hidden"
+              style={{ borderColor: "var(--border)", color: "var(--text)" }}
+            >
+              <List size={14} /> İçindekiler
+            </button>
+          )}
+          {/* "Geniş" satır genişliği seçiliyken (bkz. aşağıdaki not) sağ panel
+              lg+'de bile HİÇ render edilmiyor - bu düğme o modda ORADA da
+              görünür kalmalı, yoksa kullanıcı Okuma Ayarları'na geri dönecek
+              hiçbir yol bulamaz. */}
+          <button
+            type="button"
+            onClick={() => setIsMobileSettingsOpen(true)}
+            className={
+              lineWidth === "wide"
+                ? "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+                : "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium lg:hidden"
+            }
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}
+          >
+            <Settings2 size={14} /> Okuma Ayarları
+          </button>
+        </div>
       </div>
 
-      {/* Wikipedia Article Title */}
-      <h1 className="mt-1 mb-1 text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+      {/* Wikipedia Article Title - sayfanın GERÇEK, tek seferlik başlığı.
+          İçerik başlıkları (markdown.jsx'teki HEADING_SIZES) beşinci geçişte
+          21/15/12px'e yarıya indirildi - bu sayfa başlığı 46px'te bırakılınca
+          içerik H1'inin (21px) 2 katından fazlası oluyordu, orantısız
+          duruyordu ("başlıklar... küçültülsün" geri bildirimi buna da
+          uygulandı) - 32px'e indirildi, hâlâ en tepede ama artık makul bir
+          oranda. */}
+      <h1 className="mt-1 mb-1 text-[32px] leading-tight font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
         {page.title}
       </h1>
 
@@ -179,6 +535,33 @@ function WikiArticlePage({ token }) {
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Pinle/Favorilere Ekle/Paylaş - kullanıcı geri bildirimiyle
+              (2026-08-07, YEDİNCİ geçiş) artık GERÇEKTEN çalışıyor (bkz.
+              yukarıdaki togglePin/toggleFavorite/handleShare notu - Pin/
+              Favori localStorage'da kalıcı, Paylaş panoya kopyalıyor/Web
+              Share API'sini kullanıyor). Aktifken dolu ikon + vurgu rengiyle
+              işaretleniyor. */}
+          <button
+            type="button"
+            onClick={togglePin}
+            className="wiki-tab"
+            style={{ color: isPinned ? "var(--brand-accent)" : undefined }}
+            title={isPinned ? "Pini kaldır" : "Pinle"}
+          >
+            <Pin size={13} fill={isPinned ? "currentColor" : "none"} /> {isPinned ? "Pinlendi" : "Pinle"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleFavorite}
+            className="wiki-tab"
+            style={{ color: isFavorited ? "var(--brand-accent)" : undefined }}
+            title={isFavorited ? "Favorilerden çıkar" : "Favorilere Ekle"}
+          >
+            <Star size={13} fill={isFavorited ? "currentColor" : "none"} /> {isFavorited ? "Favoride" : "Favorilere Ekle"}
+          </button>
+          <button type="button" onClick={handleShare} className="wiki-tab" title="Bağlantıyı paylaş">
+            <Share2 size={13} /> Paylaş
+          </button>
           <button
             type="button"
             className="wiki-tab active"
@@ -203,58 +586,94 @@ function WikiArticlePage({ token }) {
       </p>
 
       {activeTab === "talk" ? (
-        <div className="rounded-lg border p-6 text-center" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-h)" }}>
+        <div className="rounded-lg border p-6" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+          <h2 className="mb-4 text-base font-semibold" style={{ color: "var(--text-h)" }}>
             "{page.title}" Tartışma Sayfası
           </h2>
-          <p className="mt-2 text-xs" style={{ color: "var(--text)" }}>
-            Bu makale hakkındaki tartışma ve öneriler henüz başlatılmadı.
-          </p>
+          <DiscussionPanel token={token} pageId={page.id} />
         </div>
       ) : (
-        /* Main Article Layout: Left TOC + Content + Right Infobox */
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          {/* Left Table of Contents */}
-          {headings.length > 1 && (
-            <nav
-              className="h-fit shrink-0 rounded-lg border p-3.5 lg:sticky lg:top-4 lg:w-52"
-              style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
-            >
-              <div className="mb-2 flex items-center justify-between border-b pb-1.5" style={{ borderColor: "var(--border)" }}>
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-h)" }}>
-                  İçindekiler
-                </span>
+        // Kullanıcı spec'i (2026-08-07, ÜÇÜNCÜ geçiş - "9. Önemli: Grid
+        // sistemini yeniden kur") - flexbox row yerine GERÇEK bir CSS Grid.
+        // Track genişlikleri `gridTemplateClass` (yukarıda tanımlı, showToc/
+        // isPanelCollapsed'e göre 4 sabit seçenekten biri) ile geliyor.
+        // `transition-[grid-template-columns]` - panel açılıp kapanınca
+        // (spec: "Açıldığında sağ taraftan slide şeklinde gelsin") track
+        // genişliği ANİ değil, YUMUŞAK geçiyor; içindeki `<aside>` kendi
+        // genişliğini HER ZAMAN grid hücresinden aldığı (w-full) için
+        // içerik de bu geçiş boyunca doğal olarak "kayarak" büyüyüp küçülüyor.
+        <div
+          className={`grid grid-cols-1 gap-6 transition-[grid-template-columns] duration-300 ease-in-out ${gridTemplateClass}`}
+        >
+          {/* Left Table of Contents - dar, sade, sticky, scroll-spy ile
+              aktif başlığı yeşil sol çizgiyle vurguluyor (bkz. yukarıdaki
+              IntersectionObserver effect'i). SADECE lg ve üzerinde (masaüstü)
+              görünür - altındaki tüm genişliklerde üstteki "İçindekiler"
+              çekmece düğmesi devreye giriyor. */}
+          {lineWidth !== "wide" && headings.length > 1 && (
+            <div className="hidden lg:block">
+              {showToc ? (
+                <nav className="h-fit w-full lg:sticky lg:top-4">
+                  <div className="mb-2 flex items-baseline justify-between">
+                    <span className="text-[14px] font-bold" style={{ color: "var(--text-h)" }}>
+                      İçindekiler
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowToc(false)}
+                      title="İçindekiler'i daralt"
+                      aria-label="İçindekiler'i daralt"
+                      className="rounded p-0.5 hover:bg-[var(--brand-accent)]/10"
+                      style={{ color: "var(--brand-accent)" }}
+                    >
+                      <PanelRightOpen size={14} className="rotate-180" />
+                    </button>
+                  </div>
+
+                  <ol className="flex flex-col gap-0.5 text-[12.5px]">
+                    {headings.map((h) => {
+                      const isActive = activeHeadingId === h.id;
+                      return (
+                        <li key={h.id}>
+                          <a
+                            href={`#${h.id}`}
+                            className="block border-l-2 py-0.5 pr-1 leading-snug"
+                            style={{
+                              paddingLeft: 8 + (h.level - 1) * 10,
+                              borderColor: isActive ? "var(--brand-accent)" : "transparent",
+                              color: isActive ? "var(--brand-accent)" : "var(--text)",
+                              fontWeight: isActive ? 600 : 400,
+                              opacity: isActive ? 1 : 0.8,
+                            }}
+                          >
+                            {h.text}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </nav>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setShowToc((s) => !s)}
-                  className="text-[11px] font-medium underline"
-                  style={{ color: "var(--brand-accent)" }}
+                  onClick={() => setShowToc(true)}
+                  title="İçindekiler'i göster"
+                  aria-label="İçindekiler'i göster"
+                  className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border lg:sticky lg:top-4"
+                  style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
                 >
-                  [{showToc ? "gizle" : "göster"}]
+                  <List size={16} style={{ color: "var(--text-h)" }} />
                 </button>
-              </div>
-
-              {showToc && (
-                <ol className="flex flex-col gap-1 text-xs">
-                  {headings.map((h) => (
-                    <li key={h.id}>
-                      <a
-                        href={`#${h.id}`}
-                        className="block rounded px-1.5 py-1 hover:bg-[var(--brand-accent)]/10"
-                        style={{ paddingLeft: 6 + (h.level - 1) * 10, color: "var(--brand-accent)", fontWeight: 500 }}
-                      >
-                        {h.text}
-                      </a>
-                    </li>
-                  ))}
-                </ol>
               )}
-            </nav>
+            </div>
           )}
 
-          {/* Center Article Content */}
-          <div className="min-w-0 flex-1">
-            <div className="leading-relaxed font-normal" style={{ color: "var(--text)" }}>
+          {/* Center Article Content - artık en geniş grid track'i (1fr,
+              kalan TÜM alanı alıyor) - yazı boyutu/satır aralığı/satır
+              genişliği sağdaki Okuma Ayarları panelinden seçilen tercihlere
+              göre (bkz. contentStyle). */}
+          <div className="min-w-0">
+            <div style={contentStyle} className="mx-auto font-normal">
               {nodes}
             </div>
 
@@ -282,48 +701,155 @@ function WikiArticlePage({ token }) {
             </div>
           </div>
 
-          {/* Right Wikipedia Infobox Card */}
-          <aside
-            className="w-full shrink-0 rounded-lg border lg:w-64"
-            style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-          >
-            <div className="border-b px-3.5 py-2 text-center" style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}>
-              <h3 className="text-xs font-bold text-[var(--text-h)]">{page.title}</h3>
-              <p className="text-[11px] text-[var(--text)] opacity-70">Bilgi Kutusu</p>
-            </div>
-            <div className="flex flex-col divide-y text-xs" style={{ borderColor: "var(--border)" }}>
-              <div className="flex justify-between px-3 py-2">
-                <span className="font-semibold text-[var(--text-h)]">Departman</span>
-                <span className="text-[var(--text)]">{page.departmentName}</span>
-              </div>
-              <div className="flex justify-between px-3 py-2">
-                <span className="font-semibold text-[var(--text-h)]">Erişim</span>
-                <span className="font-medium text-[var(--brand-accent)]">
-                  {page.visibility === "Public" ? "Herkese Açık" : "Departmana Özel"}
-                </span>
-              </div>
-              <div className="flex justify-between px-3 py-2">
-                <span className="font-semibold text-[var(--text-h)]">Oluşturan</span>
-                <span className="truncate max-w-[120px] text-[var(--text)]">{page.createdByEmail ?? "Bilinmiyor"}</span>
-              </div>
-              <div className="flex justify-between px-3 py-2">
-                <span className="font-semibold text-[var(--text-h)]">Tarih</span>
-                <span className="text-[var(--text)]">{formatUtcTimestamp(page.createdAtUtc)}</span>
-              </div>
-              {tagList.length > 0 && (
-                <div className="p-3">
-                  <span className="block mb-1 font-semibold text-[var(--text-h)]">Etiketler</span>
-                  <div className="flex flex-wrap gap-1">
-                    {tagList.map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
-                        {tag}
-                      </Badge>
-                    ))}
+          {/* Right column: Bilgi Kutusu + Okuma Ayarları - kullanıcı spec'i
+              (2026-08-07, ÜÇÜNCÜ geçiş - "4. Sağ Panel"): artık TAMAMEN
+              kapatılabiliyor. Kapalıyken SADECE küçük bir ikon düğmesi
+              (44px'lik grid track'i tam dolduran, ortalı bir kare) - açıkken
+              tam içerik + üstte "daralt" düğmesi. SADECE lg+'de VE "Geniş"
+              satır genişliği seçili DEĞİLKEN görünür ("Geniş"te grid'den
+              tamamen çıkıyor, bkz. gridTemplateClass'taki not - Okuma
+              Ayarları'na o modda üstteki tetikleyici düğmeden ulaşılıyor). */}
+          {lineWidth !== "wide" && (
+          <aside className="hidden w-full lg:sticky lg:top-4 lg:flex lg:flex-col lg:gap-2.5 lg:overflow-hidden">
+            {isPanelCollapsed ? (
+              <button
+                type="button"
+                onClick={() => setIsPanelCollapsed(false)}
+                title="Paneli genişlet"
+                aria-label="Paneli genişlet"
+                className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg border"
+                style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
+              >
+                <PanelRightOpen size={16} style={{ color: "var(--text-h)" }} />
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsPanelCollapsed(true)}
+                  title="Paneli daralt"
+                  aria-label="Paneli daralt"
+                  className="ml-auto flex items-center gap-1 rounded px-1.5 py-1 text-[11px] font-medium hover:bg-[var(--brand-accent)]/10"
+                  style={{ color: "var(--brand-accent)" }}
+                >
+                  Daralt <PanelRightClose size={13} />
+                </button>
+
+                <div className="overflow-hidden rounded-lg border" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+                  <div className="border-b px-2.5 py-1.5 text-center" style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}>
+                    <h3 className="text-[15px] font-bold text-[var(--text-h)]">{page.title}</h3>
+                    <p className="text-[11px] text-[var(--text)] opacity-70">Bilgi Kutusu</p>
+                  </div>
+                  <div className="flex flex-col divide-y text-[13px]" style={{ borderColor: "var(--border)" }}>
+                    <div className="flex justify-between px-2.5 py-1">
+                      <span className="font-semibold text-[var(--text-h)]">Departman</span>
+                      <span className="text-[var(--text)]">{page.departmentName}</span>
+                    </div>
+                    <div className="flex justify-between px-2.5 py-1">
+                      <span className="font-semibold text-[var(--text-h)]">Erişim</span>
+                      <span className="font-medium text-[var(--brand-accent)]">
+                        {page.visibility === "Public" ? "Herkese Açık" : "Departmana Özel"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between px-2.5 py-1">
+                      <span className="font-semibold text-[var(--text-h)]">Oluşturan</span>
+                      <span className="truncate max-w-[140px] text-[var(--text)]">{page.createdByEmail ?? "Bilinmiyor"}</span>
+                    </div>
+                    <div className="flex justify-between px-2.5 py-1">
+                      <span className="font-semibold text-[var(--text-h)]">Tarih</span>
+                      <span className="text-[var(--text)]">{formatUtcTimestamp(page.createdAtUtc)}</span>
+                    </div>
+                    {tagList.length > 0 && (
+                      <div className="p-2.5">
+                        <span className="block mb-1 font-semibold text-[var(--text-h)]">Etiketler</span>
+                        <div className="flex flex-wrap gap-1">
+                          {tagList.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[11px] py-0 px-1.5 font-normal">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
+
+                <ReadingSettingsPanel {...readingSettingsProps} />
+              </>
+            )}
           </aside>
+          )}
+        </div>
+      )}
+
+      {/* Mobil/tablet İçindekiler çekmecesi - SOLDAN açılıyor (Okuma
+          Ayarları çekmecesi sağdan açılıyor - bkz. aşağıda) - ikisini
+          görsel olarak ayırt etmek için. Sadece lg ALTINDA anlamlı (lg+'de
+          zaten inline TOC var), bu yüzden içindeki panel de lg:hidden. */}
+      {isMobileTocOpen && headings.length > 1 && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.4)" }} onClick={() => setIsMobileTocOpen(false)} />
+          <div
+            className="absolute top-0 left-0 flex h-full w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto p-4"
+            style={{ background: "var(--page-bg)" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>
+                İçindekiler
+              </span>
+              <button type="button" onClick={() => setIsMobileTocOpen(false)} className="rounded p-1 hover:bg-[var(--brand-accent)]/10">
+                <X size={16} style={{ color: "var(--text)" }} />
+              </button>
+            </div>
+            <ol className="flex flex-col gap-0.5 text-sm">
+              {headings.map((h) => {
+                const isActive = activeHeadingId === h.id;
+                return (
+                  <li key={h.id}>
+                    <a
+                      href={`#${h.id}`}
+                      onClick={() => setIsMobileTocOpen(false)}
+                      className="block border-l-2 py-1.5 pr-1.5"
+                      style={{
+                        paddingLeft: 10 + (h.level - 1) * 12,
+                        borderColor: isActive ? "var(--brand-accent)" : "transparent",
+                        color: isActive ? "var(--brand-accent)" : "var(--text)",
+                        fontWeight: isActive ? 600 : 400,
+                      }}
+                    >
+                      {h.text}
+                    </a>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {/* Mobil/tablet Okuma Ayarları çekmecesi - SAĞDAN açılıyor. Arka plan
+          (backdrop) tıklanınca da kapanıyor. */}
+      {isMobileSettingsOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div
+            className="absolute inset-0"
+            style={{ background: "rgba(0,0,0,0.4)" }}
+            onClick={() => setIsMobileSettingsOpen(false)}
+          />
+          <div
+            className="absolute top-0 right-0 flex h-full w-72 max-w-[85vw] flex-col gap-3 overflow-y-auto p-4"
+            style={{ background: "var(--page-bg)" }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>
+                Okuma Ayarları
+              </span>
+              <button type="button" onClick={() => setIsMobileSettingsOpen(false)} className="rounded p-1 hover:bg-[var(--brand-accent)]/10">
+                <X size={16} style={{ color: "var(--text)" }} />
+              </button>
+            </div>
+            <ReadingSettingsPanel {...readingSettingsProps} />
+          </div>
         </div>
       )}
     </article>

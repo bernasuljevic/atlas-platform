@@ -362,3 +362,69 @@ export async function createWikiPage(accessToken, page) {
 
   return response.json();
 }
+
+// "Tartışma" sekmesi (bkz. DiscussionPanel.jsx) - pageId verilmezse ana
+// sayfadaki genel platform tartışmasının yorumları geliyor. Açık endpoint
+// (getWikiPages ile AYNI desen) ama görünürlük backend'de zaten uygulanıyor.
+export async function getComments(accessToken, pageId) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const query = pageId ? `?pageId=${encodeURIComponent(pageId)}` : "";
+  const response = await fetch(`${API_URL}/api/wiki/comments${query}`, { headers });
+
+  if (!response.ok) {
+    throw new Error("Yorumlar yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function createComment(accessToken, { pageId, content }) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ pageId: pageId ?? null, content }),
+    });
+
+  let response = await doRequest(accessToken);
+
+  // createWikiPage'deki AYNI 401 -> refresh -> tekrar dene deseni.
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Yorum gönderilemedi");
+  }
+
+  return response.json();
+}
+
+export async function deleteComment(accessToken, commentId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/comments/${commentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu yorumu silme yetkin yok.");
+    }
+    throw new Error("Yorum silinemedi");
+  }
+}

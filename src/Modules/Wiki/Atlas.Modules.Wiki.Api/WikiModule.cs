@@ -26,6 +26,7 @@ public static class WikiModule
         // InMemoryWikiPageRepository'deki gibi kendisi depo değil.
         services.AddScoped<IWikiPageRepository, EfWikiPageRepository>();
         services.AddScoped<IWikiFolderRepository, EfWikiFolderRepository>();
+        services.AddScoped<IWikiCommentRepository, EfWikiCommentRepository>();
 
         // AI modülü (ve ileride Wiki'nin görünürlük kuralına ihtiyaç duyan başka
         // bir modül) bu arayüz üzerinden Wiki'nin kuralını KOPYALAMADAN kullanabiliyor.

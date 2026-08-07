@@ -1,3 +1,5 @@
+using Atlas.Modules.Wiki.Application.Comments.Commands;
+using Atlas.Modules.Wiki.Application.Comments.Queries;
 using Atlas.Modules.Wiki.Application.WikiFolders.Commands;
 using Atlas.Modules.Wiki.Application.WikiFolders.Queries;
 using Atlas.Modules.Wiki.Application.WikiPages.Commands;
@@ -100,6 +102,36 @@ public static class WikiEndpoints
             return Results.Ok(new { id = newFolderId });
         })
         .WithName("CreateWikiFolder")
+        .RequireAuthorization();
+
+        // "Tartışma" sekmesi (bkz. HomePage/WikiArticlePage'deki DiscussionPanel).
+        // GetWikiPages ile AYNI desen - açık endpoint (Public sayfalar/genel
+        // tartışma giriş yapmamış bir ziyaretçiye de görünür olabilir), ama
+        // pageId verilmiş VE o sayfa görünmüyorsa Handler boş liste döndürüyor
+        // (bkz. GetCommentsQueryHandler'daki not).
+        group.MapGet("/comments", async (IMediator mediator, Guid? pageId) =>
+        {
+            var comments = await mediator.Send(new GetCommentsQuery(pageId));
+            return Results.Ok(comments);
+        })
+        .WithName("GetComments");
+
+        group.MapPost("/comments", async (CreateCommentCommand command, IMediator mediator) =>
+        {
+            var newCommentId = await mediator.Send(command);
+            return Results.Ok(new { id = newCommentId });
+        })
+        .WithName("CreateComment")
+        .RequireAuthorization();
+
+        // Yetki kuralı istemciden gelmiyor - DeleteWikiPage'deki AYNI desen,
+        // Handler Admin mi yoksa yorumun sahibi mi diye kendisi karar veriyor.
+        group.MapDelete("/comments/{id:guid}", async (Guid id, IMediator mediator) =>
+        {
+            await mediator.Send(new DeleteCommentCommand(id));
+            return Results.NoContent();
+        })
+        .WithName("DeleteComment")
         .RequireAuthorization();
 
         // Admin aracı: AI'ın embedding indeksini (örn. bir bakım hatası ya da

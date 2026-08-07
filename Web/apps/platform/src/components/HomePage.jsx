@@ -6,13 +6,17 @@ import {
   FilePlus2,
   FileText,
   ListChecks,
-  ScrollText,
+  Pin,
+  Plus,
   ShieldCheck,
+  Star,
   Users,
 } from "lucide-react";
 import { getWikiDashboard } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
+import { Badge } from "@atlas/ui/badge";
+import DiscussionPanel from "./DiscussionPanel";
 
 // Kullanıcının verdiği referans mockup'taki (2026-08-04) "kart" deseni - başlıklı,
 // bir sağ üst köşe eylemi (opsiyonel) olabilen, alt satırları divide-y ile
@@ -33,45 +37,61 @@ function Panel({ title, action, children }) {
   );
 }
 
-function StatCard({ icon, label, value, hint }) {
+// Eski büyük 4'lü StatCard ızgarasının yerini aldı (2026-08-07 yerleşim
+// düzenlemesi, spec'in "6. İçerik Öncelikli Tasarım - İstatistik kartları
+// ikinci planda kalmalı" maddesi) - artık karşılama satırının içinde, tek
+// satırlık küçük bir şerit. Kendi kutusu/border'ı YOK, sadece ayraçlarla
+// (divider) ayrılan minik metin grupları - dikkat hâlâ makalelerde.
+function MiniStat({ icon, value, label }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border p-2.5" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-      <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-        style={{ background: "var(--brand-accent-bg)", color: "var(--brand-accent)" }}
-      >
-        {icon}
+    <span className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap" style={{ color: "var(--text)" }}>
+      <span style={{ color: "var(--brand-accent)" }}>{icon}</span>
+      <span className="font-bold" style={{ color: "var(--text-h)" }}>
+        {value}
       </span>
-      <div className="min-w-0">
-        <p className="text-base leading-none font-bold" style={{ color: "var(--text-h)" }}>
-          {value}
-        </p>
-        <p className="mt-0.5 truncate text-[11px] font-medium" style={{ color: "var(--text-h)", opacity: 0.85 }}>
-          {label}
-          {hint && <span className="opacity-70"> · {hint}</span>}
-        </p>
-      </div>
-    </div>
+      <span style={{ opacity: 0.7 }}>{label}</span>
+    </span>
   );
 }
 
-function QuickAccessRow({ icon, title, subtitle, to }) {
+// "Hızlı Erişim" artık büyük bir Panel/kart değil, üstte küçük ikonlu bir
+// düğme şeridi (kullanıcı spec'i, "5. Hızlı Erişim - büyük kartlar yerine
+// küçük aksiyon butonları"). `to` (React Router linki) VEYA `href` (aynı
+// sayfa içinde bir çapaya kaydırmak için, ör. #son-guncellemeler) kabul
+// ediyor - ikisi birden verilmez. `disabled` verilirse (Favoriler/Pinlenenler)
+// tıklanamaz, sadece WikiLayout'taki "Bildirimler (yakında)" Bell
+// düğmesiyle AYNI desende bir title tooltip'i gösterir - gerçek kalıcılık
+// henüz kullanıcı tarafından onaylanmadığı için (bkz. proje notu) şimdilik
+// sadece arayüz iskeleti.
+function QuickActionButton({ icon, label, to, href, disabled }) {
+  const classes =
+    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition hover:bg-[var(--brand-accent)]/10";
+  const style = {
+    borderColor: "var(--border)",
+    color: "var(--text-h)",
+    opacity: disabled ? 0.55 : 1,
+    cursor: disabled ? "not-allowed" : "pointer",
+  };
+
+  if (disabled) {
+    return (
+      <button type="button" className={classes} style={style} title={`${label} (yakında)`}>
+        {icon} {label}
+      </button>
+    );
+  }
+
+  if (href) {
+    return (
+      <a href={href} className={classes} style={style}>
+        {icon} {label}
+      </a>
+    );
+  }
+
   return (
-    <Link to={to} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-[var(--brand-accent)]/5">
-      <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
-        style={{ background: "var(--code-bg)", color: "var(--brand-accent)" }}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-medium" style={{ color: "var(--text-h)" }}>
-          {title}
-        </p>
-        <p className="truncate text-[11px]" style={{ color: "var(--text)", opacity: 0.7 }}>
-          {subtitle}
-        </p>
-      </div>
+    <Link to={to} className={classes} style={style}>
+      {icon} {label}
     </Link>
   );
 }
@@ -128,73 +148,77 @@ function RecentUpdatesBox({ updates }) {
   );
 }
 
-// "Son Eklenen Makaleler" - referans Wikipedia ekran görüntülerindeki
-// ("Haftanın seçkin maddesi" / "Günün kaliteli maddesi" ikilisi - 2026-08-05
-// geri bildirimi) desene göre kuruldu: her makale kendi kutusunda, görsel
-// SIRAYLA sol/sağ değişiyor (bkz. HomePage'deki imageOnRight hesaplaması),
-// özet artık kısaltılmamış (bkz. backend'deki ExcerptLength 420) ya da
-// GERÇEKTEN uzunsa "(Devamı...)" linkiyle bitiyor - MarkdownExcerptHelper
-// kısaltma yaptıysa sonuna "…" ekliyor, o işareti burada "gerçekten uzun mu"
-// sorusunun cevabı olarak kullanıyoruz (backend'e ayrı bir "isTruncated"
-// alanı eklemeye gerek kalmadı).
-function ArticleFeatureBox({ article, imageOnRight }) {
-  const isTruncated = article.excerpt.endsWith("…");
-  const excerptWithoutEllipsis = isTruncated ? article.excerpt.slice(0, -1) : article.excerpt;
+// "Son Eklenen Makaleler" artık ikili büyük kutular yerine yoğun bir kart
+// ızgarası (kullanıcı spec'i, "2. Ana Sayfa Kartları" - referans admin
+// panelindeki gibi ekranı daha verimli dolduran, birbirine yakın yükseklikte
+// kartlar). Kartın TAMAMI tek bir Link - "Devamını oku" bu yüzden kendi
+// başına ayrı bir <a> DEĞİL (bir <a> içine ikinci bir <a> geçersiz HTML
+// olurdu), sadece vurgulu bir metin.
+function ArticleCard({ article }) {
+  const excerpt = article.excerpt.endsWith("…") ? article.excerpt.slice(0, -1) + "…" : article.excerpt;
 
   return (
-    <div
-      className={`flex flex-col gap-4 rounded-lg border p-4 sm:flex-row ${imageOnRight ? "sm:flex-row-reverse" : ""}`}
+    <Link
+      to={`/wiki/${article.id}`}
+      className="group flex h-full flex-col overflow-hidden rounded-lg border transition hover:shadow-md"
       style={{ borderColor: "var(--border)", background: "var(--bg)" }}
     >
       {article.coverImageUrl ? (
-        <Link to={`/wiki/${article.id}`} className="shrink-0 sm:w-56">
-          <img
-            src={article.coverImageUrl}
-            alt=""
-            className="h-40 w-full rounded-md border object-cover sm:h-full"
-            style={{ borderColor: "var(--border)" }}
-          />
-        </Link>
+        <img src={article.coverImageUrl} alt="" className="h-32 w-full object-cover" />
       ) : (
-        <div
-          className="flex h-40 shrink-0 items-center justify-center rounded-md border sm:h-full sm:w-56"
-          style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}
-        >
-          <FileText size={28} style={{ color: "var(--text)", opacity: 0.35 }} />
+        <div className="flex h-32 w-full items-center justify-center" style={{ background: "var(--code-bg)" }}>
+          <FileText size={26} style={{ color: "var(--text)", opacity: 0.3 }} />
         </div>
       )}
-      <div className="min-w-0 flex-1">
-        <Link to={`/wiki/${article.id}`} className="text-lg font-bold hover:underline" style={{ color: "var(--text-h)" }}>
+
+      <div className="flex flex-1 flex-col gap-1.5 p-3.5">
+        <Badge variant="outline" className="w-fit text-[10px] font-normal">
+          {article.departmentName}
+        </Badge>
+
+        <h3 className="line-clamp-2 text-sm leading-snug font-bold group-hover:underline" style={{ color: "var(--text-h)" }}>
           {article.title}
-        </Link>
-        <p className="mt-1.5 text-sm leading-relaxed sm:text-base" style={{ color: "var(--text)" }}>
-          {excerptWithoutEllipsis}
-          {isTruncated && (
-            <>
-              {"… "}
-              <Link to={`/wiki/${article.id}`} className="font-semibold whitespace-nowrap hover:underline" style={{ color: "var(--brand-accent)" }}>
-                (Devamı...)
-              </Link>
-            </>
-          )}
+        </h3>
+
+        <p className="line-clamp-2 flex-1 text-xs leading-relaxed" style={{ color: "var(--text)", opacity: 0.8 }}>
+          {excerpt}
         </p>
-        <p className="mt-2 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
-          {article.createdByEmail ?? "Bilinmiyor"} · {formatUtcTimestamp(article.createdAtUtc)} · {article.departmentName}
-        </p>
+
+        <div
+          className="mt-1 flex items-center justify-between border-t pt-2 text-[11px]"
+          style={{ borderColor: "var(--border)", color: "var(--text)", opacity: 0.65 }}
+        >
+          <span className="truncate">{article.createdByEmail ?? "Bilinmiyor"}</span>
+          <span className="shrink-0">{formatUtcTimestamp(article.createdAtUtc)}</span>
+        </div>
+
+        <span className="text-xs font-semibold" style={{ color: "var(--brand-accent)" }}>
+          Devamını oku →
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }
 
 // Giriş yapınca artık doğrudan makale listesine değil buraya (Dashboard)
-// geliniyor (bkz. App.jsx - /wiki index route'u). Düzen, kullanıcının ikinci
-// geri bildirimine göre yeniden sıralandı (2026-08-05: "son eklenenler en
-// yukarıda olsun sağlı sollu... Son güncellemeler/istatistikler sayfanın en
-// sonunda olsun") - önceki sürümde üstte "Haftanın Seçkin Maddesi" + "Son
-// Güncellemeler" yan yana duruyordu, istatistikler onun hemen altındaydı.
-// Şimdiki sıra: (1) Son Eklenen Makaleler ızgarası (EN ÜSTTE, büyük yazı),
-// (2) Hızlı Erişim + Popüler Kategoriler, (3) Son Güncellemeler + istatistik
-// şeridi (EN ALTTA).
+// geliniyor (bkz. App.jsx - /wiki index route'u).
+//
+// 2026-08-07 - kapsamlı yeniden yerleşim (kullanıcının 8 maddelik "Atlas
+// Wiki Ana Sayfasını Yeniden Tasarla" spec'i + referans admin panel
+// görüntüsü). Önceki sürümdeki geniş boşluklar (max-w-6xl + büyük karşılama
+// kutusu + ikili büyük makale kutuları) kaldırıldı:
+// - Dış kap artık max-w-6xl DEĞİL, w-full (bkz. aşağıdaki kök div) -
+//   WikiLayout'un <main>'i zaten kapsız (bkz. oradaki not), boşluğun asıl
+//   kaynağı burasıydı.
+// - Karşılama kutusu küçültüldü, istatistikler artık ayrı bir kart ızgarası
+//   değil, karşılama satırının İÇİNDE küçük MiniStat'lar.
+// - "Hızlı Erişim" artık bir Panel değil, üstte ince bir ikon şeridi
+//   (QuickActionButton).
+// - Makale ızgarası artık 2 büyük ikili kutu değil, yoğun bir kart ızgarası
+//   (ArticleCard, 3/2/1 sütun - bkz. aşağıdaki grid className).
+// - Son Güncellemeler + Popüler Kategoriler ikinci plana alınıp EN ALTA,
+//   daha küçük şekilde taşındı (spec madde 6: "istatistik kartları ikinci
+//   planda kalmalı").
 function HomePage({ token }) {
   const { isAdmin, fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
   const [dashboard, setDashboard] = useState(null);
@@ -214,20 +238,20 @@ function HomePage({ token }) {
     };
   }, [token]);
 
-  // Artık ayrı bir "öne çıkan tek makale" YOK - hepsi (en yeni dahil) AYNI
-  // ızgarada, eşit ağırlıkta gösteriliyor. Kapak görsele sahip sayfalar
-  // hafifçe önceliklendiriliyor (ızgara tamamen görselsiz kartlarla dolmasın
-  // diye), ama görselsiz sayfalar da (bkz. ArticleGridCard'ın placeholder'ı)
-  // listeden hiç ATILMIYOR.
+  // Kapak görsele sahip sayfalar hafifçe önceliklendiriliyor (ızgara tamamen
+  // görselsiz kartlarla dolmasın diye), ama görselsiz sayfalar da (bkz.
+  // ArticleCard'ın placeholder'ı) listeden hiç ATILMIYOR. 9'a çıkarıldı
+  // (eskiden 6) - kart ızgarası artık daha yoğun (xl:grid-cols-3), 9 kart
+  // 3 satırı düzgün dolduruyor.
   const gridArticles = [...(dashboard?.recentlyAdded ?? [])]
     .sort((a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0))
-    .slice(0, 6);
+    .slice(0, 9);
   const recentUpdates = (dashboard?.recentlyUpdated ?? []).slice(0, 5);
 
   const [activeTab, setActiveTab] = useState("home");
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-2 text-left md:px-6">
+    <div className="flex w-full flex-col gap-4 px-4 py-2 text-left md:px-6">
       {/* Wikipedia Subtabs Bar */}
       <div className="flex flex-wrap items-center justify-between border-b" style={{ borderColor: "var(--border)" }}>
         <div className="flex items-center gap-1">
@@ -247,59 +271,87 @@ function HomePage({ token }) {
           </button>
         </div>
 
+        {/* Kullanıcı geri bildirimi (2026-08-07, YEDİNCİ geçiş - "yeni sayfa
+            yazısı iki tane olmuş... okunun yanındaki kalsın işareti olsun
+            sadece artı şeklinde") - "Yeni Sayfa" hem burada (Oku'nun
+            yanında) HEM aşağıdaki Hızlı Erişim şeridinde tekrarlanıyordu.
+            Aşağıdakinden kaldırıldı, burası kalıp metin yerine sade bir "+"
+            ikonuna indirildi. */}
         <div className="flex items-center gap-1 text-xs font-medium">
           <span className="wiki-tab active">Oku</span>
           <Link to="/wiki/pages" className="wiki-tab">
             Tüm Sayfalar
           </Link>
-          <Link to="/wiki/new" className="wiki-tab">
-            Yeni Sayfa
+          <Link to="/wiki/new" className="wiki-tab" title="Yeni Sayfa" aria-label="Yeni Sayfa">
+            <Plus size={14} />
           </Link>
         </div>
       </div>
 
-      {/* Wikipedia Style Welcome Box */}
-      <div
-        className="rounded-lg border p-4 shadow-sm"
-        style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="mt-0 mb-1 text-xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
-              Atlas Wiki'ye hoş geldiniz{fullName ? `, ${fullName}` : ""}!
-            </h1>
-            <p className="text-xs font-normal" style={{ color: "var(--text)" }}>
-              Şirket bilgi platformuna hoş geldiniz. Aradığınız tüm bilgiye tek noktadan ulaşabilirsiniz.
-            </p>
-          </div>
-          {dashboard && (
-            <div className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold" style={{ borderColor: "var(--border)", background: "var(--code-bg)" }}>
-              <span style={{ color: "var(--text)" }}>Toplam Sayfa Sayısı:</span>
-              <span style={{ color: "var(--brand-accent)" }}>{dashboard.totalPageCount}</span>
-            </div>
-          )}
+      {/* Hızlı Erişim şeridi - spec madde 5, büyük kartlar yerine küçük
+          ikonlu butonlar, üst tarafta. "Yeni Sayfa" (yukarıdaki tab çubuğunda
+          zaten var) ve "Gelişmiş Arama" (üst bardaki arama kutusuyla AYNI yere
+          - /wiki/pages - gidiyordu, "Tüm Sayfalar" ile birebir aynıydı)
+          kullanıcı geri bildirimiyle (2026-08-07) kaldırıldı. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <QuickActionButton icon={<ListChecks size={14} />} label="Tüm Sayfalar" to="/wiki/pages" />
+        <QuickActionButton icon={<Clock size={14} />} label="Son Güncellenenler" href="#son-guncellemeler" />
+        <QuickActionButton icon={<Star size={14} />} label="Favoriler" disabled />
+        <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" disabled />
+        {isAdmin && <QuickActionButton icon={<ShieldCheck size={14} />} label="Audit Log" to="/audit-log" />}
+      </div>
+
+      {/* Küçültülmüş karşılama satırı - spec madde 3, "Karşılama alanı
+          küçültülsün... altında direkt içerikler başlasın". Eskiden ayrı bir
+          kart + tek bir "Toplam Sayfa Sayısı" rozeti vardı, alttaki 4'lü
+          StatCard ızgarası ayrı bir bölümdü - üçü de burada, tek satırlık
+          ince bir şeride indirildi. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: "var(--border)" }}>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+            Atlas Wiki'ye hoş geldiniz{fullName ? `, ${fullName}` : ""}!
+          </h1>
+          <p className="text-xs" style={{ color: "var(--text)", opacity: 0.75 }}>
+            Şirket bilgi platformuna hoş geldiniz - aradığınız tüm bilgiye tek noktadan ulaşın.
+          </p>
         </div>
+        {dashboard && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <MiniStat icon={<FileText size={13} />} value={dashboard.totalPageCount} label="toplam makale" />
+            <MiniStat icon={<FilePlus2 size={13} />} value={dashboard.addedThisWeekCount} label="bu hafta eklendi" />
+            <MiniStat icon={<Clock size={13} />} value={dashboard.updatedThisWeekCount} label="bu hafta güncellendi" />
+            {ownDepartment && (
+              <MiniStat icon={<Users size={13} />} value={dashboard.departmentSpecificCount} label={ownDepartment} />
+            )}
+          </div>
+        )}
       </div>
 
       {error && <p style={{ color: "red" }} className="text-xs">{error}</p>}
 
       {activeTab === "talk" ? (
-        <div className="rounded-lg border p-6 text-center" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-          <h2 className="text-base font-semibold" style={{ color: "var(--text-h)" }}>
+        <div className="rounded-lg border p-6" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+          <h2 className="mb-1 text-base font-semibold" style={{ color: "var(--text-h)" }}>
             Anasayfa Tartışması
           </h2>
-          <p className="mt-2 text-xs" style={{ color: "var(--text)" }}>
+          <p className="mb-4 text-xs" style={{ color: "var(--text)", opacity: 0.7 }}>
             Genel platform konuları ve duyurular için alan.
           </p>
+          {/* pageId BİLEREK verilmiyor - bu, tek bir sayfaya değil PLATFORMUN
+              GENELİNE ait yorumlar demek (bkz. backend'deki Comment.PageId
+              notu). */}
+          <DiscussionPanel token={token} />
         </div>
       ) : dashboard && (
-        <div className="flex flex-col gap-5">
-          {/* (1) EN ÜSTTE - kapak görselli, büyük yazılı makale ızgarası
-              ("sağlı sollu" - çok sütunlu grid). */}
+        <div className="flex flex-col gap-6">
+          {/* (1) EN ÜSTTE, en dikkat çeken alan - yoğun makale kart ızgarası
+              (spec madde 2 + 6: "en dikkat çeken alan makaleler olmalı"). */}
           {gridArticles.length > 0 && (
-            <Panel
-              title="Son Eklenen Makaleler"
-              action={
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+                  Son Eklenen Makaleler
+                </h2>
                 <Link
                   to="/wiki/pages"
                   className="flex items-center gap-1 text-xs font-medium hover:opacity-80"
@@ -307,40 +359,21 @@ function HomePage({ token }) {
                 >
                   Tümünü Gör <ArrowRight size={13} />
                 </Link>
-              }
-            >
-              <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
-                {gridArticles.map((a, idx) => (
-                  <ArticleFeatureBox key={a.id} article={a} imageOnRight={idx % 2 === 1} />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {gridArticles.map((a) => (
+                  <ArticleCard key={a.id} article={a} />
                 ))}
               </div>
-            </Panel>
+            </section>
           )}
 
-          {/* (2) Hızlı Erişim + Popüler Kategoriler, yan yana. */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-            <Panel title="Hızlı Erişim">
-              <QuickAccessRow
-                icon={<ListChecks size={15} />}
-                title="Tüm Sayfalar"
-                subtitle="Tüm içeriklere göz atın"
-                to="/wiki/pages"
-              />
-              <QuickAccessRow
-                icon={<ScrollText size={15} />}
-                title="Yeni Sayfa"
-                subtitle="Yeni bir makale oluşturun"
-                to="/wiki/new"
-              />
-              {isAdmin && (
-                <QuickAccessRow
-                  icon={<ShieldCheck size={15} />}
-                  title="Audit Log"
-                  subtitle="Sistem kayıtlarını görüntüleyin"
-                  to="/audit-log"
-                />
-              )}
-            </Panel>
+          {/* (2) EN ALTTA, ikinci planda - Son Güncellemeler + Popüler
+              Kategoriler (spec madde 6: "istatistik kartları ikinci planda
+              kalmalı"). id="son-guncellemeler" - üstteki Hızlı Erişim
+              şeridindeki "Son Güncellenenler" düğmesi buraya kaydırıyor. */}
+          <div id="son-guncellemeler" className="grid grid-cols-1 gap-5 scroll-mt-4 lg:grid-cols-2">
+            {recentUpdates.length > 0 && <RecentUpdatesBox updates={recentUpdates} />}
 
             {dashboard.popularTags.length > 0 && (
               <Panel title="Popüler Kategoriler">
@@ -348,19 +381,6 @@ function HomePage({ token }) {
                   <PopularTagRow key={t.tag} tag={t.tag} count={t.count} />
                 ))}
               </Panel>
-            )}
-          </div>
-
-          {/* (3) EN SONDA - Son Güncellemeler kutusu + istatistik şeridi
-              (Toplam Makale / Son Eklenen / Son Güncellenen). */}
-          {recentUpdates.length > 0 && <RecentUpdatesBox updates={recentUpdates} />}
-
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-            <StatCard icon={<FileText size={15} />} label="Toplam Makale" value={dashboard.totalPageCount} hint="Tüm içerikler" />
-            <StatCard icon={<FilePlus2 size={15} />} label="Son Eklenen" value={dashboard.addedThisWeekCount} hint="Bu hafta" />
-            <StatCard icon={<Clock size={15} />} label="Son Güncellenen" value={dashboard.updatedThisWeekCount} hint="Bu hafta" />
-            {ownDepartment && (
-              <StatCard icon={<Users size={15} />} label="Sizin İçerikleriniz" value={dashboard.departmentSpecificCount} hint={ownDepartment} />
             )}
           </div>
         </div>

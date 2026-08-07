@@ -10,6 +10,7 @@ import HomePage from "./components/HomePage";
 import WikiBoard from "./components/WikiBoard";
 import WikiArticlePage from "./components/WikiArticlePage";
 import WikiEditorPage from "./components/WikiEditorPage";
+import WikiFolderBrowsePage from "./components/WikiFolderBrowsePage";
 import AuditLogPage from "./components/AuditLogPage";
 
 // Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
@@ -67,6 +68,11 @@ function WikiEditorRoute() {
   return <WikiEditorPage token={token} />;
 }
 
+function WikiFolderBrowseRoute() {
+  const { token } = useAuth();
+  return <WikiFolderBrowsePage token={token} />;
+}
+
 function AuditLogRoute() {
   const { token } = useAuth();
   return <AuditLogPage token={token} />;
@@ -99,6 +105,11 @@ function App() {
               <Route index element={<WikiIndexRoute />} />
               <Route path="pages" element={<WikiPagesRoute />} />
               <Route path="new" element={<WikiEditorRoute />} />
+              {/* Breadcrumb'taki departman/klasör segmentlerinin gittiği yer
+                  (bkz. WikiFolderBrowsePage'deki not) - folderId opsiyonel,
+                  yoksa departmanın kökü gösteriliyor. */}
+              <Route path="browse/:departmentName" element={<WikiFolderBrowseRoute />} />
+              <Route path="browse/:departmentName/:folderId" element={<WikiFolderBrowseRoute />} />
               <Route path=":id" element={<WikiArticleRoute />} />
               <Route path=":id/edit" element={<WikiEditorRoute />} />
             </Route>
