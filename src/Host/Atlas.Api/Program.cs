@@ -6,6 +6,7 @@ using Atlas.Api.Observability;
 using Atlas.Modules.AI.Api;
 using Atlas.Modules.Audit.Api;
 using Atlas.Modules.Auth.Api;
+using Atlas.Modules.Documents.Api;
 using Atlas.Modules.Notifications.Api;
 using Atlas.Modules.Vault.Api;
 using Atlas.Modules.Wiki.Api;
@@ -43,6 +44,9 @@ builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddAIModule(builder.Configuration);
 builder.Services.AddAuditModule(builder.Configuration);
 builder.Services.AddVaultModule(builder.Configuration);
+// P3 Gün 2 - henüz sadece storage+persistence bağlı, endpoint YOK (bkz.
+// DocumentsModule.cs'teki not).
+builder.Services.AddDocumentsModule(builder.Configuration);
 
 // CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)
 // istek atabilmesi için tarayıcıya "bu adrese izin var" demeliyiz - yoksa tarayıcı
@@ -219,6 +223,7 @@ app.MigrateWikiDatabase();
 app.MigrateAiDatabase();
 app.MigrateAuditDatabase();
 app.MigrateVaultDatabase();
+app.MigrateDocumentsDatabase();
 
 // ============================================================
 // MODÜL ENDPOINT KAYITLARI
@@ -229,6 +234,8 @@ app.MapNotificationsEndpoints();
 app.MapAIEndpoints();
 app.MapAuditEndpoints();
 app.MapVaultEndpoints();
+// P3 Gün 3 - şimdilik sadece upload; liste/detay/indirme Gün 4'te gelecek.
+app.MapDocumentsEndpoints();
 
 // Basit bir sağlık kontrolü - "API gerçekten ayakta mı?" sorusuna cevap
 app.MapGet("/", () => Results.Ok(new

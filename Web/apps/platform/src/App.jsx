@@ -16,6 +16,9 @@ import WikiPinnedPage from "./components/WikiPinnedPage";
 import AuditLogPage from "./components/AuditLogPage";
 import VaultPage from "./components/VaultPage";
 import VaultEntryFormPage from "./components/VaultEntryFormPage";
+import DocumentLibraryPage from "./components/DocumentLibraryPage";
+import DocumentUploadPage from "./components/DocumentUploadPage";
+import DocumentDetailPage from "./components/DocumentDetailPage";
 
 // Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
 function LoginRoute() {
@@ -110,6 +113,24 @@ function VaultEntryFormRoute() {
   return <VaultEntryFormPage token={token} />;
 }
 
+// Vault/Audit Log ile AYNI gerekçeyle Wiki'nin dışında, üst seviye bir route -
+// Document, WikiPage'e FK'siz, tamamen bağımsız bir entity (bkz. Documents
+// modülünün tasarım kararı).
+function DocumentLibraryRoute() {
+  const { token } = useAuth();
+  return <DocumentLibraryPage token={token} />;
+}
+
+function DocumentUploadRoute() {
+  const { token } = useAuth();
+  return <DocumentUploadPage token={token} />;
+}
+
+function DocumentDetailRoute() {
+  const { token } = useAuth();
+  return <DocumentDetailPage token={token} />;
+}
+
 // "/" hiçbir zaman kendi başına bir sayfa değil - sadece giriş durumuna göre
 // doğru yere yönlendiren bir trafik yönlendiricisi.
 function RootRedirect() {
@@ -155,6 +176,11 @@ function App() {
             <Route path="/vault" element={<VaultRoute />} />
             <Route path="/vault/new" element={<VaultEntryFormRoute />} />
             <Route path="/vault/:id/edit" element={<VaultEntryFormRoute />} />
+            {/* /documents/upload'ın /documents/:id ile ÇAKIŞMAMASI için AYNI
+                static-önce-dynamic sırası. */}
+            <Route path="/documents" element={<DocumentLibraryRoute />} />
+            <Route path="/documents/upload" element={<DocumentUploadRoute />} />
+            <Route path="/documents/:id" element={<DocumentDetailRoute />} />
           </Route>
         </Routes>
       </AuthProvider>

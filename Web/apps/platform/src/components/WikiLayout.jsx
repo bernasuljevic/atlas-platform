@@ -214,6 +214,16 @@ function WikiLayout({ token, onLogout }) {
               >
                 Şifre Kasası
               </Link>
+              {/* Vault'la AYNI gerekçeyle Admin'e özel değil - Document Library
+                  herkesin gezip görünürlük kuralına göre erişebildiği bir alan. */}
+              <Link
+                to="/documents"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="block px-3 py-2 text-sm hover:bg-[var(--brand-accent)]/10"
+                style={{ color: "var(--text)" }}
+              >
+                Belgeler
+              </Link>
               {isAdmin && (
                 <Link
                   to="/audit-log"

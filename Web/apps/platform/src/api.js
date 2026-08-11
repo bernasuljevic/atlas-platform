@@ -405,6 +405,163 @@ export async function createComment(accessToken, { pageId, content }) {
   return response.json();
 }
 
+// Belgeler (Documents modülü) - Faz 3/Gün 5. Liste/detay GetWikiPages'teki
+// AYNI "token opsiyonel, görünürlük backend'de filtrelenir" desenini
+// kullanıyor - indirme ise Vault'un reveal'ı gibi authenticated.
+export async function getDocuments(accessToken, { departmentName, status, pageNumber = 1, pageSize = 10 } = {}) {
+  const params = new URLSearchParams({ pageNumber, pageSize });
+  if (departmentName) params.set("departmentName", departmentName);
+  if (status) params.set("status", status);
+
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/documents?${params.toString()}`, { headers });
+
+  if (!response.ok) {
+    throw new Error("Belgeler yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function getDocumentById(accessToken, id) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/documents/${id}`, { headers });
+
+  if (response.status === 404) {
+    throw new Error("Bu belge artık mevcut değil ya da görme yetkin yok.");
+  }
+  if (!response.ok) {
+    throw new Error("Belge yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// multipart/form-data - JSON.stringify KULLANMIYORUZ, gerçek bir dosya
+// (File nesnesi) taşıyor. Content-Type header'ını BİLEREK elle koymuyoruz -
+// tarayıcı FormData'yı görünce doğru "multipart/form-data; boundary=..."
+// değerini kendisi ekliyor (elle koyarsak boundary eksik kalır, istek
+// bozulur).
+export async function uploadDocument(accessToken, { file, title, visibility, departmentName, description, tags }) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", title);
+  formData.append("visibility", visibility);
+  if (departmentName) formData.append("departmentName", departmentName);
+  if (description) formData.append("description", description);
+  if (tags) formData.append("tags", tags);
+
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? body?.detail ?? "Belge yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function updateDocument(accessToken, id, data) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu belgeyi düzenleme yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Belge güncellenemedi");
+  }
+}
+
+export async function deleteDocument(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu belgeyi silme yetkin yok.");
+    }
+    throw new Error("Belge silinemedi");
+  }
+}
+
+// GÜVENLİK: indirme linkini basit bir <a href> yapmıyoruz - token URL'e
+// KOYULMUYOR (query string'de bir JWT taşımak, tarayıcı geçmişinde/proxy
+// loglarında sızabilirdi). Bunun yerine dosyayı authenticated bir fetch ile
+// blob olarak çekip, tarayıcının kendi "indir" mekanizmasını (geçici bir
+// object URL + tıklanan bir <a>) TETİKLİYORUZ.
+export async function downloadDocument(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/${id}/download`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Belge indirilemedi");
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  const fileName = match ? match[1] : "belge";
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 // Favoriler/Pinler - eskiden TAMAMEN localStorage'daydı (bkz. WikiArticlePage.jsx'in
 // eski togglePin/toggleFavorite'i), artık gerçek, kullanıcı bazlı bir backend
 // tablosu. Toggle endpoint'leri dönüş değerinde işlemden SONRAKİ durumu (bool)
