@@ -13,6 +13,8 @@ public class WikiDbContext : DbContext
     public DbSet<WikiFolder> WikiFolders => Set<WikiFolder>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<UserPageFavorite> UserPageFavorites => Set<UserPageFavorite>();
+    public DbSet<UserPagePin> UserPagePins => Set<UserPagePin>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

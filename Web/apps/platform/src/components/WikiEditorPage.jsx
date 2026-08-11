@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
+  Code2,
+  Heading2,
+  Image as ImageIcon,
+  Info,
+  ListChecks,
+  Minus,
+  Table2,
+  Video,
+} from "lucide-react";
+import {
   createWikiFolder,
   createWikiPage,
   getWikiFolderTree,
@@ -15,6 +25,7 @@ import { Input } from "@atlas/ui/input";
 import { Label } from "@atlas/ui/label";
 import { Textarea } from "@atlas/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@atlas/ui/radio-group";
+import SlashCommandMenu from "./SlashCommandMenu";
 
 const CONTENT_TEXTAREA_ID = "wiki-editor-content";
 const LINK_SEARCH_DEBOUNCE_MS = 250;
@@ -24,6 +35,49 @@ const LINK_SEARCH_DEBOUNCE_MS = 250;
 // elle dolduruyor.
 const TABLE_TEMPLATE =
   "\n| Sütun 1 | Sütun 2 |\n| --- | --- |\n| Değer 1 | Değer 2 |\n";
+
+// Faz 1 (2026-08-08, "Atlas İçerik Sistemi" spec'i - "3.3 Callout blokları") -
+// dört tip, markdown.jsx'teki CALLOUT_CONFIG ile BİREBİR aynı anahtar/sıra
+// (`info`/`warning`/`error`/`success`) - buradaki değer, üretilen ":::<value>"
+// açılış satırına doğrudan yazılıyor, ikisi senkron kalmalı.
+const CALLOUT_TYPE_OPTIONS = [
+  { value: "info", label: "💡 Bilgi" },
+  { value: "warning", label: "⚠️ Uyarı" },
+  { value: "error", label: "❌ Hata" },
+  { value: "success", label: "✅ Başarılı" },
+];
+
+// Faz 2 (2026-08-11, "Kapsamlı Geliştirme Paketi" - editör blok genişletmesi
+// v2) - "/" slash-command menüsünün listesi. Her öğe toolbar düğmelerinin
+// ZATEN kullandığı before/after/placeholder üçlüsüyle applyToolbarInsert'i
+// tetikliyor (bkz. handleSlashSelect) - YENİ bir ekleme mekanizması icat
+// edilmedi, sadece toolbar'ın dışında ikinci bir tetikleyici eklendi.
+// Dosya-referans (`/file`) BİLEREK YOK - Documents modülü henüz kurulmadı,
+// referans verilecek gerçek bir belge/GUID yok (bkz. proje notu).
+const SLASH_ITEMS = [
+  { key: "heading", label: "Başlık", icon: Heading2, before: "## ", after: "", placeholder: "Başlık" },
+  { key: "code", label: "Kod Bloğu", icon: Code2, before: "```\n", after: "\n```", placeholder: "kod" },
+  { key: "table", label: "Tablo", icon: Table2, before: TABLE_TEMPLATE, after: "", placeholder: "" },
+  { key: "callout", label: "Callout", icon: Info, before: ":::info\n", after: "\n:::", placeholder: "Metin" },
+  { key: "checklist", label: "Checklist", icon: ListChecks, before: "- [ ] ", after: "", placeholder: "Yapılacak" },
+  { key: "divider", label: "Ayraç", icon: Minus, before: "\n---\n", after: "", placeholder: "" },
+  {
+    key: "video",
+    label: "Video",
+    icon: Video,
+    before: ":::video\n",
+    after: "\n:::",
+    placeholder: "https://www.youtube.com/watch?v=... veya video dosyası URL'si",
+  },
+  {
+    key: "image",
+    label: "Resim (Sola Hizalı)",
+    icon: ImageIcon,
+    before: ":::image-left\n![",
+    after: "](https://...)\n:::",
+    placeholder: "Açıklama",
+  },
+];
 
 // Textarea'ya React ref yerine DOM id'siyle erişiyoruz - @atlas/ui/textarea
 // forwardRef kullanmıyor, ref buraya kadar güvenilir şekilde ulaşmayabilirdi.
@@ -91,6 +145,13 @@ function WikiEditorPage({ token }) {
   const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
   const [isImagePopoverOpen, setIsImagePopoverOpen] = useState(false);
   const [headingLevel, setHeadingLevel] = useState(2);
+  const [calloutType, setCalloutType] = useState("info");
+  const [imageAlign, setImageAlign] = useState("left");
+  // Slash-command menüsü - triggerPos bir state DEĞİL bir ref, çünkü
+  // handleSlashSelect içinde SENKRON olarak (bir sonraki render'ı beklemeden)
+  // okunması gerekiyor - "/" karakterinin textarea'daki TAM konumu.
+  const [isSlashMenuOpen, setIsSlashMenuOpen] = useState(false);
+  const slashTriggerPosRef = useRef(null);
   const [linkText, setLinkText] = useState("");
   const [linkTarget, setLinkTarget] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -162,6 +223,57 @@ function WikiEditorPage({ token }) {
     // Textarea kontrollü olduğu için değer state güncellenince yeniden render
     // oluyor - imleç konumunu geri koymak için bir sonraki tick'i bekliyoruz.
     setTimeout(() => restoreFocusAndCursor(result.cursorPos), 0);
+  }
+
+  // İmleç bir satırın EN BAŞINDA "/" yazınca slash menüsünü açıyor - piksel
+  // konumu takip ETMİYORUZ (bkz. SlashCommandMenu.jsx'teki mimari not), sadece
+  // "kullanıcı yeni bir satırın başında / yazdı mı" kontrolü yeterli.
+  // Kullanıcı başka bir şey yazmaya devam ederse (örn. "/x") menü kapanıyor -
+  // yeniden "/" yazması gerekir.
+  function handleContentChange(e) {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setContent(value);
+
+    const charBeforeCursor = value[cursorPos - 1];
+    const charBeforeThat = value[cursorPos - 2];
+    const isAtLineStart = charBeforeThat === undefined || charBeforeThat === "\n";
+
+    if (charBeforeCursor === "/" && isAtLineStart) {
+      slashTriggerPosRef.current = cursorPos - 1;
+      setIsSlashMenuOpen(true);
+      setIsLinkPopoverOpen(false);
+      setIsImagePopoverOpen(false);
+    } else if (isSlashMenuOpen) {
+      setIsSlashMenuOpen(false);
+    }
+  }
+
+  function handleSlashSelect(item) {
+    const triggerPos = slashTriggerPosRef.current;
+    const el = document.getElementById(CONTENT_TEXTAREA_ID);
+    setIsSlashMenuOpen(false);
+    if (!el || triggerPos === null) return;
+
+    // Önce tetikleyici "/" karakterini metinden çıkarıyoruz - kullanıcı bir
+    // blok seçtiğinde geride "/video" gibi bir kalıntı kalmasın.
+    const withoutSlash = el.value.slice(0, triggerPos) + el.value.slice(triggerPos + 1);
+    setContent(withoutSlash);
+
+    // insertAtCursor, textarea'nın GÜNCEL DOM value'sunu okuyor - controlled
+    // bileşenin yeni değeri (withoutSlash) render'a yansıyana kadar bir tık
+    // bekliyoruz (applyToolbarInsert'teki AYNI setTimeout(...,0) deseni).
+    setTimeout(() => {
+      const el2 = document.getElementById(CONTENT_TEXTAREA_ID);
+      if (!el2) return;
+      el2.focus();
+      el2.setSelectionRange(triggerPos, triggerPos);
+      const result = insertAtCursor(item.before, item.after, item.placeholder);
+      if (result) {
+        setContent(result.newValue);
+        setTimeout(() => restoreFocusAndCursor(result.cursorPos), 0);
+      }
+    }, 0);
   }
 
   function handleInsertLink() {
@@ -350,10 +462,88 @@ function WikiEditorPage({ token }) {
             <Button type="button" variant="ghost" size="sm" onClick={() => applyToolbarInsert(TABLE_TEMPLATE, "", "")}>
               Tablo
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setIsLinkPopoverOpen((o) => !o); setIsImagePopoverOpen(false); }}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyToolbarInsert("`", "`", "kod")}>
+              Satır İçi Kod
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyToolbarInsert("- [ ] ", "", "Yapılacak")}>
+              ☑ Checklist
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => applyToolbarInsert("\n---\n", "", "")}>
+              Ayraç
+            </Button>
+            {/* Callout - önce tipi seç (heading seviyesi seçiciyle AYNI desen),
+                sonra ":::<tip>" ... ":::" sarmalayıcısını ekle (bkz.
+                markdown.jsx'teki CalloutBlock). */}
+            <select
+              value={calloutType}
+              onChange={(e) => setCalloutType(e.target.value)}
+              className="rounded border px-1.5 py-1 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }}
+            >
+              {CALLOUT_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => applyToolbarInsert(`:::${calloutType}\n`, "\n:::", "Metin")}
+            >
+              Callout Ekle
+            </Button>
+            {/* Video - tek bir şablon insert (Callout/Checklist/Ayraç ile AYNI
+                desen, popover YOK) - kullanıcı yer tutucu URL'yi elle
+                değiştiriyor. YouTube/mp4/webm/ogg/mov otomatik algılanıyor
+                (bkz. markdown.jsx'teki VideoBlock), tanınmayan bir URL sade
+                bir "Videoyu Aç" linkine düşüyor. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                applyToolbarInsert(":::video\n", "\n:::", "https://www.youtube.com/watch?v=... veya video dosyası URL'si")
+              }
+            >
+              🎬 Video
+            </Button>
+            {/* Hizalı resim - metnin ImageBlock'un aksine (her zaman ortada,
+                sabit boyutta) metnin YANINA konup metnin etrafından dolanması
+                gereken durumlar için (bkz. markdown.jsx'teki AlignedImageBlock). */}
+            <select
+              value={imageAlign}
+              onChange={(e) => setImageAlign(e.target.value)}
+              className="rounded border px-1.5 py-1 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }}
+            >
+              <option value="left">Sol</option>
+              <option value="center">Orta</option>
+              <option value="right">Sağ</option>
+            </select>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => applyToolbarInsert(`:::image-${imageAlign}\n![`, "](https://...)\n:::", "Açıklama")}
+            >
+              🖼️ Hizalı Resim
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setIsLinkPopoverOpen((o) => !o); setIsImagePopoverOpen(false); setIsSlashMenuOpen(false); }}
+            >
               🔗 Link
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setIsImagePopoverOpen((o) => !o); setIsLinkPopoverOpen(false); }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => { setIsImagePopoverOpen((o) => !o); setIsLinkPopoverOpen(false); setIsSlashMenuOpen(false); }}
+            >
               🖼️ Resim
             </Button>
           </div>
@@ -449,10 +639,12 @@ function WikiEditorPage({ token }) {
             </div>
           )}
 
+          {isSlashMenuOpen && <SlashCommandMenu items={SLASH_ITEMS} onSelect={handleSlashSelect} />}
+
           <Textarea
             id={CONTENT_TEXTAREA_ID}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange}
             disabled={isSaving}
             className="min-h-64 rounded-t-none"
           />

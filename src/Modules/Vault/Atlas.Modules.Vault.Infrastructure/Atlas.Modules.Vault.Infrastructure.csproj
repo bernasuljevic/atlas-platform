@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Atlas.Modules.Vault.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Microsoft.AspNetCore.DataProtection AYRI bir NuGet paketi olarak
+       EKLENMEDİ - Auth.Infrastructure'daki HttpCurrentUserAccessor ile AYNI
+       desen: Data Protection zaten paylaşılan ASP.NET Core framework'ünün
+       bir parçası, FrameworkReference yeterli. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Atlas.Modules.Vault.Domain\Atlas.Modules.Vault.Domain.csproj" />
+    <ProjectReference Include="..\Atlas.Modules.Vault.Application\Atlas.Modules.Vault.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>

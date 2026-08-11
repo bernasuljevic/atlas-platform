@@ -202,6 +202,28 @@ function WikiLayout({ token, onLogout }) {
               className="absolute top-full right-0 z-20 mt-2 w-44 overflow-hidden rounded-lg border shadow-lg"
               style={{ borderColor: "var(--border)", background: "var(--bg)" }}
             >
+              {/* Audit Log'un AKSİNE Admin'e özel değil - Vault, departman/rol
+                  kavramından bağımsız KİŞİSEL bir kasa (bkz. Vault'un
+                  "sadece oluşturan kullanıcı + Admin görebilir" yetki kararı),
+                  o yüzden her giriş yapmış kullanıcı burada görüyor. */}
+              <Link
+                to="/vault"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="block px-3 py-2 text-sm hover:bg-[var(--brand-accent)]/10"
+                style={{ color: "var(--text)" }}
+              >
+                Şifre Kasası
+              </Link>
+              {/* Vault'la AYNI gerekçeyle Admin'e özel değil - Document Library
+                  herkesin gezip görünürlük kuralına göre erişebildiği bir alan. */}
+              <Link
+                to="/documents"
+                onClick={() => setIsUserMenuOpen(false)}
+                className="block px-3 py-2 text-sm hover:bg-[var(--brand-accent)]/10"
+                style={{ color: "var(--text)" }}
+              >
+                Belgeler
+              </Link>
               {isAdmin && (
                 <Link
                   to="/audit-log"

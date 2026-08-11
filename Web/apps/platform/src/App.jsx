@@ -11,7 +11,14 @@ import WikiBoard from "./components/WikiBoard";
 import WikiArticlePage from "./components/WikiArticlePage";
 import WikiEditorPage from "./components/WikiEditorPage";
 import WikiFolderBrowsePage from "./components/WikiFolderBrowsePage";
+import WikiFavoritesPage from "./components/WikiFavoritesPage";
+import WikiPinnedPage from "./components/WikiPinnedPage";
 import AuditLogPage from "./components/AuditLogPage";
+import VaultPage from "./components/VaultPage";
+import VaultEntryFormPage from "./components/VaultEntryFormPage";
+import DocumentLibraryPage from "./components/DocumentLibraryPage";
+import DocumentUploadPage from "./components/DocumentUploadPage";
+import DocumentDetailPage from "./components/DocumentDetailPage";
 
 // Zaten giriş yapılmışsa /login'e gitmeye çalışmak anlamsız - /wiki'ye yönlendiriyoruz.
 function LoginRoute() {
@@ -73,9 +80,55 @@ function WikiFolderBrowseRoute() {
   return <WikiFolderBrowsePage token={token} />;
 }
 
+// Audit Log/Vault'un AKSİNE bunlar Wiki İÇERİĞİ (kullanıcının kendi wiki
+// sayfalarının bir alt kümesi) - o yüzden top-level DEĞİL, /wiki altında
+// nested, WikiLayout'un sidebar/header'ını (Vault/Audit Log gibi ayrı bir
+// "araç" sayfası değil, Wiki'nin doğal bir parçası) paylaşıyor.
+function WikiFavoritesRoute() {
+  const { token } = useAuth();
+  return <WikiFavoritesPage token={token} />;
+}
+
+function WikiPinnedRoute() {
+  const { token } = useAuth();
+  return <WikiPinnedPage token={token} />;
+}
+
 function AuditLogRoute() {
   const { token } = useAuth();
   return <AuditLogPage token={token} />;
+}
+
+// Audit Log ile AYNI gerekçeyle Wiki'nin dışında, üst seviye bir route -
+// Vault, Wiki içeriği DEĞİL (bkz. Vault modülünün "WikiPage değil, tamamen
+// ayrı bir entity" tasarım kararı), WikiLayout'un sidebar/klasör ağacı
+// içinde görünmesi kavramsal olarak yanlış olurdu.
+function VaultRoute() {
+  const { token } = useAuth();
+  return <VaultPage token={token} />;
+}
+
+function VaultEntryFormRoute() {
+  const { token } = useAuth();
+  return <VaultEntryFormPage token={token} />;
+}
+
+// Vault/Audit Log ile AYNI gerekçeyle Wiki'nin dışında, üst seviye bir route -
+// Document, WikiPage'e FK'siz, tamamen bağımsız bir entity (bkz. Documents
+// modülünün tasarım kararı).
+function DocumentLibraryRoute() {
+  const { token } = useAuth();
+  return <DocumentLibraryPage token={token} />;
+}
+
+function DocumentUploadRoute() {
+  const { token } = useAuth();
+  return <DocumentUploadPage token={token} />;
+}
+
+function DocumentDetailRoute() {
+  const { token } = useAuth();
+  return <DocumentDetailPage token={token} />;
 }
 
 // "/" hiçbir zaman kendi başına bir sayfa değil - sadece giriş durumuna göre
@@ -110,10 +163,24 @@ function App() {
                   yoksa departmanın kökü gösteriliyor. */}
               <Route path="browse/:departmentName" element={<WikiFolderBrowseRoute />} />
               <Route path="browse/:departmentName/:folderId" element={<WikiFolderBrowseRoute />} />
+              <Route path="favorites" element={<WikiFavoritesRoute />} />
+              <Route path="pinned" element={<WikiPinnedRoute />} />
               <Route path=":id" element={<WikiArticleRoute />} />
               <Route path=":id/edit" element={<WikiEditorRoute />} />
             </Route>
             <Route path="/audit-log" element={<AuditLogRoute />} />
+            {/* /vault/new'in /vault/:id/edit ile ÇAKIŞMAMASI için (react-router
+                "new" ile ":id"yi ayırt edemez sanılabilir ama static segment
+                her zaman dynamic'ten önce eşleşir) - WikiEditorPage'in
+                /wiki/new + /wiki/:id/edit deseniyle BİREBİR aynı sıra. */}
+            <Route path="/vault" element={<VaultRoute />} />
+            <Route path="/vault/new" element={<VaultEntryFormRoute />} />
+            <Route path="/vault/:id/edit" element={<VaultEntryFormRoute />} />
+            {/* /documents/upload'ın /documents/:id ile ÇAKIŞMAMASI için AYNI
+                static-önce-dynamic sırası. */}
+            <Route path="/documents" element={<DocumentLibraryRoute />} />
+            <Route path="/documents/upload" element={<DocumentUploadRoute />} />
+            <Route path="/documents/:id" element={<DocumentDetailRoute />} />
           </Route>
         </Routes>
       </AuthProvider>

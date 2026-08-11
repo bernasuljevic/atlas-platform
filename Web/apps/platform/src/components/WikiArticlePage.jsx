@@ -18,7 +18,15 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteWikiPage, getWikiFolderTree, getWikiPageById } from "../api";
+import {
+  deleteWikiPage,
+  getFavoritePages,
+  getPinnedPages,
+  getWikiFolderTree,
+  getWikiPageById,
+  toggleFavorite as apiToggleFavorite,
+  togglePin as apiTogglePin,
+} from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
 import { renderWikiMarkdown } from "../markdown";
@@ -120,29 +128,12 @@ function WikiArticlePage({ token }) {
 
   // Pinle/Favorilere Ekle (kullanıcı geri bildirimi, 2026-08-07, YEDİNCİ
   // geçiş: "pinle favorilere ekle ve paylaşta kullanılabilsin" - öncekinde
-  // ikisi de tamamen dekoratifti, tıklanamıyordu). BİLİNÇLİ bir kapsam
-  // kararı: gerçek bir backend tablosu/endpoint YOK henüz (bu, kendi başına
-  // ayrı bir özellik olurdu - yeni entity + migration + endpoint) - bunun
-  // yerine tarayıcının localStorage'ında sayfa id'lerinin bir listesi olarak
-  // tutuluyor, tıpkı Okuma Ayarları tercihleri gibi. Bu GERÇEK ve KALICI
-  // (aynı tarayıcıda bir daha ziyarette de pinli/favori kalıyor) ama
-  // CİHAZLAR ARASI senkron DEĞİL - kullanıcı bunu isterse gerçek bir
-  // backend özelliğine (Favoriler/Pinlenenler anasayfa butonlarının hâlâ
-  // "yakında" olmasının da nedeni bu) geçmek ayrı bir iş olur.
-  const [pinnedIds, setPinnedIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("wikiPinnedPages") ?? "[]");
-    } catch {
-      return [];
-    }
-  });
-  const [favoriteIds, setFavoriteIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("wikiFavoritePages") ?? "[]");
-    } catch {
-      return [];
-    }
-  });
+  // ikisi de tamamen dekoratifti, tıklanamıyordu). ESKİDEN localStorage'da
+  // tutuluyordu (cihazlar arası senkron olmuyordu, erişimi kaybedilmiş bir
+  // sayfa sessizce listede kalıyordu) - artık gerçek, kullanıcı bazlı bir
+  // backend tablosu (bkz. UserPageFavorite/UserPagePin, Wiki.Domain).
+  const [isPinned, setIsPinned] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // Okuma Ayarları (kullanıcı spec'i, 2026-08-05: "Sağ Tarafta Yardım Paneli") -
   // üç tercih de localStorage'da kalıcı (tema tercihinin WikiLayout'ta
@@ -202,6 +193,31 @@ function WikiArticlePage({ token }) {
       cancelled = true;
     };
   }, [token, page?.departmentName, page?.folderId]);
+
+  // Favori/pin durumu - Toggle endpoint'i işlemden SONRAKİ durumu zaten
+  // döndürdüğü için (bkz. handleTogglePin/handleToggleFavorite) burada SADECE
+  // sayfa ilk açıldığında mevcut durumu öğrenmek için tam liste çekiliyor.
+  // Hata sessizce yutuluyor - favori/pin rozetinin yanlış görünmesi sayfanın
+  // asıl içeriğini engelleyecek bir hata değil.
+  useEffect(() => {
+    if (!page || !token) return;
+    let cancelled = false;
+
+    Promise.all([getFavoritePages(token), getPinnedPages(token)])
+      .then(([favorites, pinned]) => {
+        if (cancelled) return;
+        setIsFavorited(favorites.some((p) => p.id === page.id));
+        setIsPinned(pinned.some((p) => p.id === page.id));
+      })
+      .catch(() => {
+        // Giriş yapmamış bir ziyaretçi için de bu effect çalışır (token
+        // null/undefined ise fetch zaten 401 döner) - sessizce yut.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, page?.id]);
 
   useEffect(() => {
     localStorage.setItem("wikiFontSize", fontSize);
@@ -314,23 +330,22 @@ function WikiArticlePage({ token }) {
 
   const canEdit = isAdmin || page.createdByUserId === userId;
 
-  const isPinned = pinnedIds.includes(page.id);
-  const isFavorited = favoriteIds.includes(page.id);
-
-  function togglePin() {
-    setPinnedIds((prev) => {
-      const next = prev.includes(page.id) ? prev.filter((pid) => pid !== page.id) : [...prev, page.id];
-      localStorage.setItem("wikiPinnedPages", JSON.stringify(next));
-      return next;
-    });
+  async function togglePin() {
+    try {
+      const result = await apiTogglePin(token, page.id);
+      setIsPinned(result);
+    } catch (err) {
+      toast("Pin durumu güncellenemedi", { description: err.message });
+    }
   }
 
-  function toggleFavorite() {
-    setFavoriteIds((prev) => {
-      const next = prev.includes(page.id) ? prev.filter((pid) => pid !== page.id) : [...prev, page.id];
-      localStorage.setItem("wikiFavoritePages", JSON.stringify(next));
-      return next;
-    });
+  async function toggleFavorite() {
+    try {
+      const result = await apiToggleFavorite(token, page.id);
+      setIsFavorited(result);
+    } catch (err) {
+      toast("Favori durumu güncellenemedi", { description: err.message });
+    }
   }
 
   // Web Share API (mobil cihazlarda gerçek bir "paylaş" sayfası açar) varsa
@@ -828,9 +843,18 @@ function WikiArticlePage({ token }) {
       )}
 
       {/* Mobil/tablet Okuma Ayarları çekmecesi - SAĞDAN açılıyor. Arka plan
-          (backdrop) tıklanınca da kapanıyor. */}
+          (backdrop) tıklanınca da kapanıyor. GERÇEK BUG (2026-08-07, ONUNCU
+          geçiş, kullanıcı bildirdi: "tıklanınca bir şey gelmiyor") - bu
+          çekmece HER ZAMAN `lg:hidden` idi (normalde lg+'de zaten inline sağ
+          panel olduğu için çekmeceye gerek yoktu) - ama "Geniş" satır
+          genişliği seçiliyken sağ panel lg+'de de TAMAMEN kalkıyor
+          (yukarıdaki not), tetikleyici düğme o durumda BİLEREK lg+'de de
+          gösterilmeye başlanmıştı AMA bu çekmecenin kendisi unutulup hâlâ
+          `lg:hidden` bırakılmıştı - düğme tıklanıp state değişiyordu ama
+          çekmece CSS ile gizli kaldığı için görsel olarak HİÇBİR ŞEY
+          olmuyordu. Düzeltme: tetikleyiciyle BİREBİR AYNI koşul. */}
       {isMobileSettingsOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className={lineWidth === "wide" ? "fixed inset-0 z-40" : "fixed inset-0 z-40 lg:hidden"}>
           <div
             className="absolute inset-0"
             style={{ background: "rgba(0,0,0,0.4)" }}

@@ -58,11 +58,11 @@ function MiniStat({ icon, value, label }) {
 // düğme şeridi (kullanıcı spec'i, "5. Hızlı Erişim - büyük kartlar yerine
 // küçük aksiyon butonları"). `to` (React Router linki) VEYA `href` (aynı
 // sayfa içinde bir çapaya kaydırmak için, ör. #son-guncellemeler) kabul
-// ediyor - ikisi birden verilmez. `disabled` verilirse (Favoriler/Pinlenenler)
-// tıklanamaz, sadece WikiLayout'taki "Bildirimler (yakında)" Bell
-// düğmesiyle AYNI desende bir title tooltip'i gösterir - gerçek kalıcılık
-// henüz kullanıcı tarafından onaylanmadığı için (bkz. proje notu) şimdilik
-// sadece arayüz iskeleti.
+// ediyor - ikisi birden verilmez. `disabled` HÂLÂ destekleniyor (WikiLayout'taki
+// "Bildirimler (yakında)" Bell düğmesiyle AYNI desende bir title tooltip'i
+// gösterir, gerçek bir backend'i olmayan özellikler için) - Favoriler/
+// Pinlenenler artık gerçek bir backend'e sahip olduğu için BU İKİSİ disabled
+// değil (bkz. UserPageFavorite/UserPagePin, Wiki.Domain).
 function QuickActionButton({ icon, label, to, href, disabled }) {
   const classes =
     "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition hover:bg-[var(--brand-accent)]/10";
@@ -296,8 +296,8 @@ function HomePage({ token }) {
       <div className="flex flex-wrap items-center gap-2">
         <QuickActionButton icon={<ListChecks size={14} />} label="Tüm Sayfalar" to="/wiki/pages" />
         <QuickActionButton icon={<Clock size={14} />} label="Son Güncellenenler" href="#son-guncellemeler" />
-        <QuickActionButton icon={<Star size={14} />} label="Favoriler" disabled />
-        <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" disabled />
+        <QuickActionButton icon={<Star size={14} />} label="Favoriler" to="/wiki/favorites" />
+        <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" to="/wiki/pinned" />
         {isAdmin && <QuickActionButton icon={<ShieldCheck size={14} />} label="Audit Log" to="/audit-log" />}
       </div>
 
