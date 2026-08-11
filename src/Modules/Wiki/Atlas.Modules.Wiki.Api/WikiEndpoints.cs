@@ -1,5 +1,9 @@
 using Atlas.Modules.Wiki.Application.Comments.Commands;
 using Atlas.Modules.Wiki.Application.Comments.Queries;
+using Atlas.Modules.Wiki.Application.Favorites.Commands;
+using Atlas.Modules.Wiki.Application.Favorites.Queries;
+using Atlas.Modules.Wiki.Application.Pins.Commands;
+using Atlas.Modules.Wiki.Application.Pins.Queries;
 using Atlas.Modules.Wiki.Application.WikiFolders.Commands;
 using Atlas.Modules.Wiki.Application.WikiFolders.Queries;
 using Atlas.Modules.Wiki.Application.WikiPages.Commands;
@@ -132,6 +136,43 @@ public static class WikiEndpoints
             return Results.NoContent();
         })
         .WithName("DeleteComment")
+        .RequireAuthorization();
+
+        // Faz: Favoriler/Pinler. Tek bir toggle endpoint'i (ayrı POST/DELETE
+        // çifti değil) - istemci "şu an favori mi" durumunu zaten bildiği için
+        // (sayfa/liste zaten yıldızı dolu/boş gösteriyor), tek bir tıklamanın
+        // karşılığı tek bir istek. Yanıttaki bool, istemcinin ek bir GET
+        // atmadan ikonu güncelleyebilmesi için.
+        group.MapPost("/pages/{id:guid}/favorite", async (Guid id, IMediator mediator) =>
+        {
+            var isFavorited = await mediator.Send(new ToggleFavoriteCommand(id));
+            return Results.Ok(new { isFavorited });
+        })
+        .WithName("ToggleFavorite")
+        .RequireAuthorization();
+
+        group.MapPost("/pages/{id:guid}/pin", async (Guid id, IMediator mediator) =>
+        {
+            var isPinned = await mediator.Send(new TogglePinCommand(id));
+            return Results.Ok(new { isPinned });
+        })
+        .WithName("TogglePin")
+        .RequireAuthorization();
+
+        group.MapGet("/favorites", async (IMediator mediator) =>
+        {
+            var pages = await mediator.Send(new GetFavoritePagesQuery());
+            return Results.Ok(pages);
+        })
+        .WithName("GetFavoritePages")
+        .RequireAuthorization();
+
+        group.MapGet("/pinned", async (IMediator mediator) =>
+        {
+            var pages = await mediator.Send(new GetPinnedPagesQuery());
+            return Results.Ok(pages);
+        })
+        .WithName("GetPinnedPages")
         .RequireAuthorization();
 
         // Admin aracı: AI'ın embedding indeksini (örn. bir bakım hatası ya da

@@ -405,6 +405,255 @@ export async function createComment(accessToken, { pageId, content }) {
   return response.json();
 }
 
+// Favoriler/Pinler - eskiden TAMAMEN localStorage'daydı (bkz. WikiArticlePage.jsx'in
+// eski togglePin/toggleFavorite'i), artık gerçek, kullanıcı bazlı bir backend
+// tablosu. Toggle endpoint'leri dönüş değerinde işlemden SONRAKİ durumu (bool)
+// veriyor - istemci bunun için ayrı bir GET atmak zorunda kalmıyor.
+export async function toggleFavorite(accessToken, pageId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}/favorite`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Favori durumu güncellenemedi");
+  }
+
+  const body = await response.json();
+  return body.isFavorited;
+}
+
+export async function togglePin(accessToken, pageId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}/pin`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Pin durumu güncellenemedi");
+  }
+
+  const body = await response.json();
+  return body.isPinned;
+}
+
+export async function getFavoritePages(accessToken) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/favorites`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Favoriler yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function getPinnedPages(accessToken) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pinned`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Pinlenenler yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// Şifre Kasası (Vault) - Faz 7/Gün 3. WikiPage'in aksine TÜM uç noktalar
+// (liste dahil) token gerektiriyor - backend'de hiçbiri anonim erişime açık
+// değil (bkz. VaultEndpoints - hepsi .RequireAuthorization()). Bu yüzden
+// hepsi createWikiPage/getAuditLog'daki AYNI 401 -> refresh -> tekrar dene
+// desenini kullanıyor, getWikiPages'teki gibi "token opsiyonel" davranış YOK.
+export async function getPasswordEntries(accessToken, category) {
+  const params = category ? `?category=${encodeURIComponent(category)}` : "";
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Kasa kayıtları yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// GetPasswordEntryByIdQueryHandler'daki "varlığını bile sızdırma" kuralı
+// yüzünden 404, "kayıt yok" ile "görme yetkin yok"u BİLEREK ayırt etmiyor.
+export async function getPasswordEntryById(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (response.status === 404) {
+    throw new Error("Bu kayıt artık mevcut değil ya da görme yetkin yok.");
+  }
+  if (!response.ok) {
+    throw new Error("Kayıt yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function createPasswordEntry(accessToken, entry) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(entry),
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? body?.detail ?? "Kayıt oluşturulamadı");
+  }
+
+  return response.json();
+}
+
+export async function updatePasswordEntry(accessToken, id, entry) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(entry),
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu kaydı düzenleme yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? "Kayıt güncellenemedi");
+  }
+}
+
+export async function deletePasswordEntry(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu kaydı silme yetkin yok.");
+    }
+    throw new Error("Kayıt silinemedi");
+  }
+}
+
+// Şifrenin KENDİSİNİ döndüren TEK yol - her çağrı backend'de "Revealed" audit
+// kaydı bırakır ve LastAccessedAtUtc'yi günceller (bkz. RevealPasswordEntryCommand'daki
+// not) - o yüzden SADECE kullanıcı gerçekten "Göster"/"Kopyala"ya bastığında
+// çağrılmalı, liste/detay çekerken hiç otomatik tetiklenmemeli.
+export async function revealPasswordEntry(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}/reveal`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu kaydın parolasını görme yetkin yok.");
+    }
+    throw new Error("Parola görüntülenemedi");
+  }
+
+  const body = await response.json();
+  return body.password;
+}
+
 export async function deleteComment(accessToken, commentId) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/comments/${commentId}`, {

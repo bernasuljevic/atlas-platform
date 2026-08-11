@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\Modules\Notifications\Atlas.Modules.Notifications.Api\Atlas.Modules.Notifications.Api.csproj" />
     <ProjectReference Include="..\..\Modules\AI\Atlas.Modules.AI.Api\Atlas.Modules.AI.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Audit\Atlas.Modules.Audit.Api\Atlas.Modules.Audit.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Vault\Atlas.Modules.Vault.Api\Atlas.Modules.Vault.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.1.1" />

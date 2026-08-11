@@ -89,6 +89,52 @@ namespace Atlas.Modules.Wiki.Infrastructure.Migrations
                     b.ToTable("OutboxMessages", "wiki");
                 });
 
+            modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.UserPageFavorite", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WikiPageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "WikiPageId")
+                        .IsUnique();
+
+                    b.ToTable("UserPageFavorites", "wiki");
+                });
+
+            modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.UserPagePin", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WikiPageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "WikiPageId")
+                        .IsUnique();
+
+                    b.ToTable("UserPagePins", "wiki");
+                });
+
             modelBuilder.Entity("Atlas.Modules.Wiki.Domain.Entities.WikiFolder", b =>
                 {
                     b.Property<Guid>("Id")

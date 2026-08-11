@@ -28,6 +28,11 @@ public static class WikiModule
         services.AddScoped<IWikiFolderRepository, EfWikiFolderRepository>();
         services.AddScoped<IWikiCommentRepository, EfWikiCommentRepository>();
 
+        // Faz: Favoriler/Pinler - eskiden tamamen localStorage'daydı (bkz.
+        // UserPageFavorite.cs'teki not), artık gerçek, kullanıcı bazlı bir DB tablosu.
+        services.AddScoped<IUserPageFavoriteRepository, EfUserPageFavoriteRepository>();
+        services.AddScoped<IUserPagePinRepository, EfUserPagePinRepository>();
+
         // AI modülü (ve ileride Wiki'nin görünürlük kuralına ihtiyaç duyan başka
         // bir modül) bu arayüz üzerinden Wiki'nin kuralını KOPYALAMADAN kullanabiliyor.
         // Durumsuz (stateless) - Singleton güvenli.

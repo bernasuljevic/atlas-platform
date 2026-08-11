@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Check, Copy } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, Info, PlayCircle, XCircle } from "lucide-react";
 
 // Kasıtlı olarak KÜÇÜK, ELLE YAZILMIŞ bir render katmanı - dışarıdan bir
 // markdown kütüphanesi (react-markdown/marked) EKLENMEDİ, çünkü sadece
@@ -19,7 +19,11 @@ import { Check, Copy } from "lucide-react";
 // link penceresindeki arama - sonuç bulunamazsa bu tür bir bağlantı öneriliyor).
 // Aksi halde normal bir dış bağlantı. **kalın**, *italik* - iç içe geçmiyor
 // (basit tutuldu, editördeki araç çubuğu zaten bunları iç içe üretmiyor).
-const INLINE_PATTERN = /!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+// Faz 1 (2026-08-08, "Atlas İçerik Sistemi" spec'i) - `inline kod` eklendi,
+// EN SONA (diğer alternatiflerden sonra) konuldu ki `**kalın**`/`*italik*`
+// içindeki `*` karakterleriyle çakışmasın (regex alternation soldan sağa
+// denenir, backtick hiçbir diğer deseninde geçmiyor zaten çakışma riski yok).
+const INLINE_PATTERN = /!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g;
 
 function renderInline(text, keyPrefix) {
   const nodes = [];
@@ -33,7 +37,7 @@ function renderInline(text, keyPrefix) {
       nodes.push(text.slice(lastIndex, match.index));
     }
 
-    const [full, imgAlt, imgSrc, linkText, linkTarget, boldText, italicText] = match;
+    const [full, imgAlt, imgSrc, linkText, linkTarget, boldText, italicText, inlineCode] = match;
     const key = `${keyPrefix}-${i++}`;
 
     if (imgSrc !== undefined) {
@@ -99,6 +103,20 @@ function renderInline(text, keyPrefix) {
       nodes.push(<strong key={key}>{boldText}</strong>);
     } else if (italicText !== undefined) {
       nodes.push(<em key={key}>{italicText}</em>);
+    } else if (inlineCode !== undefined) {
+      // Kod bloğundan (CodeBlock) FARKLI - burası bir CÜMLE içindeki tek bir
+      // kelime/ifade için (ör. "npm run dev komutunu kullanın"). Aynı
+      // --code-bg değişkeni kullanılıyor (yeni renk YOK), font-mono ile
+      // gövde metninden ayrışıyor.
+      nodes.push(
+        <code
+          key={key}
+          className="rounded px-1 py-0.5 font-mono text-[0.9em]"
+          style={{ background: "var(--code-bg)", color: "var(--text-h)" }}
+        >
+          {inlineCode}
+        </code>
+      );
     }
 
     lastIndex = match.index + full.length;
@@ -258,6 +276,126 @@ function ImageBlock({ src, alt }) {
   );
 }
 
+// Video - kullanıcı ya bir YouTube URL'si ya doğrudan bir video dosyası URL'si
+// (mp4/webm/ogg/mov) yapıştırıyor. YouTube ise embed iframe, dosyaysa native
+// <video> etiketi - üçüncü, TANINMAYAN bir URL ise (ör. Vimeo, kurumsal bir
+// video sunucusu) kırık bir gömme DENEMİYORUZ, sade bir "Videoyu Aç" linkine
+// düşüyoruz - her URL şeklini "embed edilebilir" varsaymak, kullanıcıya boş
+// bir kare göstermekten daha kötü bir deneyim olurdu.
+const YOUTUBE_PATTERN = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
+
+function VideoBlock({ url, caption }) {
+  const youtubeMatch = url.match(YOUTUBE_PATTERN);
+  const isVideoFile = VIDEO_FILE_PATTERN.test(url);
+
+  return (
+    <figure className="my-4 mx-auto w-full max-w-[800px]">
+      {youtubeMatch ? (
+        // youtube-nocookie.com - reklamsız, sade bir gömme (Google'ın kendi
+        // önerdiği "gizlilik geliştirilmiş mod" domaini).
+        <div className="relative aspect-video overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--border)" }}>
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${youtubeMatch[1]}`}
+            title={caption || "Video"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+          />
+        </div>
+      ) : isVideoFile ? (
+        <video controls className="w-full rounded-lg border shadow-sm" style={{ borderColor: "var(--border)" }}>
+          <source src={url} />
+          Tarayıcınız video oynatmayı desteklemiyor.
+        </video>
+      ) : url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 rounded-lg border p-3.5 text-sm hover:bg-[var(--brand-accent)]/10"
+          style={{ borderColor: "var(--border)", color: "var(--brand-accent)" }}
+        >
+          <PlayCircle size={18} /> Videoyu Aç
+        </a>
+      ) : null}
+      {caption && (
+        <figcaption className="mt-1.5 text-center text-[13px] italic opacity-75" style={{ color: "var(--text)" }}>
+          {caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+// Wikipedia'nın "thumbnail" (metnin yanına konup metnin etrafından dolandığı
+// görsel) fikri - ImageBlock'un AKSİNE (her zaman kendi satırında, ortada,
+// sabit boyutta) burada float kullanılıyor, "left"/"right" metnin görseli
+// SARMASINA izin veriyor. "center" ImageBlock'la GÖRSEL olarak birebir aynı
+// sonucu verir (float yok, ortalı) - üç seçeneği tutarlı tek bir sözdiziminde
+// (":::image-<yön>") sunmak, kullanıcının editördeki tek bir select'ten
+// hepsine erişebilmesi için.
+const IMAGE_ALIGN_CLASSES = {
+  left: "float-left mr-4 mb-2 max-w-[320px]",
+  right: "float-right ml-4 mb-2 max-w-[320px]",
+  center: "mx-auto max-w-[800px]",
+};
+
+function AlignedImageBlock({ src, alt, align }) {
+  return (
+    <figure className={`my-2 ${IMAGE_ALIGN_CLASSES[align] ?? IMAGE_ALIGN_CLASSES.center}`}>
+      <img
+        src={src}
+        alt={alt || "Görsel"}
+        className="w-full rounded-lg border object-contain shadow-sm"
+        style={{ borderColor: "var(--border)" }}
+      />
+      {alt && (
+        <figcaption className="mt-1.5 text-center text-[12px] italic opacity-75" style={{ color: "var(--text)" }}>
+          {alt}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
+// Callout türleri - kullanıcı spec'i (2026-08-08, "Atlas İçerik Sistemi" -
+// "3.3 Callout blokları: 💡 Bilgi/⚠️ Uyarı/❌ Hata/✅ Başarılı") BİREBİR
+// karşılığı. Renk paleti kasıtlı olarak SINIRLI tutuldu - "aşırı renkli ve
+// karmaşık kartlar kullanma" talimatına uyarak YENİ bir renk EKLENMEDİ,
+// sadece bu uygulamada ZATEN var olan iki ton kullanıldı: Bilgi/Başarılı
+// --brand-accent (yeşil, linkler/butonlarla AYNI), Uyarı/Hata "red" (Sil
+// düğmesi ve kırmızı link özelliğiyle AYNI, bu ikisi zaten uygulamanın
+// "dikkat çek" rengi olarak kurulu). Arka plan HER ZAMAN nötr --code-bg -
+// tek fark sol kenar çizgisi + ikon rengi, blockquote'un border-l-4
+// deseniyle AYNI görsel dilde.
+const CALLOUT_CONFIG = {
+  info: { icon: Info, label: "Bilgi", color: "var(--brand-accent)" },
+  success: { icon: CheckCircle2, label: "Başarılı", color: "var(--brand-accent)" },
+  warning: { icon: AlertTriangle, label: "Uyarı", color: "red" },
+  error: { icon: XCircle, label: "Hata", color: "red" },
+};
+
+function CalloutBlock({ type, text, keyPrefix }) {
+  const { icon: Icon, label, color } = CALLOUT_CONFIG[type] ?? CALLOUT_CONFIG.info;
+  return (
+    <div
+      className="mb-4 flex gap-2.5 rounded-lg border-l-4 p-3.5"
+      style={{ borderLeftColor: color, background: "var(--code-bg)" }}
+    >
+      <Icon size={17} className="mt-0.5 shrink-0" style={{ color }} />
+      <div className="min-w-0">
+        <p className="mb-0.5 text-[13px] font-semibold" style={{ color: "var(--text-h)" }}>
+          {label}
+        </p>
+        <p className="whitespace-pre-wrap text-[15px]" style={{ color: "var(--text)" }}>
+          {renderInline(text, keyPrefix)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Satırları blok blok ("# .." - "###### .." başlık, "```" kod bloğu, "|...|"
 // tablo, "- " liste, "> " alıntı, boş satırla ayrılan paragraflar) gruplayıp
 // her bloğun kendi içindeki metni renderInline ile biçimlendiriyor - iki
@@ -330,6 +468,89 @@ export function renderWikiMarkdown(content) {
       continue;
     }
 
+    // Video - callout ile AYNI ":::<tip>" ... ":::" ailesi, aynı yere kondu.
+    // İçindeki ilk dolu satır URL, kalanı (varsa) alt yazı.
+    const videoMatch = line.trim().match(/^:::video$/);
+    if (videoMatch) {
+      flushParagraph();
+      i++;
+      const videoLines = [];
+      while (i < lines.length && lines[i].trim() !== ":::") {
+        videoLines.push(lines[i]);
+        i++;
+      }
+      i++; // kapanış ":::" satırını atla
+
+      const nonEmptyLines = videoLines.filter((l) => l.trim() !== "");
+      const [urlLine, ...captionLines] = nonEmptyLines;
+      blocks.push(
+        <VideoBlock
+          key={`video-${blocks.length}`}
+          url={(urlLine ?? "").trim()}
+          caption={captionLines.join(" ").trim()}
+        />
+      );
+      continue;
+    }
+
+    // Hizalı resim - ":::image-left|center|right" ... ":::" - içindeki ilk
+    // satır "![alt](url)" olmalı (STANDALONE_IMAGE_PATTERN'in AYNISI), kalan
+    // satırlar (varsa) alt yazı olarak alt metnin YERİNE geçiyor.
+    const imageAlignMatch = line.trim().match(/^:::image-(left|center|right)$/);
+    if (imageAlignMatch) {
+      flushParagraph();
+      const align = imageAlignMatch[1];
+      i++;
+      const innerLines = [];
+      while (i < lines.length && lines[i].trim() !== ":::") {
+        innerLines.push(lines[i]);
+        i++;
+      }
+      i++; // kapanış ":::" satırını atla
+
+      const nonEmptyInner = innerLines.filter((l) => l.trim() !== "");
+      const [imageLine, ...captionLines] = nonEmptyInner;
+      const imgMatch = (imageLine ?? "").trim().match(STANDALONE_IMAGE_PATTERN);
+
+      if (imgMatch) {
+        const [, alt, src] = imgMatch;
+        const caption = captionLines.join(" ").trim() || alt;
+        blocks.push(<AlignedImageBlock key={`img-align-${blocks.length}`} src={src} alt={caption} align={align} />);
+      }
+      continue;
+    }
+
+    // Callout - "```" ile AYNI "açılış satırı + kapanış satırı" desenini
+    // izliyor (":::info" ... ":::"), o yüzden kod bloğu kontrolünün hemen
+    // ardına, tablo kontrolünden ÖNCE kondu.
+    const calloutMatch = line.trim().match(/^:::(info|warning|error|success)$/);
+    if (calloutMatch) {
+      flushParagraph();
+      const type = calloutMatch[1];
+      i++;
+      const calloutLines = [];
+      while (i < lines.length && lines[i].trim() !== ":::") {
+        calloutLines.push(lines[i]);
+        i++;
+      }
+      i++; // kapanış ":::" satırını atla
+      blocks.push(
+        <CalloutBlock key={`callout-${blocks.length}`} type={type} text={calloutLines.join("\n")} keyPrefix={`callout-${blocks.length}`} />
+      );
+      continue;
+    }
+
+    // Divider - tek başına bir satırda "---". Tablo kontrolünden ÖNCE
+    // kontrol edilmesine gerek YOK çünkü tablo deseni "|" ile başlayıp
+    // bitiyor - çakışma riski yok, ama okunurluk için kod bloğu/callout gibi
+    // "kendi başına bir blok" desenlerinin yanına kondu.
+    if (line.trim() === "---") {
+      flushParagraph();
+      blocks.push(<hr key={`hr-${blocks.length}`} className="my-5" style={{ borderColor: "var(--border)" }} />);
+      i++;
+      continue;
+    }
+
     const isTableRow = /^\|.*\|$/.test(line.trim());
     const nextIsSeparator = i + 1 < lines.length && /^\|[\s:|-]+\|$/.test(lines[i + 1].trim());
 
@@ -384,6 +605,39 @@ export function renderWikiMarkdown(content) {
             </tbody>
           </table>
         </div>
+      );
+      continue;
+    }
+
+    // Checklist - "- [ ] .."/"- [x] .." de "- " ile BAŞLIYOR, o yüzden bu
+    // kontrol düz liste kontrolünden ÖNCE gelmek ZORUNDA - aksi halde "- "
+    // yakalayıp "[ ]"/"[x]" kısmını düz metin gibi gösterirdi.
+    const checklistMatch = line.match(/^- \[([ xX])\] (.*)$/);
+    if (checklistMatch) {
+      flushParagraph();
+      const items = [];
+      while (i < lines.length) {
+        const m = lines[i].match(/^- \[([ xX])\] (.*)$/);
+        if (!m) break;
+        items.push({ checked: m[1].toLowerCase() === "x", text: m[2] });
+        i++;
+      }
+      blocks.push(
+        <ul key={`checklist-${blocks.length}`} className="mb-4 flex flex-col gap-1.5">
+          {items.map((item, idx) => (
+            <li key={idx} className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={item.checked}
+                disabled
+                className="mt-1 shrink-0 accent-[var(--brand-accent)]"
+              />
+              <span style={{ opacity: item.checked ? 0.6 : 1, textDecoration: item.checked ? "line-through" : "none" }}>
+                {renderInline(item.text, `checklist-${blocks.length}-${idx}`)}
+              </span>
+            </li>
+          ))}
+        </ul>
       );
       continue;
     }

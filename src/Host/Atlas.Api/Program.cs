@@ -7,6 +7,7 @@ using Atlas.Modules.AI.Api;
 using Atlas.Modules.Audit.Api;
 using Atlas.Modules.Auth.Api;
 using Atlas.Modules.Notifications.Api;
+using Atlas.Modules.Vault.Api;
 using Atlas.Modules.Wiki.Api;
 using Atlas.Shared.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -41,6 +42,7 @@ builder.Services.AddCaching(builder.Configuration);
 builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddAIModule(builder.Configuration);
 builder.Services.AddAuditModule(builder.Configuration);
+builder.Services.AddVaultModule(builder.Configuration);
 
 // CORS: React uygulamasının (farklı port, localhost:5173) bu API'ye (localhost:5080)
 // istek atabilmesi için tarayıcıya "bu adrese izin var" demeliyiz - yoksa tarayıcı
@@ -216,6 +218,7 @@ app.MigrateAuthDatabase();
 app.MigrateWikiDatabase();
 app.MigrateAiDatabase();
 app.MigrateAuditDatabase();
+app.MigrateVaultDatabase();
 
 // ============================================================
 // MODÜL ENDPOINT KAYITLARI
@@ -225,6 +228,7 @@ app.MapWikiEndpoints();
 app.MapNotificationsEndpoints();
 app.MapAIEndpoints();
 app.MapAuditEndpoints();
+app.MapVaultEndpoints();
 
 // Basit bir sağlık kontrolü - "API gerçekten ayakta mı?" sorusuna cevap
 app.MapGet("/", () => Results.Ok(new
