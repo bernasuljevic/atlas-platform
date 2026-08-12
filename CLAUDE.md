@@ -309,6 +309,23 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     push edilmeden ÖNCE fark edildi). Çözüm: paylaşılan `dateUtils.js` /
     `formatUtcTimestamp()` - "Z" SADECE stringin sonunda yoksa ekleniyor,
     her iki kaynaktan gelen değerle de doğru çalışıyor.
+20. **`dotnet ef migrations add`, hedef DbContext'in kendisiyle hiç ilgisi
+    olmayan bir sebepten (Redis erişilemez) başarısız olabilir:** Documents
+    modülüne (SQL Server, `.\SQLEXPRESS`) yeni bir migration eklenirken
+    (2026-08-12) "Unable to resolve service for type DbContextOptions..."
+    hatası alındı - kök sebep DbContext'te değil, Docker Desktop'ın arka
+    planda kapanmış olmasıydı (Redis/Postgres container'ları duruyordu).
+    `dotnet ef migrations add --startup-project src/Host/Atlas.Api`,
+    hedef DbContext SQL Server'a bağlı olsa bile `Program.cs`'in TAMAMINI
+    (dolayısıyla `AddCaching()`'in Redis bağlantısını da) kurmaya çalışıyor -
+    Redis erişilemeyince tüm host inşası çöküyor, hata mesajı da ilk bakışta
+    DbContext'in kendisinde bir sorun varmış gibi görünüyor (yanıltıcı).
+    Genel ders: bir modülün migration'ı SQL Server'a bağlı olsa bile, o an
+    Docker'da çalışması gereken HER şeyin (Redis, Postgres) ayakta olması
+    gerekiyor - `docker ps` ile hızlıca kontrol edip gerekirse
+    `docker compose start postgres redis` ile düzeltilebilir (Ders #9'daki
+    gibi tüm stack'i değil, sadece bu iki servisi başlatmak yeterli, native
+    SQL Server'a dokunmuyor).
 
 ## Şu ana kadar tamamlananlar
 
@@ -863,6 +880,173 @@ bilinçli olarak ertelenmişti) - kullanıcı üçüne de "evet" diyerek onaylad
       başlıkta ne içerikte geçen bir kelime) ile arama yapılınca sayfa doğru
       şekilde bulundu.
 
+## Şifre Kasası (Vault) modülü (2026-08-11, Faz 7 tamamlandı - Gün 1-3)
+
+Yeni `Atlas.Modules.Vault` modülü (Domain/Application/Infrastructure/Api,
+kendi `vault.*` şeması - Auth/Wiki/Audit ile AYNI SQL Server veritabanı).
+`PasswordEntry` WikiPage'e hiç bağlı değil, kullanıcının kendi parola/erişim
+bilgilerini tuttuğu tamamen bağımsız bir varlık.
+
+**Şifreleme:** ASP.NET Core'un kendi Data Protection API'si
+(`IDataProtectionProvider` - yeni bir NuGet paketi DEĞİL,
+`Microsoft.AspNetCore.App` framework referansı yeterli). Anahtarlar
+`%LOCALAPPDATA%\AtlasPlatformDataProtectionKeys`'de disk üzerinde kalıcı
+(proje klasörü OneDrive senkronizasyonunda - Ders #16'daki User Secrets
+riskiyle aynı gerekçeyle oraya yazılmıyor). **Bilinçli, dokümante sınırlama:**
+bu production-grade bir password manager (zero-knowledge, client-side
+master-password-türetilmiş anahtar, HSM) DEĞİL - sunucu her zaman şifreyi
+çözebilir (dahili/trusted-IT-admin modeli), anahtarlar tek instance'ta disk
+üzerinde. İç kullanım için makul, gerçek bir ticari password manager'la
+karıştırılmamalı.
+
+**Yetkilendirme:** owner-or-Admin (Audit log'un "kim görebilir" kısıtından
+FARKLI - burada normal kullanıcı SADECE KENDİ kayıtlarını görür/yönetir,
+Admin hepsini). `GetPasswordEntryByIdQuery` "varlığı gizle" deseninde
+(null→404), Update/Delete/Reveal throw-based (400/403). **Reveal BİLEREK bir
+Command** (Query değil) - `AuditBehavior`'dan geçip audit'lensin diye
+("PasswordEntry.Revealed" - kimin ne zaman hangi kaydı gördüğü iz bırakıyor).
+`passwordGenerator.js` - `Math.random` DEĞİL `crypto.getRandomValues`
+tabanlı, belirsiz karakterleri (0/O, 1/l vb.) hariç tutuyor, her kategoriden
+en az bir karakter garantiliyor.
+
+**Frontend:** `/vault`, `/vault/new`, `/vault/:id/edit` (Wiki İÇERİĞİ
+DEĞİLLER, top-level route - Audit Log'la aynı gerekçe, ama herkese görünür,
+Audit Log'un aksine). `VaultPage.jsx` (liste, kategori filtresi, maskeli
+parolalar + Göster/Kopyala - reveal edilen parola state'te cache'leniyor,
+gereksiz tekrar-reveal audit kirliliği yaratmasın diye), `VaultEntryFormPage.jsx`
+(tam sayfa oluştur/düzenle, edit modunda parola alanı BOŞ başlıyor - eski
+şifreli değeri hiç istemciye göndermiyoruz).
+
+**Yapısal garanti:** Vault ASLA `WikiPageCreatedEvent` yayınlamıyor - AI/
+arama pipeline'ına hiç girmiyor (bir filtre kuralı değil, mimari olarak o
+event'i hiç tetiklemediği için garanti).
+
+## Kapsamlı Geliştirme Paketi (2026-08-11/12, plan dosyası: `crispy-sauteeing-kettle.md`)
+
+Kullanıcı Atlas'ı "wiki sayfalarının olduğu bir site" olmaktan çıkarıp
+kapsamlı bir şirket bilgi platformuna dönüştürmek istedi (zengin blok
+editörü + gerçek dosya sistemi + gerçek Favoriler/Pinler). 19 bölümlük bir
+spec olduğu için önce 3 paralel Explore ajanı + 1 Plan ajanıyla mevcut
+mimari uçtan uca analiz edildi, sonra 7 faza (P1-P7) bölünüp sırayla
+uygulanmaya başlandı - kullanıcının "hepsini tek seferde bitirme, günlere
+yay, önemli şeyleri anlat" talimatına göre.
+
+- [x] **P1 - Favoriler/Pinler (gerçek backend):** Eskiden TAMAMEN
+      localStorage'daydı (cihazlar arası senkron olmuyordu, erişimi kaybedilen
+      bir sayfa sessizce listede kalmaya devam ediyordu), HomePage'deki
+      butonlar dekoratif/disabled'dı. `UserPageFavorite`/`UserPagePin`
+      (Wiki.Domain) - İKİ AYRI tablo, bir sayfa aynı anda hem favori hem pin
+      olabilir. `ToggleFavoriteCommand`/`TogglePinCommand` BİLEREK
+      audit'lenmiyor (güvenlik açısından önemsiz bir eylem). `GetFavoritePagesQuery`/
+      `GetPinnedPagesQuery` mevcut `WikiVisibilityRules`'u uyguluyor - erişim
+      sonradan kaybedilirse liste sessizce küçülür. `/wiki/favorites`,
+      `/wiki/pinned` (Wiki İÇERİĞİ oldukları için `WikiLayout` altında nested -
+      Vault/Documents'ın top-level kararının AKSİNE).
+- [x] **P2 - Editör blok genişletmesi v2:** Faz 1'in (callout/divider/
+      checklist/inline-code) devamı, AYNI mimari karar korunarak (içerik
+      modeli hâlâ düz markdown string, JSON blok modeline GEÇİLMEDİ, yeni bir
+      editör kütüphanesi EKLENMEDİ). Video bloğu (`:::video`...`:::` - YouTube
+      URL'si otomatik `youtube-nocookie.com` iframe'ine, mp4/webm/mov
+      `<video>` etiketine, tanınmayan kaynak sade bir linke düşüyor). Hizalı
+      resim bloğu (`:::image-left/center/right` - float ile metin görselin
+      etrafından dolanıyor). "/" slash-command menüsü (`SlashCommandMenu.jsx` -
+      satır başında `/` yazınca 8 blok tipini listeliyor, mevcut Link/Resim
+      popover deseniyle AYNI sabit pozisyonda; `onMouseDown`+`preventDefault`
+      kullanıyor, `onClick` DEĞİL - textarea'nın focus'unu kaybetmemek için).
+      `document:GUID` içerik-referans bloğu BİLEREK bu fazdan çıkarıldı
+      (Documents modülü henüz yoktu, test edilemez bir ölü link olurdu) -
+      P5'e ertelendi.
+- [x] **P3 - Documents modülü temeli:** Yeni `Atlas.Modules.Documents`
+      modülü, Vault'un 4 katmanlı yapısını taklit ediyor (kendi `documents.*`
+      şeması, AYNI SQL Server veritabanı). `Document` entity WikiPage'e FK'siz,
+      tamamen bağımsız - kendi `DepartmentName`/`Visibility` alanları var
+      (WikiPage'inkiyle aynı semantik). **Güvenli depolama:** dosyalar
+      `wwwroot` DIŞINDA (`%LOCALAPPDATA%\AtlasPlatformDocuments`),
+      `UseStaticFiles` HİÇ KULLANILMIYOR - tek erişim yolu authenticated
+      `GET /api/documents/{id}/download`. `StorageKey` HİÇBİR ZAMAN kullanıcı
+      girdisinden türetilmiyor (`IFileStorageService.SaveAsync` kendi GUID
+      tabanlı anahtarını üretir, çağıran bir key ÖNERMİYOR bile) - path
+      traversal yapısal olarak imkânsız, bir filtre/sanitizasyon değil.
+      Public `DocumentDto` `StorageKey` İÇERMİYOR - indirme endpoint'i içinde
+      kullanılan ayrı, internal bir `DocumentDownloadInfoDto` var. Liste/
+      detay/indirme yetkilendirmesi MEVCUT `IWikiVisibilityChecker`'ı
+      (Shared.Contracts) DOĞRUDAN tekrar kullanıyor - yeni bir görünürlük
+      arayüzü icat edilmedi. Update/Delete owner-or-admin (Vault deseni),
+      silme diskteki dosyayı da temizliyor. Pozitif uzantı allowlist'i
+      (Document/Presentation/Spreadsheet/Data/Image/Video/Audio/Archive
+      kategorileri) - reddetme listesi DEĞİL, izin listesi. SHA-256 içerik
+      hash'i P6'nın duplicate-detection'ı için şimdiden kolon olarak açıldı
+      (ikinci bir migration'dan kaçınmak için, davranış henüz yok).
+      Frontend: `DocumentLibraryPage`/`DocumentUploadPage` (sürükle-bırak,
+      TAM SAYFA - Dialog DEĞİL, `WikiBoard.jsx`'in Dialog'dan uzaklaşma
+      tarihiyle tutarlı)/`DocumentDetailPage`. İndirme JWT'yi URL'e KOYMUYOR -
+      authenticated fetch + blob + `URL.createObjectURL` ile tarayıcı indirmesi.
+- [x] **P4 Gün 1-4 - Document processing pipeline (Gün 1-4 tamamlandı, henüz
+      COMMIT EDİLMEDİ - bkz. "Sırada ne var"):**
+  - Gün 1: `TextChunker`, AI.Domain'den yeni paylaşılan `Atlas.Shared.Text`
+    projesine taşındı (davranış değişmedi, saf statik algoritma) - artık hem
+    AI hem Documents AYNI chunking algoritmasını kullanıyor, kopya kod yok.
+  - Gün 2: Wiki'nin Transactional Outbox Pattern'i (`OutboxMessage`/
+    `IOutboxWriter`/`IUnitOfWork`/`OutboxProcessor`, 5sn poll, 5 deneme sonrası
+    dead-letter) Documents'a BİREBİR kopyalandı - Wiki'nin kendi Gün 1-5'lik
+    tarihini tekrar yaşamadan aynı olgunluğa tek adımda ulaştı.
+  - Gün 3: `DocumentUploadedEvent`/`DocumentChunksReadyEvent`/
+    `DocumentDeletedEvent` (Shared.Contracts) + `IDocumentProcessor` arayüzü
+    (`CanProcess(extension)`/`ExtractAsync`, `IEnumerable<>` DI ile
+    first-match-wins) + `PlainTextDocumentProcessor` (txt/md/csv/json/xml/
+    yaml/sql/log) + `DocumentUploadedEventHandler` (Documents.Infrastructure).
+    **AI modülünde daha önce yaşanan hata BAŞTAN önlendi:** `DocumentsModule.cs`'e
+    `RegisterServicesFromAssemblyContaining<UploadDocumentCommand>()`'ın
+    YANINA `RegisterServicesFromAssemblyContaining<DocumentUploadedEventHandler>()`
+    da eklendi - MediatR ilk çağrı SADECE Application assembly'sini tarar,
+    handler Infrastructure'da yaşadığı için ikinci satır olmasaydı event
+    sessizce hiç dinlenmezdi (bkz. AI Semantik Arama Gün 3'teki AYNI bug).
+    Handler mantığı: `MarkExtracting()` + ayrı bir erken `SaveChanges` (yavaş
+    bir extraction gerçekten "Extracting" olarak görünsün diye) → processor
+    seç (yoksa `NotSupportedException`) → metni çıkar (boşsa hata) → chunk'la →
+    `DocumentChunksReadyEvent`'i outbox'a ekle → `MarkReady()`; hata durumunda
+    `MarkFailed(ex.Message)`, ASLA rethrow YOK (sonsuz Outbox retry'ı önlüyor).
+  - Gün 4: `PdfDocumentProcessor` (**Docnet.Core**, PDFium sarmalayıcısı, MIT),
+    `OpenXmlWordDocumentProcessor` (SADECE .docx - eski ikili .doc'u
+    AÇAMIYOR, OpenXml SDK'nın yapısal sınırı, .doc/.rtf/.odt bilerek Failed'a
+    düşüyor), `OpenXmlPresentationDocumentProcessor` (slayt metni + speaker
+    notes, "Slayt N:" önekiyle - P5'te arama sonucunda hangi slayttan
+    geldiği görünsün diye), `OpenXmlSpreadsheetDocumentProcessor` (sheet adı +
+    satır/hücre metni, `SharedStringTable` çözümlemesiyle - Excel metin
+    hücrelerini genelde doğrudan saklamıyor, bir index saklıyor).
+    **TEDARİK ZİNCİRİ GÜVENLİĞİ bulgusu:** ilk seçilen `UglyToad.PdfPig`'in
+    NuGet'teki sürüm geçmişi ("1.7.0-custom-5", sahip "grinay") GitHub'daki
+    RESMİ release listesiyle (v0.1.8...v0.1.15) TUTARSIZDI - kurulmadı,
+    `AskUserQuestion` ile kullanıcıya sorulup Docnet.Core'a geçildi (sürüm
+    geçmişi önce doğrulandı). 4 gerçek dosya (pdf/docx/pptx/xlsx, programatik
+    üretildi) yüklenip hepsinin doğru metni çıkardığı canlı doğrulandı
+    (Outbox payload'ları SQL'den doğrudan incelenerek).
+
+**Henüz commit edilmedi:** P4 Gün 1-4'ün tüm değişiklikleri şu an local
+`master`'ın working directory'sinde uncommitted duruyor - bir feature branch
+açılıp commit/push edilmesi gerekiyor (P1-P3, Vault Gün 3 zaten
+`feature/vault-favorites-editor-v2` branch'i üzerinden PR #6 ile merge
+edildi).
+
+**Henüz yapılmayan (bu paketin geri kalanı):**
+- P4 Gün 5-6: `ReprocessDocumentCommand` + `POST /api/documents/{id}/reprocess`
+  (Wiki'nin `POST /api/wiki/reindex`'iyle aynı gerekçe - Failed bir belgeyi
+  admin/owner elle yeniden tetikleyebilsin) + Documents pipeline'ı için formal
+  integration testler (şu an sadece canlı/manuel doğrulama var).
+- P5: Documents→AI/RAG entegrasyonu - `DocumentEmbedding` (AI.Domain,
+  `WikiPageEmbedding`'e paralel) + AI'ın `DocumentChunksReadyEvent`/
+  `DocumentDeletedEvent`'e (zaten tanımlı, henüz DİNLENMİYOR) abone olması +
+  `SearchWikiPagesByMeaningQuery`'nin iki kaynaktan (Wiki+Documents) birleşik
+  sonuç döndürecek şekilde genişlemesi + frontend'de kaynak-tipi rozeti +
+  P2'de ertelenen `document:GUID` içerik-referans bloğunun bağlanması.
+- P6: `DocumentVersion` entity + migration, çoklu dosya yükleme UX,
+  `ContentHash` tabanlı duplicate-detection (engellemiyor, sadece uyarıyor).
+- P7: Vault'un `POST /reveal`'ına rate-limit policy'si (şu an HİÇ yok, login/
+  ai-search'ün aksine - gerçek bir boşluk), `IMalwareScanner` arayüzü + no-op
+  implementasyonu (upload akışına takılı, `IEmbeddingService` Fake-önce
+  felsefesiyle aynı), `DocumentStorage:RootPath` için Docker volume kalıcılığı
+  (şu an `docker-compose down` yüklenen dosyaları siler, DB satırları kalır).
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
@@ -884,8 +1068,16 @@ bilinçli olarak ertelenmişti) - kullanıcı üçüne de "evet" diyerek onaylad
 2. Portföy sertleştirme yol haritası, Cuma'ya kadar hedeflenen 3 ek iş
    (Docker Compose, SignalR toast, rate limiting) VE orijinal 6 maddelik
    özellik listesinin denetimde bulunan 3 gerçek eksiği (link arama, kırmızı
-   link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı - yeni bir
-   yön/özellik kullanıcıyla birlikte kararlaştırılacak.
+   link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı.
+3. **AKTİF - "Kapsamlı Geliştirme Paketi" (yukarıdaki bölüme bkz.):** P1
+   (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) TAMAMLANDI ve
+   merge edildi (PR #6). **P4 Gün 1-4 (belge işleme pipeline'ı - TextChunker
+   taşıma, Outbox retrofit, PlainText+PDF+DOCX+PPTX+XLSX processor'lar) de
+   tamamlandı AMA HENÜZ COMMIT/PUSH EDİLMEDİ** - bir sonraki adım: yeni bir
+   feature branch açıp bu değişiklikleri commit'lemek, sonra P4 Gün 5-6'ya
+   (`ReprocessDocumentCommand` + endpoint + integration testler) devam etmek.
+   Ardından sırayla P5 (Documents→AI/RAG entegrasyonu), P6 (toplu yükleme +
+   versiyonlama), P7 (güvenlik sertleştirme) planlanıyor.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
@@ -926,6 +1118,25 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   `WikiPage.Created`/`WikiPage.Deleted` eylemlerini kaydediyor (bkz.
   AuditBehavior, Shared.CQRS).
 - `/hubs/notifications` (SignalR Hub) → Wiki'de yeni sayfa eklenince "WikiPageCreated" mesajı yayınlanır
+- `POST /api/wiki/pages/{id}/favorite`, `POST /api/wiki/pages/{id}/pin` → token
+  gerektirir, toggle (varsa kaldırır, yoksa ekler), audit'lenmez.
+- `GET /api/wiki/favorites`, `GET /api/wiki/pinned` → token gerektirir, mevcut
+  görünürlük kuralı uygulanır (erişimi kaybedilen sayfa listeden sessizce düşer).
+- `GET /api/vault/entries`, `GET /api/vault/entries/{id}` → token gerektirir,
+  owner-or-Admin (detay: varlığı gizle/404).
+- `POST /api/vault/entries`, `PUT /api/vault/entries/{id}`, `DELETE /api/vault/entries/{id}`
+  → token gerektirir, owner-or-Admin (throw-based 403).
+- `POST /api/vault/entries/{id}/reveal` → token gerektirir, owner-or-Admin,
+  audit'lenir ("PasswordEntry.Revealed" - Reveal bilerek bir Command).
+- `POST /api/documents/upload` (multipart: file + title/description/visibility/
+  departmentName?/tags?) → token gerektirir, `IFormFile`/`[FromForm]` (JSON-bound
+  record DEĞİL - minimal API'nin dosya yükleme mecburiyeti).
+- `GET /api/documents` (paged), `GET /api/documents/{id}` → açık, görünürlük
+  kuralı `IWikiVisibilityChecker` ile uygulanır (detay: varlığı gizle/404).
+- `GET /api/documents/{id}/download` → token gerektirir (tek dosya erişim yolu,
+  `UseStaticFiles` yok).
+- `PUT /api/documents/{id}`, `DELETE /api/documents/{id}` → token gerektirir,
+  owner-or-Admin (throw-based 403), silme diskteki dosyayı da temizler.
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).

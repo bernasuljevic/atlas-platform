@@ -1,8 +1,10 @@
-using Atlas.Modules.AI.Domain.Chunking;
+using Atlas.Shared.Text.Chunking;
 using Xunit;
 
-namespace Atlas.Modules.AI.Domain.Tests;
+namespace Atlas.Shared.Text.Tests;
 
+// AI.Domain.Tests'ten BURAYA taşındı (bkz. TextChunker.cs'teki taşıma notu) -
+// testlerin İÇERİĞİ hiç değişmedi, sadece namespace/proje.
 public class TextChunkerTests
 {
     [Fact]

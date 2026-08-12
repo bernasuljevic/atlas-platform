@@ -15,13 +15,13 @@ public interface IDocumentRepository
 
     Task<IReadOnlyList<Document>> GetAllAsync(CancellationToken ct = default);
 
-    // Vault'un EfPasswordEntryRepository'siyle AYNI, BİLEREK BASİT desen -
-    // her metot KENDİ SaveChangesAsync'ini çağırıyor (Wiki'nin IUnitOfWork
-    // deseninin AKSİNE). Gerekçe: P3'te Documents'ın henüz Outbox'ı yok,
-    // birden fazla entity'yi (ör. Document + OutboxMessage) TEK transaction'da
-    // atomik yazma ihtiyacı YOK - o ihtiyaç P4'te (Outbox retrofit) doğduğunda
-    // Wiki'nin kendi geçmişini birebir tekrarlayarak (önce düz SaveChanges,
-    // sonra IUnitOfWork'e geçiş) bu arayüz de güncellenecek.
+    // P4 Gün 3'te Wiki'nin IUnitOfWork deseni burada da devrede - SaveChangesAsync
+    // BİLEREK yok, her metot sadece change tracker'a ekliyor. Kalıcı hale
+    // getirmek çağıran Handler'ın IUnitOfWork.SaveChangesAsync'i (genelde bir
+    // IOutboxWriter.Enqueue ile AYNI değişiklik kümesinde) çağırmasıyla olur -
+    // P3'teki (Vault'un basit deseniyle aynı, her metot kendi SaveChanges'ini
+    // çağıran) hâlinden BİLİNÇLİ bir geçiş, artık Outbox mesajıyla ATOMİK
+    // yazmamız gerektiği için.
     Task AddAsync(Document document, CancellationToken ct = default);
 
     Task UpdateAsync(Document document, CancellationToken ct = default);

@@ -8,13 +8,18 @@ public class DeleteDocumentCommandHandler : IRequestHandler<DeleteDocumentComman
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IOutboxWriter _outboxWriter;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
     public DeleteDocumentCommandHandler(
-        IDocumentRepository documentRepository, IFileStorageService fileStorageService, ICurrentUserAccessor currentUser)
+        IDocumentRepository documentRepository, IFileStorageService fileStorageService,
+        IOutboxWriter outboxWriter, IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
         _fileStorageService = fileStorageService;
+        _outboxWriter = outboxWriter;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -33,11 +38,17 @@ public class DeleteDocumentCommandHandler : IRequestHandler<DeleteDocumentComman
 
         request.AuditDetails = document.Title;
 
-        // Disk'teki dosya da temizleniyor - aksi halde DB satırı silinse bile
-        // diskte kalıcı bir "hayalet" dosya birikirdi (Wiki'nin sildiği bir
-        // sayfanın embedding'lerini de temizlemesiyle AYNI gerekçe - bkz.
-        // WikiPageDeletedEvent).
+        // Disk'teki dosya HEMEN (senkron) temizleniyor - Outbox'ı beklemiyor,
+        // çünkü dosya silme kendi başına atomicity gerektirmeyen, tekrar
+        // denenebilir (idempotent - StorageKey zaten yoksa no-op) bir işlem.
+        // DocumentDeletedEvent ise AI'ın (Gün 5) embedding'leri temizlemesi
+        // İÇİN - Wiki'nin WikiPageDeletedEvent'iyle AYNI gerekçe, henüz kimse
+        // dinlemiyor ama Outbox'a yazılması Document'in KENDİSİYLE atomik olmalı.
         await _fileStorageService.DeleteAsync(document.StorageKey, cancellationToken);
+
+        _outboxWriter.Enqueue(new DocumentDeletedEvent(document.Id));
+
         await _documentRepository.DeleteAsync(document, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

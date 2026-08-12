@@ -1,5 +1,16 @@
-namespace Atlas.Modules.AI.Domain.Chunking;
+namespace Atlas.Shared.Text.Chunking;
 
+// P4 Gün 1 (2026-08-11) - AI.Domain/Chunking'den BURAYA taşındı, SAF BİR
+// TAŞIMA (davranış değişmedi, tek satır bile değişmedi - sadece namespace).
+// Gerekçe: artık HEM AI modülü (wiki sayfası embedding'i) HEM Documents modülü
+// (belge içeriği embedding'i, P4'ün geri kalan günleri) AYNI chunking
+// algoritmasına ihtiyaç duyuyor - iki modülün birbirinin Domain'ine referans
+// vermesi YASAK (modüler monolith kuralı), bu yüzden gerçekten paylaşılan,
+// durumsuz bir algoritma Shared katmanına taşınıyor (Shared.Kernel/Contracts/
+// CQRS/Caching'in HER BİRİNİN kendi küçük projesi olmasıyla AYNI felsefe -
+// Kernel'e KONMADI çünkü Kernel bugün sadece Entity<TId>, chunking farklı
+// bir kaygı).
+//
 // WikiVisibilityRules (Wiki.Domain) ile aynı desen: durumsuz (stateless), saf bir
 // iş kuralı - DB'ye, HTTP'ye, hiçbir dış sisteme ihtiyacı yok, bu yüzden bir
 // entity değil, static bir sınıf. Chunking, uzun bir metni sabit boyutlu ve

@@ -11,13 +11,18 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IOutboxWriter _outboxWriter;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
     public UploadDocumentCommandHandler(
-        IDocumentRepository documentRepository, IFileStorageService fileStorageService, ICurrentUserAccessor currentUser)
+        IDocumentRepository documentRepository, IFileStorageService fileStorageService,
+        IOutboxWriter outboxWriter, IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
         _fileStorageService = fileStorageService;
+        _outboxWriter = outboxWriter;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -57,6 +62,16 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
         request.AuditDetails = document.Title;
 
         await _documentRepository.AddAsync(document, cancellationToken);
+
+        // Belge yazmasıyla AYNI transaction'da (atomik) - Document satırı
+        // yazılmadan bu event asla kalıcı olmaz, event yazılmadan Document da
+        // (aynı SaveChanges'in içinde olduğu için) kalıcı olmaz. Wiki'nin
+        // CreateWikiPageCommandHandler'ındaki AYNI desen.
+        _outboxWriter.Enqueue(new DocumentUploadedEvent(
+            document.Id, document.StorageKey, document.ContentType, document.FileExtension,
+            document.Title, document.DepartmentName, document.Visibility.ToString()));
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return document.Id;
     }

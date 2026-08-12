@@ -1,6 +1,6 @@
 using Atlas.Modules.AI.Application.Abstractions;
-using Atlas.Modules.AI.Domain.Chunking;
 using Atlas.Modules.AI.Domain.Entities;
+using Atlas.Shared.Text.Chunking;
 using MediatR;
 
 namespace Atlas.Modules.AI.Application.WikiPages.Commands;

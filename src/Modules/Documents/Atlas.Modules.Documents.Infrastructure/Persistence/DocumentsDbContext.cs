@@ -10,6 +10,7 @@ public class DocumentsDbContext : DbContext
     }
 
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
