@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { UploadCloud } from "lucide-react";
+import { toast } from "sonner";
+import { CheckCircle2, UploadCloud, X, XCircle } from "lucide-react";
 import { uploadDocument } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { DEPARTMENTS } from "../departments";
@@ -13,11 +14,21 @@ import { RadioGroup, RadioGroupItem } from "@atlas/ui/radio-group";
 // deseni - bu proje geçmişte oluşturma akışlarını Dialog'dan tam sayfaya
 // taşıdı (bkz. WikiBoard.jsx'teki "CreateWikiPageDialog kaldırıldı" notu),
 // burada da aynı, kurulu desene uyuluyor.
+//
+// P6 (çoklu dosya yükleme) - Visibility/Departman/Açıklama/Etiket TÜM
+// dosyalara ORTAK uygulanıyor (aynı seferde yüklenen dosyalar genelde aynı
+// bağlamdan gelir, ör. "şu toplantının tüm ekleri") - Title İSTİSNA: birden
+// fazla dosya seçiliyken TEK bir başlık alanı anlamsız olurdu, bu yüzden
+// o durumda Title alanı GİZLENİYOR ve her dosya kendi adından (uzantısız)
+// bir başlık alıyor (handleFilesSelect'teki TEK dosya kısayolunun AYNISI).
+// Dosyalar backend'e SIRAYLA (paralel değil) yükleniyor - basit tutuldu,
+// "N dosya aynı anda" durumunun disk/DB üzerindeki etkisini şimdilik
+// karmaşıklaştırmaya değmedi (YAGNI).
 function DocumentUploadPage({ token }) {
   const navigate = useNavigate();
   const { isAdmin, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
 
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [title, setTitle] = useState("");
   const [visibility, setVisibility] = useState("Public");
   const [department, setDepartment] = useState(isAdmin ? DEPARTMENTS[0].value : "");
@@ -26,48 +37,84 @@ function DocumentUploadPage({ token }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
+  // Her dosya için ayrı bir durum - "uploading" | "done" | "error". Submit
+  // sonrası formun ALTINDA kalıcı gösteriliyor, kullanıcı hangi dosyaların
+  // başarısız olduğunu görebilsin diye (tek dosyalık eski akışın aksine,
+  // burada otomatik yönlendirme yok - bkz. handleSubmit).
+  const [uploadResults, setUploadResults] = useState([]);
 
-  function handleFileSelect(selectedFile) {
-    if (!selectedFile) return;
-    setFile(selectedFile);
-    // Kullanıcı başlığı elle yazmadıysa dosya adından öneriyoruz - WikiEditorPage'in
-    // kırmızı linkten gelen başlığı önceden doldurmasıyla AYNI kolaylık fikri.
-    if (!title.trim()) {
-      setTitle(selectedFile.name.replace(/\.[^/.]+$/, ""));
+  function handleFilesSelect(selectedFiles) {
+    const fileArray = Array.from(selectedFiles ?? []);
+    if (fileArray.length === 0) return;
+    setFiles(fileArray);
+    if (fileArray.length === 1 && !title.trim()) {
+      setTitle(fileArray[0].name.replace(/\.[^/.]+$/, ""));
     }
   }
 
   function handleDrop(e) {
     e.preventDefault();
     setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files?.[0]);
+    handleFilesSelect(e.dataTransfer.files);
+  }
+
+  function removeFile(index) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!file) {
-      setError("Bir dosya seçmelisin.");
+    if (files.length === 0) {
+      setError("En az bir dosya seçmelisin.");
       return;
     }
 
     setError(null);
     setIsUploading(true);
-    try {
-      const result = await uploadDocument(token, {
-        file,
-        title,
-        visibility,
-        departmentName: isAdmin ? department : undefined,
-        description,
-        tags,
-      });
-      navigate(`/documents/${result.id}`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsUploading(false);
+    setUploadResults(files.map((f) => ({ fileName: f.name, status: "uploading" })));
+
+    const uploadedIds = [];
+    for (let i = 0; i < files.length; i++) {
+      const currentFile = files[i];
+      const fileTitle = files.length === 1 ? title : currentFile.name.replace(/\.[^/.]+$/, "");
+      try {
+        const result = await uploadDocument(token, {
+          file: currentFile,
+          title: fileTitle,
+          visibility,
+          departmentName: isAdmin ? department : undefined,
+          description,
+          tags,
+        });
+        uploadedIds.push(result.id);
+
+        // P6 Gün 3 (duplicate-detection) - yükleme YİNE DE başarılı oldu,
+        // bu sadece bir bilgilendirme (bkz. UploadDocumentResult'taki not).
+        if (result.duplicateOfDocumentId) {
+          toast(`"${currentFile.name}" zaten yüklü olabilir`, {
+            description: `Aynı içerikli bir belge var: "${result.duplicateOfTitle}". Yine de yüklendi.`,
+          });
+        }
+
+        setUploadResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "done" } : r)));
+      } catch (err) {
+        setUploadResults((prev) =>
+          prev.map((r, idx) => (idx === i ? { ...r, status: "error", message: err.message } : r))
+        );
+      }
+    }
+
+    setIsUploading(false);
+
+    // Tek dosyalık eski davranış KORUNDU (doğrudan detay sayfasına git) -
+    // birden fazla dosyada yönlendirme YOK, kullanıcı sonuç listesini
+    // görüp kendi seçtiği belgeye tıklayabilsin diye burada kalıyoruz.
+    if (files.length === 1 && uploadedIds.length === 1) {
+      navigate(`/documents/${uploadedIds[0]}`);
     }
   }
+
+  const isMultiple = files.length > 1;
 
   return (
     <div className="mx-auto max-w-xl text-left">
@@ -90,22 +137,52 @@ function DocumentUploadPage({ token }) {
           }}
         >
           <UploadCloud size={28} style={{ color: "var(--text)", opacity: 0.5 }} />
-          {file ? (
-            <p className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
-              {file.name}
+          {files.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--text)", opacity: 0.7 }}>
+              Dosyaları buraya sürükle ya da aşağıdan seç (birden fazla seçilebilir)
             </p>
           ) : (
-            <p className="text-sm" style={{ color: "var(--text)", opacity: 0.7 }}>
-              Dosyayı buraya sürükle ya da aşağıdan seç
+            <p className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+              {files.length} dosya seçildi
             </p>
           )}
-          <Input type="file" onChange={(e) => handleFileSelect(e.target.files?.[0])} className="mt-1" />
+          <Input type="file" multiple onChange={(e) => handleFilesSelect(e.target.files)} className="mt-1" />
         </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="upload-title">Başlık</Label>
-          <Input id="upload-title" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isUploading} required />
-        </div>
+        {files.length > 0 && (
+          <ul className="flex flex-col gap-1 rounded-lg border p-2" style={{ borderColor: "var(--border)" }}>
+            {files.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2 px-1 py-0.5 text-sm">
+                <span className="truncate" style={{ color: "var(--text)" }}>
+                  {f.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  disabled={isUploading}
+                  className="shrink-0"
+                  style={{ color: "var(--text)", opacity: 0.6 }}
+                  aria-label={`${f.name} dosyasını kaldır`}
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {!isMultiple && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="upload-title">Başlık</Label>
+            <Input id="upload-title" value={title} onChange={(e) => setTitle(e.target.value)} disabled={isUploading} required />
+          </div>
+        )}
+        {isMultiple && (
+          <p className="text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+            Birden fazla dosya seçtiğin için her biri kendi dosya adından bir başlık alacak - yüklendikten sonra
+            istediğin belgeyi ayrı ayrı düzenleyebilirsin.
+          </p>
+        )}
 
         {isAdmin ? (
           <div className="flex flex-col gap-1.5">
@@ -122,7 +199,7 @@ function DocumentUploadPage({ token }) {
         ) : (
           <p className="text-sm" style={{ color: "var(--text)" }}>
             {ownDepartment
-              ? `Bu belge senin departmanına (${ownDepartment}) eklenecek.`
+              ? `Bu belge(ler) senin departmanına (${ownDepartment}) eklenecek.`
               : "Departmanın olmadığı için belge yükleyemezsin."}
           </p>
         )}
@@ -166,12 +243,34 @@ function DocumentUploadPage({ token }) {
             className="text-white hover:opacity-90"
             style={{ background: "var(--brand-accent)" }}
           >
-            {isUploading ? "Yükleniyor..." : "Yükle"}
+            {isUploading ? "Yükleniyor..." : files.length > 1 ? `${files.length} Dosyayı Yükle` : "Yükle"}
           </Button>
           <Button type="button" variant="outline" onClick={() => navigate("/documents")}>
-            Vazgeç
+            {uploadResults.length > 0 ? "Belgelere dön" : "Vazgeç"}
           </Button>
         </div>
+
+        {uploadResults.length > 0 && (
+          <ul className="flex flex-col gap-1 rounded-lg border p-2" style={{ borderColor: "var(--border)" }}>
+            {uploadResults.map((r, i) => (
+              <li key={`${r.fileName}-${i}`} className="flex items-center gap-2 px-1 py-0.5 text-sm">
+                {r.status === "uploading" && (
+                  <span className="h-3.5 w-3.5 shrink-0 animate-pulse rounded-full" style={{ background: "var(--brand-accent)" }} />
+                )}
+                {r.status === "done" && <CheckCircle2 size={14} className="shrink-0" style={{ color: "green" }} />}
+                {r.status === "error" && <XCircle size={14} className="shrink-0" style={{ color: "red" }} />}
+                <span className="truncate" style={{ color: "var(--text)" }}>
+                  {r.fileName}
+                </span>
+                {r.status === "error" && (
+                  <span className="truncate text-xs" style={{ color: "red" }}>
+                    · {r.message}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </form>
     </div>
   );

@@ -21,7 +21,12 @@ public record DocumentDto(
     string? Description,
     string? Tags,
     string Status,
-    string? ProcessingError);
+    string? ProcessingError,
+    // P6 (versiyonlama) - frontend'in "Versiyon 3 (güncel)" gibi gösterebilmesi
+    // için. GetDocumentVersionsQuery'nin döndürdüğü liste SADECE ESKİ
+    // versiyonları taşıyor (bkz. o Query'deki not) - güncel versiyon numarası
+    // Document'ın kendisinden, yani buradan geliyor.
+    int CurrentVersionNumber);
 
 public static class DocumentMappingExtensions
 {
@@ -29,5 +34,5 @@ public static class DocumentMappingExtensions
         document.Id, document.Title, document.OriginalFileName, document.ContentType, document.FileExtension,
         document.SizeBytes, document.DepartmentName, document.Visibility.ToString(), document.CreatedByUserId,
         document.CreatedByEmail, document.CreatedAtUtc, document.UpdatedAtUtc, document.Description, document.Tags,
-        document.Status.ToString(), document.ProcessingError);
+        document.Status.ToString(), document.ProcessingError, document.CurrentVersionNumber);
 }
