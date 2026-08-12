@@ -99,6 +99,20 @@ public static class DocumentsEndpoints
         .WithName("DeleteDocument")
         .RequireAuthorization();
 
+        // POST /api/wiki/reindex'in Documents'taki karşılığı - AMA tek bir
+        // belgeyi hedefliyor, Admin-only bulk DEĞİL. owner-or-Admin yetkisi
+        // (Delete/Update ile AYNI desen) Handler'da uygulanıyor - istemciden
+        // gelen bir alana güvenilmiyor. Failed'a düşmüş bir belgeyi (ör. o an
+        // desteklenmeyen bir uzantıydı, sonradan bir processor eklendi) sahibi/
+        // Admin elle yeniden tetikleyebilsin diye.
+        group.MapPost("/{id:guid}/reprocess", async (Guid id, IMediator mediator) =>
+        {
+            await mediator.Send(new ReprocessDocumentCommand(id));
+            return Results.Accepted();
+        })
+        .WithName("ReprocessDocument")
+        .RequireAuthorization();
+
         return app;
     }
 }
