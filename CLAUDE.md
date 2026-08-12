@@ -1223,7 +1223,7 @@ sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
       geçiyor, 30s'den 45s'e çıktı). Branch protection'a "Integration
       Tests" üçüncü zorunlu check olarak eklendi.
 
-  Gün 1-2 için PR #13 açık (kullanıcının "sadece bu adımı push'la" istisnai
+  Gün 1-2 için PR #13 açıldı (kullanıcının "sadece bu adımı push'la" istisnai
   onayıyla - GitHub Actions'ı yerel simüle edecek bir araç olmadığı için CI
   değişikliğinin GERÇEK bir Actions çalıştırmasıyla doğrulanması
   gerekiyordu).
@@ -1297,10 +1297,13 @@ sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
       doğrulandı: `npx vitest run` → 4 dosya, 17 test, hepsi yeşil;
       `npm run lint`/`npm run build` de temiz.
 
-  Dört gün de (Gün 1-5) tamamlandı - PR #13'e Gün 3-5 commit'leri eklenecek,
-  kullanıcının açık "push'la" talimatı beklenip push edilecek (Gün 2'deki
-  "Evet, onaylıyorum" SADECE o adımın CI doğrulaması için istisnaydı, genel
-  bir yeniden yetkilendirme değildi).
+  Dört gün de (Gün 1-5) tamamlandı, PR #13'e eklendi, push edildi ve
+  **merge edildi (2026-08-12, `master`'a fast-forward)** - üç zorunlu CI
+  check'i de (Backend, Frontend, Integration Tests) yeşildi. Merge sonrası
+  yerel `master` senkronize edildi, `chore/test-ci-hardening` local branch
+  silindi.
+
+**Test & CI Sertleştirme paketi artık TAMAMEN BİTTİ (Gün 1-5) ve `master`'da.**
 
 ## Sırada ne var
 
@@ -1324,15 +1327,30 @@ sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
    (Docker Compose, SignalR toast, rate limiting) VE orijinal 6 maddelik
    özellik listesinin denetimde bulunan 3 gerçek eksiği (link arama, kırmızı
    link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı.
-3. **"Kapsamlı Geliştirme Paketi" TAMAMEN BİTTİ (yukarıdaki bölüme bkz.):**
-   P1 (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) merge edildi
-   (PR #6). P4 (belge işleme pipeline'ı, Gün 1-6) merge edildi (PR #7, bkz.
-   Ders #21'deki regresyon düzeltmesi de aynı PR'da). P5 (Documents→AI/RAG
-   entegrasyonu, Gün 1-4) merge edildi (PR #8). P6 (belge versiyonlama +
-   toplu yükleme, Gün 1-5) merge edildi (PR #9). **P7 (güvenlik sertleştirme,
-   Gün 1-3) de TAMAMLANDI** - `feature/security-hardening` branch'inde,
-   henüz push/PR edilmedi. Paketin 19 bölümlük orijinal spec'inin TAMAMI
-   artık uygulanmış durumda.
+3. **"Kapsamlı Geliştirme Paketi" TAMAMEN BİTTİ ve TAMAMI merge edildi
+   (yukarıdaki bölüme bkz.):** P1 (Favoriler/Pinler), P2 (Editör v2), P3
+   (Documents temeli) merge edildi (PR #6). P4 (belge işleme pipeline'ı,
+   Gün 1-6) merge edildi (PR #7, bkz. Ders #21'deki regresyon düzeltmesi de
+   aynı PR'da). P5 (Documents→AI/RAG entegrasyonu, Gün 1-4) merge edildi
+   (PR #8). P6 (belge versiyonlama + toplu yükleme, Gün 1-5) merge edildi
+   (PR #9). **P7 (güvenlik sertleştirme, Gün 1-3) merge edildi (PR #10).**
+   Paketin 19 bölümlük orijinal spec'inin TAMAMI `master`'da.
+4. **README.md portföy seviyesinde güncellendi ve merge edildi** (PR #11/#12,
+   2026-08-12) - Audit/Vault/Documents/AI modülleri dahil projenin GÜNCEL
+   tam mimarisini yansıtıyor (eskiden "Bölüm 19 - Sayfalama"da kalmış bir
+   öğrenme günlüğüydü).
+5. **Test & CI Sertleştirme paketi TAMAMLANDI ve merge edildi (PR #13,
+   yukarıdaki bölüme bkz.):** integration testler CI'a taşındı (CI'a
+   taşınınca gerçek bir bug bulundu - xUnit test sınıfı paralelliği, bkz.
+   ilgili bölüm), Documents modülüne hızlı bir Application-katmanı unit test
+   projesi eklendi (18 test), frontend'e ilk kez otomatik test altyapısı
+   (Vitest + React Testing Library, 17 test) kuruldu.
+
+**Şu an bloklanmış olan (madde 1) dışında net, önceden planlanmış bir
+sonraki adım YOK** - hem "Kapsamlı Geliştirme Paketi"nin 19 bölümlük orijinal
+spec'i hem de "API key'ler gelene kadar ne yapalım" sorusuna açılan Test & CI
+paketi tamamen bitti. Bir sonraki özellik/yön kullanıcıyla birlikte
+kararlaştırılmalı - varsayılan bir öncelik YOK.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
