@@ -129,5 +129,13 @@ jobs:
       - name: Lint
         run: npm run lint --workspace=web
 
+      # Vitest + React Testing Library (2026-08-12'de eklendi) - dateUtils/
+      # jwt/passwordGenerator gibi saf mantığı VE WikiSearch.jsx gibi gerçek
+      # bir component'in jsdom'da render+kullanıcı-etkileşimini test ediyor.
+      # Backend'in "Category!=Integration" testleri gibi dış bağımlılığı yok,
+      # bu yüzden ayrı bir job DEĞİL - aynı job'da lint/build'in yanına eklendi.
+      - name: Test
+        run: npm run test --workspace=web
+
       - name: Build
         run: npm run build --workspace=web
