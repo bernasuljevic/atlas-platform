@@ -1176,12 +1176,17 @@ yay, önemli şeyleri anlat" talimatına göre.
     Postgres/SQL Server'ın ZATEN kanıtlanmış aynı deseni. Öncesinde bu
     override hiç yoktu, `docker compose down` yüklenen belgeleri sessizce
     siliyordu (DB satırları kalıp artık var olmayan bir dosyaya işaret
-    ediyordu). **Not:** `docker compose config` ile doğrulandı ama tam bir
-    "up --build" döngüsüyle CANLI doğrulanmadı (bu makinede native SQL
-    Server/Postgres/Redis kullanılıyor, SQL Server imajı dahil tam stack'i
-    sıfırdan ayağa kaldırmak bu değişikliğin kapsamına göre orantısız bir
-    süre gerektirirdi) - değişiklik aynı dosyadaki iki ZATEN canlı
-    doğrulanmış volume deseniyle birebir aynı yapıyı izliyor.
+    ediyordu).
+
+**Sonradan (2026-08-12, Test & CI sertleştirme paketinin Gün 1'i) tam bir
+"up --build" döngüsüyle CANLI DOĞRULANDI:** `docker compose up -d --build`
+ile tüm stack sıfırdan ayağa kaldırıldı, bir kullanıcı kaydedilip
+doğrulandı, bir belge yüklendi (indirildi, byte-birebir eşleşti,
+`status: "Ready"` - embedding pipeline'ı da container içinde sorunsuz
+çalıştı). Sonra `docker compose down` (volume'ler SİLİNMEDEN) + `docker
+compose up -d` ile TÜM container'lar (sqlserver dahil) sıfırdan yeniden
+oluşturuldu - aynı belge tekrar indirildi, içerik byte-birebir AYNIYDI.
+Kod değişikliği gerekmedi, sadece P7 Gün 3'ün doğru çalıştığının kanıtıydı.
 
   Test/lint yeşil (docker-compose.yml değişikliği .NET/JS kodunu
   etkilemiyor, ayrı bir test gerektirmedi).
