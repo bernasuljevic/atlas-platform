@@ -38,6 +38,10 @@ public static class AIModule
         // aynı sebepten Scoped.
         services.AddScoped<IWikiPageEmbeddingRepository, EfWikiPageEmbeddingRepository>();
 
+        // P5: Documents→AI/RAG entegrasyonu - WikiPageEmbedding'in AYNI deseni,
+        // ayrı tablo/repository (bkz. DocumentEmbedding'deki "neden ayrı" notu).
+        services.AddScoped<IDocumentEmbeddingRepository, EfDocumentEmbeddingRepository>();
+
         // AI modülünde MediatR ilk kez burada kayıt ediliyor (Gün 1'de fark ettiğimiz
         // eksiklik) - Auth/Wiki'deki AddMediatR bloklarıyla birebir aynı desen:
         // loglama + validasyon (henüz validator yok ama ValidationBehavior validator

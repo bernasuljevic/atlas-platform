@@ -29,12 +29,17 @@ namespace Atlas.IntegrationTests;
 /// diskteki dosyayı da temizliyor.
 ///
 /// Sahip token'ı SINIF SEVİYESİNDE (static, tembel/lazy) ÖNBELLEKLENİYOR - "login"
-/// rate limit politikası dakikada 5 istek (bkz. Program.cs), bu sınıftaki 7 testin
+/// rate limit politikası dakikada 5 istek (bkz. Program.cs), bu sınıftaki testlerin
 /// HER BİRİ kendi register+login'ini yapsaydı aynı 1 dakikalık pencerede kolayca
 /// aşılırdı (AiSearchEndpointsTests'in 4 çağrıyla sınırda kalmasıyla AYNI kısıt).
 /// Testlerin çoğu "kim yüklediği" ile ilgilenmediği için tek bir paylaşılan sahip
 /// yeterli - SADECE yetki testi (owner-or-admin) gerçekten İKİNCİ, farklı bir
 /// kullanıcı istiyor.
+///
+/// P5 (Documents→AI/RAG entegrasyonu) ile GecerliBelge_..._BirlesikAramadaDocumentKaynakliSonucOlarakCikar
+/// eklendi - AiSearchEndpointsTests'teki AYNI Postgres-kalıcılık kısıtı burada
+/// da geçerli (AI'ın DbContext'i InMemory'e çevrilmiyor), bu yüzden o test de
+/// kendi DocumentEmbedding'lerini AiEmbeddingTestCleanup ile temizliyor.
 /// </summary>
 [Trait("Category", "Integration")]
 public class DocumentsProcessingIntegrationTests : IClassFixture<AtlasApiFactory>
@@ -327,6 +332,78 @@ public class DocumentsProcessingIntegrationTests : IClassFixture<AtlasApiFactory
         {
             if (documentId is not null)
                 await DeleteDocumentAsync(token, documentId.Value);
+        }
+    }
+
+    // AiSearchEndpointsTests'teki SearchTitlesWithRetryAsync'in AYNI fikri -
+    // GEÇEN zincir burada bir kat daha uzun: Documents Outbox'ının
+    // DocumentUploadedEvent'i işlemesi (extraction+chunking) VE AI'ın KENDİ
+    // Outbox'ının DocumentChunksReadyEvent'i işlemesi (embedding) İKİ AYRI
+    // 5sn'lik poll aralığından SIRAYLA geçiyor - Wiki'nin tek-hop'lu eşdeğerinin
+    // (10sn) İKİ KATI + pay, bu yüzden 30sn.
+    //
+    // BULUNAN GERÇEK BUG: AiSearchEndpointsTests'teki SearchTitlesWithRetryAsync'in
+    // 500ms'lik poll aralığı KOPYALANMIŞTI - ama o metot en fazla 10sn (yaklaşık
+    // 20 istek) bekliyor, "ai-search" rate limit'inin (dakikada 20, bkz. Program.cs)
+    // TAM sınırında kalıyor. Burada 30sn'lik pencerede AYNI 500ms aralığı ~60 isteğe
+    // denk geliyordu - canlı olarak 429 (TooManyRequests) ile patladı. 3sn'ye
+    // çıkarılınca 30sn'de en fazla ~10 istek oluyor, limitin güvenle altında.
+    private async Task<List<JsonElement>> SearchUntilDocumentAppearsAsync(string token, string queryText, Guid documentId)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        List<JsonElement> results;
+        do
+        {
+            var request = new HttpRequestMessage(
+                HttpMethod.Get, $"/api/ai/search?q={Uri.EscapeDataString(queryText)}&topN=5");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            results = body.EnumerateArray().ToList();
+            if (results.Any(r => r.GetProperty("resourceId").GetGuid() == documentId))
+                return results;
+
+            await Task.Delay(3000);
+        } while (DateTime.UtcNow < deadline);
+
+        return results;
+    }
+
+    [Fact]
+    public async Task GecerliBelge_IslendiktenSonra_BirlesikAramadaDocumentKaynakliSonucOlarakCikar()
+    {
+        // P5'in ASIL iddiasını (Documents→AI/RAG entegrasyonu) uçtan uca
+        // doğrulayan test - P4'teki GecerliMetinBelgesi testinin sadece
+        // "Ready'e geçti" demesinin bir adım ötesi: gerçekten arama
+        // SONUÇLARINDA çıkıyor mu, doğru sourceType/resourceId ile mi.
+        var token = await GetOwnerTokenAsync();
+        var uniqueTerm = $"birlesikaramatesti{Guid.NewGuid():N}";
+        Guid? documentId = null;
+
+        try
+        {
+            var response = await UploadDocumentAsync(
+                token, $"Birleşik Arama Testi {Guid.NewGuid()}",
+                $"Bu belge {uniqueTerm} konusunu ayrıntılı olarak anlatıyor.");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var created = await response.Content.ReadFromJsonAsync<JsonElement>();
+            documentId = created.GetProperty("id").GetGuid();
+
+            var results = await SearchUntilDocumentAppearsAsync(token, uniqueTerm, documentId.Value);
+
+            var hit = Assert.Single(results, r => r.GetProperty("resourceId").GetGuid() == documentId.Value);
+            Assert.Equal("Document", hit.GetProperty("sourceType").GetString());
+        }
+        finally
+        {
+            if (documentId is not null)
+            {
+                await DeleteDocumentAsync(token, documentId.Value);
+                await AiEmbeddingTestCleanup.DeleteEmbeddingsForDocumentsAsync(_factory, [documentId.Value]);
+            }
         }
     }
 }

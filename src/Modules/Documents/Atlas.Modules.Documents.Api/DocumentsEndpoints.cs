@@ -29,6 +29,17 @@ public static class DocumentsEndpoints
         // GetWikiPageById ile AYNI "varlığı gizle" deseni - Handler null
         // dönerse 404, başka departmanın DepartmentOnly belgesinin ID'si
         // tahmin edilse bile "yok" gibi davranılıyor.
+        // SearchWikiPageSuggestions ile AYNI desen (auth GEREKMİYOR, görünürlük
+        // filtresi ICurrentUserAccessor'dan otomatik) - WikiEditorPage'in link
+        // penceresi (P5 Gün 4) bunu Wiki'ninkiyle BİRLİKTE çağırıp tek bir
+        // öneri listesinde birleştiriyor.
+        group.MapGet("/search-suggestions", async (IMediator mediator, string q = "") =>
+        {
+            var suggestions = await mediator.Send(new SearchDocumentSuggestionsQuery(q));
+            return Results.Ok(suggestions);
+        })
+        .WithName("SearchDocumentSuggestions");
+
         group.MapGet("/{id:guid}", async (Guid id, IMediator mediator) =>
         {
             var document = await mediator.Send(new GetDocumentByIdQuery(id));

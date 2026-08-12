@@ -11,6 +11,8 @@ public class AiDbContext : DbContext
 
     public DbSet<WikiPageEmbedding> WikiPageEmbeddings => Set<WikiPageEmbedding>();
 
+    public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Auth "auth", Wiki "wiki" şemasını kullanıyor - bu da "ai" şemasını kullanıyor.

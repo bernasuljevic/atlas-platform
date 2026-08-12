@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, Check, CheckCircle2, Copy, Info, PlayCircle, XCircle } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, FileText, Info, PlayCircle, XCircle } from "lucide-react";
 
 // Kasıtlı olarak KÜÇÜK, ELLE YAZILMIŞ bir render katmanı - dışarıdan bir
 // markdown kütüphanesi (react-markdown/marked) EKLENMEDİ, çünkü sadece
@@ -17,7 +17,13 @@ import { AlertTriangle, Check, CheckCircle2, Copy, Info, PlayCircle, XCircle } f
 // "kırmızı link" fikriyle aynı - hedef sayfa HENÜZ YOK, tıklanınca o başlıkla
 // önceden doldurulmuş bir "Yeni Sayfa" ekranına gidiyor (bkz. WikiEditorPage'in
 // link penceresindeki arama - sonuç bulunamazsa bu tür bir bağlantı öneriliyor).
-// Aksi halde normal bir dış bağlantı. **kalın**, *italik* - iç içe geçmiyor
+// "document:GUID" - P2'de ertelenmiş, P5'te (Documents→AI/RAG entegrasyonu)
+// bağlanan içerik-referans bloğu: bir wiki sayfasının içinden Document
+// Library'deki bir belgeye işaret ediyor (bkz. WikiEditorPage'in link
+// penceresindeki BİRLEŞİK - wiki+belge - arama). "wiki:"den KASITLI olarak
+// farklı bir görsel işaret (küçük bir dosya ikonu) taşıyor ki okuyucu
+// tıklamadan önce bunun bir wiki sayfası DEĞİL, indirilebilir bir belge
+// olduğunu anlasın. Aksi halde normal bir dış bağlantı. **kalın**, *italik* - iç içe geçmiyor
 // (basit tutuldu, editördeki araç çubuğu zaten bunları iç içe üretmiyor).
 // Faz 1 (2026-08-08, "Atlas İçerik Sistemi" spec'i) - `inline kod` eklendi,
 // EN SONA (diğer alternatiflerden sonra) konuldu ki `**kalın**`/`*italik*`
@@ -82,6 +88,20 @@ function renderInline(text, keyPrefix) {
             style={{ color: "red" }}
             title={`"${wantedTitle}" sayfası henüz yok - oluşturmak için tıkla`}
           >
+            {linkText}
+          </Link>
+        );
+      } else if (linkTarget.startsWith("document:")) {
+        const documentId = linkTarget.slice("document:".length);
+        nodes.push(
+          <Link
+            key={key}
+            to={`/documents/${documentId}`}
+            className="inline-flex items-center gap-1 align-text-bottom hover:underline"
+            style={{ color: "var(--brand-accent)" }}
+            title="Belge Kütüphanesi'nde aç"
+          >
+            <FileText size={14} className="shrink-0" aria-hidden="true" />
             {linkText}
           </Link>
         );

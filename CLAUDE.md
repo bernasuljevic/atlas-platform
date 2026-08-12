@@ -1074,13 +1074,49 @@ yay, önemli şeyleri anlat" talimatına göre.
   Tüm değişiklikler `feature/document-processing-pipeline` branch'inde,
   3 ayrı commit'te (Gün 1-4 / regresyon düzeltmesi / Gün 5-6).
 
+- [x] **P5 - Documents→AI/RAG entegrasyonu (Gün 1-4, TAMAMLANDI,
+      `feature/documents-ai-rag-integration` branch'inde):**
+  - Gün 1: `DocumentEmbedding` (AI.Domain) - `WikiPageEmbedding`'e paralel
+    ama AYRI bir tablo (WikiPageId/DocumentId farklı kimlik uzayları,
+    "polymorphic" tek tablo İCAT EDİLMEDİ). `EmbeddingDimension` sabiti
+    (1024) yeni bir `EmbeddingDimensions` statik sınıfına çıkarıldı - iki
+    entity de (Wiki+Document) artık TEK bir yerden türüyor.
+    `IDocumentEmbeddingRepository`/`EfDocumentEmbeddingRepository` -
+    `IWikiPageEmbeddingRepository`'nin birebir kopyası. Migration uygulandı.
+  - Gün 2: `GenerateDocumentEmbeddingsCommand` - Wiki'nin karşılığından TEK
+    farkı: TextChunker'ı KENDİSİ ÇAĞIRMIYOR, zaten bölünmüş `ChunkTexts`
+    alıyor (chunking Documents.Infrastructure'da yapıldı).
+    `DocumentChunksReadyEventHandler`/`DocumentDeletedEventHandler`
+    (AI.Infrastructure) - `WikiPageCreatedEventHandler`/
+    `WikiPageDeletedEventHandler` ile birebir aynı best-effort desen.
+  - Gün 3: `SearchWikiPagesByMeaningQuery` → `SearchByMeaningQuery`
+    (`AI.Application/Search/Queries`'e taşındı, `WikiSearchResultDto` →
+    `SemanticSearchResultDto` ile `SourceType`+`ResourceId`) - artık İKİ
+    kaynaktan (Wiki+Documents) aday çekip AYNI `IWikiVisibilityChecker`
+    kuralıyla filtreleyip TEK bir listede skora göre birleştiriyor. Endpoint
+    (`/api/ai/search`) değişmedi. **İki gerçek bug canlı integration testte
+    yakalandı:** (1) iki repository çağrısını `Task.WhenAll` ile "aynı anda"
+    başlatmak, AYNI DI scope'undaki Scoped `AiDbContext` üzerinde "a second
+    operation was started" hatasıyla HER istekte patlıyordu (EF Core
+    DbContext thread-safe değil) - sıralı `await`e çevrildi. (2) yeni uçtan
+    uca testin 500ms'lik poll aralığı "ai-search" rate limit'ini (dakikada
+    20) aşıp 429 alıyordu (iki ayrı Outbox turu toplam ~10sn sürüyor,
+    Wiki'nin tek-hop'lu eşdeğerinden daha uzun) - 3sn'ye çıkarıldı.
+  - Gün 4: `WikiSearch.jsx` birleşik sonuçları (kaynak-tipi ikonuyla, BookOpen/
+    FileText) gösteriyor, tıklanınca `sourceType`'a göre `/wiki/:id` ya da
+    `/documents/:id`'ye gidiyor. P2'de ertelenen `document:GUID` içerik-
+    referans bloğu (`markdown.jsx`) bağlandı - `wiki:`den görsel olarak
+    AYRIŞTIRILDI (küçük dosya ikonu). Bunu besleyen yeni
+    `SearchDocumentSuggestionsQuery` (Documents.Application,
+    `GET /api/documents/search-suggestions`) - Wiki'nin var olan endpoint'i
+    Documents'a bağımlı KILINMADI (modül izolasyonu), bunun yerine
+    WikiEditorPage'in link penceresi İKİ öneri endpoint'ini
+    `Promise.allSettled` ile birlikte çağırıp frontend'de birleştiriyor.
+
+  `dotnet test Atlas.sln`: tüm testler (135+ Domain/Application/
+  Infrastructure + 19 Integration testi) yeşil.
+
 **Henüz yapılmayan (bu paketin geri kalanı):**
-- P5: Documents→AI/RAG entegrasyonu - `DocumentEmbedding` (AI.Domain,
-  `WikiPageEmbedding`'e paralel) + AI'ın `DocumentChunksReadyEvent`/
-  `DocumentDeletedEvent`'e (zaten tanımlı, henüz DİNLENMİYOR) abone olması +
-  `SearchWikiPagesByMeaningQuery`'nin iki kaynaktan (Wiki+Documents) birleşik
-  sonuç döndürecek şekilde genişlemesi + frontend'de kaynak-tipi rozeti +
-  P2'de ertelenen `document:GUID` içerik-referans bloğunun bağlanması.
 - P6: `DocumentVersion` entity + migration, çoklu dosya yükleme UX,
   `ContentHash` tabanlı duplicate-detection (engellemiyor, sadece uyarıyor).
 - P7: Vault'un `POST /reveal`'ına rate-limit policy'si (şu an HİÇ yok, login/
@@ -1096,7 +1132,7 @@ yay, önemli şeyleri anlat" talimatına göre.
    (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-07-28,
    kullanıcı gözlemi):** Arama şu an "başlığa göre eşleşiyormuş" hissi
    verebiliyor - kod tarafında bu YANLIŞ, canlı test edilip kanıtlandı
-   (`SearchWikiPagesByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,
+   (`SearchByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,
    `Title` skora hiç girmiyor, sadece görüntüleme alanı - bkz.
    `GenerateWikiPageEmbeddingsCommandHandler`'daki `TextChunker.Chunk(request.Content)`,
    Title hiç chunk'lanmıyor). Gerçek sebep `FakeEmbeddingService`'in kaba
@@ -1113,10 +1149,11 @@ yay, önemli şeyleri anlat" talimatına göre.
    link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı.
 3. **AKTİF - "Kapsamlı Geliştirme Paketi" (yukarıdaki bölüme bkz.):** P1
    (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) TAMAMLANDI ve
-   merge edildi (PR #6). **P4 (belge işleme pipeline'ı, Gün 1-6) de
-   TAMAMLANDI** - `feature/document-processing-pipeline` branch'i push
-   edildi, PR açıldı (bkz. Ders #21'deki regresyon düzeltmesi de aynı PR'da).
-   Ardından sırayla P5 (Documents→AI/RAG entegrasyonu), P6 (toplu yükleme +
+   merge edildi (PR #6). **P4 (belge işleme pipeline'ı, Gün 1-6) TAMAMLANDI**
+   - `feature/document-processing-pipeline` branch'i merge edildi (PR #7,
+   bkz. Ders #21'deki regresyon düzeltmesi de aynı PR'da). **P5 (Documents→
+   AI/RAG entegrasyonu, Gün 1-4) de TAMAMLANDI** - `feature/documents-ai-rag-integration`
+   branch'inde, henüz push/PR edilmedi. Ardından P6 (toplu yükleme +
    versiyonlama), P7 (güvenlik sertleştirme) planlanıyor.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
@@ -1151,8 +1188,16 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
 - `GET /api/ai/search?q=...&topN=5&fromUtc=...&toUtc=...` (topN/fromUtc/toUtc
   opsiyonel, varsayılan topN=5) → token gerektirir, sonuçlar departman
   görünürlük kuralına göre filtrelenir (Admin bypass eder). fromUtc/toUtc
-  verilirse, mesafe sıralamasından ÖNCE sayfanın embedding'inin oluşturulma
-  zamanına göre daraltır - normal semantik aramaya EK, isteğe bağlı bir filtre.
+  verilirse, mesafe sıralamasından ÖNCE embedding'in oluşturulma zamanına
+  göre daraltır - normal semantik aramaya EK, isteğe bağlı bir filtre. P5'ten
+  itibaren SADECE wiki sayfalarını DEĞİL, Documents'ın da chunk'larını
+  arıyor - her sonuç `{sourceType: "WikiPage"|"Document", resourceId, ...}`
+  taşıyor.
+- `GET /api/documents/search-suggestions?q=...` → açık (görünürlük filtresi
+  otomatik), `GET /api/wiki/search-suggestions`'ın Documents karşılığı -
+  başlık/etiket üzerinde hafif, gerçek-zamanlı arama (içerik YOK, Document
+  kendi çıkarılmış metnini saklamıyor). WikiEditorPage'in link penceresi
+  ikisini birlikte çağırıyor.
 - `GET /api/audit-log?details=...&fromUtc=...&toUtc=...&pageNumber=1&pageSize=20`
   (hepsi opsiyonel, `details` kısmi eşleşme/`Contains`) → sadece Admin rolü.
   `WikiPage.Created`/`WikiPage.Deleted` eylemlerini kaydediyor (bkz.

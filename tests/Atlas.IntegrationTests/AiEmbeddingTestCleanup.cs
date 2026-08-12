@@ -30,4 +30,19 @@ public static class AiEmbeddingTestCleanup
             .Where(e => pageIds.Contains(e.WikiPageId))
             .ExecuteDeleteAsync();
     }
+
+    // DeleteEmbeddingsForPagesAsync'in P5'teki (Documents→AI/RAG entegrasyonu)
+    // karşılığı - AYNI gerekçe: DocumentEmbeddings de AI'ın Postgres'inde
+    // kalıcı, DocumentsDbContext'in InMemory olması bunu temizlemiyor.
+    public static async Task DeleteEmbeddingsForDocumentsAsync(AtlasApiFactory factory, IReadOnlyCollection<Guid> documentIds)
+    {
+        if (documentIds.Count == 0) return;
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AiDbContext>();
+
+        await db.DocumentEmbeddings
+            .Where(e => documentIds.Contains(e.DocumentId))
+            .ExecuteDeleteAsync();
+    }
 }

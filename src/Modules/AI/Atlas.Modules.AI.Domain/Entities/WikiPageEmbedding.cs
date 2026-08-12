@@ -9,11 +9,11 @@ namespace Atlas.Modules.AI.Domain.Entities;
 public class WikiPageEmbedding : Entity<Guid>
 {
     // Bu sayı, Infrastructure'daki "vector(...)" sütun tipiyle EŞLEŞMEK ZORUNDA
-    // (şu an Voyage AI'a göre 1024). Sabiti burada, TEK bir yerde tanımlıyoruz -
-    // hem bu entity'nin validasyonu hem de EF Core configuration'ı buradan okuyor.
-    // Aksi halde "1024" sayısını iki ayrı yerde elle senkron tutmak zorunda
-    // kalırdık ve bir gün biri güncellenip diğeri unutulurdu.
-    public const int EmbeddingDimension = 1024;
+    // (şu an Voyage AI'a göre 1024). Gerçek sabit artık EmbeddingDimensions'ta
+    // (P5'te DocumentEmbedding de aynı sayıya ihtiyaç duyunca oraya taşındı) -
+    // bu property sadece geriye dönük uyumluluk için burada duruyor (mevcut
+    // WikiPageEmbeddingConfiguration/FakeEmbeddingService referansları değişmedi).
+    public const int EmbeddingDimension = EmbeddingDimensions.Standard;
 
     public Guid WikiPageId { get; private set; }
 

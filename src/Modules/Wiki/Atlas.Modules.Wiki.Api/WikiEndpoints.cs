@@ -43,7 +43,7 @@ public static class WikiEndpoints
         .WithName("GetWikiDashboard");
 
         // Üst bardaki arama kutusunun harf harf çağırdığı hafif öneri
-        // endpoint'i - AI'ın anlam bazlı aramasından (SearchWikiPagesByMeaningQuery)
+        // endpoint'i - AI'ın anlam bazlı aramasından (SearchByMeaningQuery)
         // BİLEREK ayrı, bkz. SearchWikiPageSuggestionsQuery'deki not.
         group.MapGet("/search-suggestions", async (IMediator mediator, string q = "") =>
         {
