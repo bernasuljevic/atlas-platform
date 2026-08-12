@@ -84,8 +84,11 @@ public static class DocumentsEndpoints
                 stream, file.FileName, file.ContentType, file.Length,
                 title, departmentName, visibility, description, tags);
 
-            var newDocumentId = await mediator.Send(command);
-            return Results.Ok(new { id = newDocumentId });
+            // UploadDocumentResult (P6 Gün 3) - id'nin YANINDA artık isteğe
+            // bağlı duplicateOfDocumentId/duplicateOfTitle de taşıyor
+            // (ikisi de null ise eşleşme yok demektir).
+            var result = await mediator.Send(command);
+            return Results.Ok(result);
         })
         .WithName("UploadDocument")
         .RequireAuthorization()

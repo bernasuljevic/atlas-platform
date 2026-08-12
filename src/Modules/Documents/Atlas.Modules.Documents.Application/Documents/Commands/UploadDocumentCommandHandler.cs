@@ -7,26 +7,29 @@ using MediatR;
 
 namespace Atlas.Modules.Documents.Application.Documents.Commands;
 
-public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentCommand, Guid>
+public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentCommand, UploadDocumentResult>
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IWikiVisibilityChecker _visibilityChecker;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
     public UploadDocumentCommandHandler(
         IDocumentRepository documentRepository, IFileStorageService fileStorageService,
-        IOutboxWriter outboxWriter, IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
+        IWikiVisibilityChecker visibilityChecker, IOutboxWriter outboxWriter, IUnitOfWork unitOfWork,
+        ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
         _fileStorageService = fileStorageService;
+        _visibilityChecker = visibilityChecker;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
-    public async Task<Guid> Handle(UploadDocumentCommand request, CancellationToken cancellationToken)
+    public async Task<UploadDocumentResult> Handle(UploadDocumentCommand request, CancellationToken cancellationToken)
     {
         if (!_currentUser.IsAuthenticated || _currentUser.UserId is null)
             throw new InvalidOperationException("Belge yüklemek için giriş yapmış olmalısınız.");
@@ -49,6 +52,20 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
         var bytes = buffer.ToArray();
         var contentHash = Convert.ToHexString(SHA256.HashData(bytes));
 
+        // P6 Gün 3 (duplicate-detection) - YÜKLEMEYİ ENGELLEMİYOR, sadece
+        // istemciye "aynı içerikli bir belge zaten var" uyarısı taşıyor.
+        // Görünürlük filtresi BURADA da uygulanıyor - başka departmanın
+        // DepartmentOnly bir belgesiyle eşleştiğini SÖYLEMEK bile o belgenin
+        // VARLIĞINI sızdırırdı (aynı sınıf hata: CLAUDE.md "Öğrenilen
+        // dersler #10"). Birden fazla görünür eşleşme varsa EN YENİSİ
+        // gösteriliyor - kullanıcı için en alakalı referans muhtemelen budur.
+        var candidatesWithSameHash = await _documentRepository.GetAllByContentHashAsync(contentHash, cancellationToken);
+        var visibleDuplicate = candidatesWithSameHash
+            .Where(d => _visibilityChecker.IsVisibleTo(
+                d.Visibility.ToString(), d.DepartmentName, _currentUser.Department, _currentUser.IsAdmin))
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefault();
+
         var fileExtension = Path.GetExtension(request.OriginalFileName).TrimStart('.');
 
         using var saveStream = new MemoryStream(bytes);
@@ -59,6 +76,7 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
             request.SizeBytes, departmentName, visibility, _currentUser.UserId.Value, _currentUser.Email,
             request.Description, request.Tags, contentHash);
 
+        request.AuditResourceId = document.Id.ToString();
         request.AuditDetails = document.Title;
 
         await _documentRepository.AddAsync(document, cancellationToken);
@@ -73,6 +91,6 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return document.Id;
+        return new UploadDocumentResult(document.Id, visibleDuplicate?.Id, visibleDuplicate?.Title);
     }
 }

@@ -22,6 +22,9 @@ public class EfDocumentRepository : IDocumentRepository
     public async Task<IReadOnlyList<Document>> GetAllAsync(CancellationToken ct = default) =>
         await _context.Documents.OrderByDescending(d => d.CreatedAtUtc).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Document>> GetAllByContentHashAsync(string contentHash, CancellationToken ct = default) =>
+        await _context.Documents.Where(d => d.ContentHash == contentHash).ToListAsync(ct);
+
     public Task AddAsync(Document document, CancellationToken ct = default)
     {
         _context.Documents.Add(document);
