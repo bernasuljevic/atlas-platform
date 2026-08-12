@@ -2,13 +2,23 @@
 
 [![CI](https://github.com/bernasuljevic/atlas-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/bernasuljevic/atlas-platform/actions/workflows/ci.yml)
 
-Modüler monolith mimarisiyle sıfırdan kurulan, .NET 10 + React tabanlı bir öğrenme
-projesi. Kurumsal wiki + AI fikrine dayanıyor (orijinal ilham: SubMed Platform
-mimarisi - departman bazlı wiki + AI katmanı). Şu an **Auth**, **Wiki**,
-**Notifications** ve **AI** (iskelet) modülleri var; gerçek bir SQL Server
-(Auth+Wiki) ve PostgreSQL/pgvector (AI) veritabanı, Redis cache, SignalR ile
-gerçek zamanlı bildirim, JWT + refresh token tabanlı gerçek bir login sistemi
-ve Swagger/health-check ile üretim benzeri bir gözlemlenebilirlik katmanı var.
+Modüler monolith mimarisiyle sıfırdan kurulan, .NET 10 + React tabanlı bir
+kurumsal bilgi platformu. Kurumsal wiki + AI fikrine dayanıyor (orijinal
+ilham: SubMed Platform mimarisi - departman bazlı wiki + AI katmanı), bir
+öğrenme projesi olarak başladı, zamanla GitHub portföyünde gösterilebilecek
+kurumsal seviyede bir ürüne dönüştü. Yedi modül var: **Auth** (JWT + refresh
+token + e-posta doğrulama), **Wiki** (klasör ağacı, zengin blok editörü,
+favoriler/pinler, etiketler), **Notifications** (SignalR, gerçek zamanlı),
+**AI** (Wiki sayfaları + yüklenen belgeleri birlikte tarayan semantik arama),
+**Audit** (denetim kaydı - kim ne zaman ne yaptı), **Vault** (kurum içi şifre
+kasası, Data Protection API ile şifrelenmiş) ve **Documents** (belge
+kütüphanesi - yükleme, metin çıkarımı, versiyonlama, AI aramasına otomatik
+bağlanma). Gerçek bir SQL Server (Auth/Wiki/Audit/Vault/Documents, ayrı
+şemalar) ve PostgreSQL/pgvector (AI embedding'leri) veritabanı, Redis cache,
+SignalR gerçek zamanlı bildirim, JWT + refresh token tabanlı login, IP/kullanıcı
+bazlı rate limiting, crash-safe event teslimatı (Transactional Outbox Pattern),
+Serilog + correlation ID ile üretim benzeri bir gözlemlenebilirlik katmanı ve
+GitHub Actions ile CI/CD var.
 
 ## Mimari özet
 
@@ -16,18 +26,22 @@ ve Swagger/health-check ile üretim benzeri bir gözlemlenebilirlik katmanı var
 src/Shared/                          → tüm modüllerin ortak kullandığı temel yapılar
   Atlas.Shared.Kernel                → Entity taban sınıfı
   Atlas.Shared.Contracts             → modüller arası interface'ler/event'ler
-  Atlas.Shared.CQRS                  → MediatR pipeline behavior'ları (LoggingBehavior)
+  Atlas.Shared.CQRS                  → MediatR pipeline behavior'ları (Logging/Validation/Caching/Audit/CacheInvalidation)
   Atlas.Shared.Caching               → Redis cache (ICacheService/RedisCacheService)
+  Atlas.Shared.Text                  → chunking algoritması (AI + Documents ortak kullanıyor)
 src/Modules/Auth/                    → Domain → Application → Infrastructure → Api
 src/Modules/Wiki/                    → aynı 4 katman deseni
 src/Modules/Notifications/           → aynı 4 katman deseni, SignalR Hub Infrastructure'da
-src/Modules/AI/                      → aynı 4 katman deseni, iskelet (embedding/LLM yok henüz)
+src/Modules/AI/                      → aynı 4 katman deseni - Wiki+Documents birleşik semantik arama
+src/Modules/Audit/                   → aynı 4 katman deseni - denetim kaydı
+src/Modules/Vault/                   → aynı 4 katman deseni - şifre kasası (Data Protection API)
+src/Modules/Documents/               → aynı 4 katman deseni - belge kütüphanesi + işleme pipeline'ı
 src/Host/Atlas.Api/                  → composition root, sadece her modülün *.Api projesine referans verir
-tests/                               → xUnit unit testler (Domain katmanı) + Atlas.IntegrationTests
+tests/                               → xUnit unit testler (Domain/Application/Infrastructure) + Atlas.IntegrationTests
 Web/                                 → npm workspaces monorepo
   Web/apps/platform/                 → React (Vite) frontend, shadcn/ui
-  Web/packages/ui/                   → paylaşılan @atlas/ui paketi (şu an boş iskelet)
-docker-compose.yml                   → Redis + PostgreSQL/pgvector container'ları
+  Web/packages/ui/                   → paylaşılan @atlas/ui paketi (Button/Card/Input/Dialog/Table/...)
+docker-compose.yml                   → SQL Server + PostgreSQL/pgvector + Redis + backend + frontend
 ```
 
 **Katman kuralı:** Domain framework'ten habersiz. Application "nasıl saklanır"ı
@@ -48,10 +62,13 @@ en hızlı yol bu - SQL Server Express kurmana, User Secrets ayarlamana ya da
 docker compose up --build
 ```
 
-Bu tek komut şunların HEPSİNİ ayağa kaldırır: SQL Server (Auth+Wiki+Audit),
-PostgreSQL+pgvector (AI), Redis, backend API (migration'ları otomatik uygular)
-ve derlenmiş React frontend'i (nginx ile sunuluyor). İlk çalıştırmada image'ları
-indirip derlemek birkaç dakika sürebilir, sonrakiler çok daha hızlı.
+Bu tek komut şunların HEPSİNİ ayağa kaldırır: SQL Server (Auth+Wiki+Audit+
+Vault+Documents, ayrı şemalar), PostgreSQL+pgvector (AI embedding'leri),
+Redis, backend API (migration'ları otomatik uygular) ve derlenmiş React
+frontend'i (nginx ile sunuluyor). Yüklenen belgeler `atlas-documents-data`
+adında kalıcı bir volume'de tutuluyor - `docker compose down` (volume'ler
+silinmeden) sonrasında da kaybolmuyor. İlk çalıştırmada image'ları indirip
+derlemek birkaç dakika sürebilir, sonrakiler çok daha hızlı.
 
 Hazır olduğunda:
 - Frontend: http://localhost:5173
@@ -75,7 +92,7 @@ daha pratik - IDE'nin debugger'ını doğrudan kullanabilirsin.
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) — `dotnet --version` ile `10.x` görmelisin.
 - [Node.js](https://nodejs.org/) (npm ile birlikte) — React frontend için.
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Redis ve PostgreSQL için.
-- SQL Server Express (`.\SQLEXPRESS` instance adıyla, Windows Authentication) - Auth+Wiki verisi için.
+- SQL Server Express (`.\SQLEXPRESS` instance adıyla, Windows Authentication) - Auth/Wiki/Audit/Vault/Documents verisi için (tek veritabanı, ayrı şemalar).
 
 ### 2. Docker container'larını başlat (Redis + PostgreSQL)
 
@@ -130,7 +147,8 @@ Terminalde `Now listening on: http://localhost:5000` gibi bir çıktı göreceks
 - `http://localhost:5000/` → API ayakta mı (basit ping)
 - `http://localhost:5000/health` → SQL Server + Redis + PostgreSQL'e gerçekten
   ulaşılabiliyor mu (`{"status":"Healthy","services":{"sqlserver":"Healthy",...}}`)
-- `http://localhost:5000/swagger` → tüm Auth/Wiki endpoint'lerini tarayıcıdan
+- `http://localhost:5000/swagger` → SignalR Hub (Notifications) hariç TÜM
+  modüllerin (Auth/Wiki/AI/Audit/Vault/Documents) endpoint'lerini tarayıcıdan
   deneyebileceğin Swagger UI. Sağ üstteki **Authorize** butonuna login'den
   dönen `accessToken`'ı `Bearer <token>` formatında yapıştırarak korumalı
   endpoint'leri de deneyebilirsin.
@@ -178,10 +196,11 @@ Email = '...'` ile Admin yapabilirsin.
 dotnet test Atlas.sln
 ```
 
-Bu, Domain katmanındaki unit testleri (Auth/Wiki/AI, veritabanı gerektirmez) ve
-`Atlas.IntegrationTests` projesini (gerçek HTTP istekleriyle uçtan uca, EF Core
-InMemory provider kullanır - SQL Server'a dokunmaz ama Docker'daki Postgres/Redis
-container'larının ayakta olmasını bekler) çalıştırır.
+Bu, her modülün Domain/Application/Infrastructure katmanındaki unit testlerini
+(veritabanı gerektirmez) ve `Atlas.IntegrationTests` projesini (gerçek HTTP
+istekleriyle uçtan uca, EF Core InMemory provider kullanır - SQL Server'a
+dokunmaz ama Docker'daki Postgres/Redis container'larının ayakta olmasını
+bekler) çalıştırır.
 
 ## Bölüm 2 — DI Container ve Service Lifetime
 
@@ -325,8 +344,90 @@ register+login akışı, yetkisiz erişim reddi, wiki sayfası oluşturma+listel
 değişmedi (Bölüm 11) - sayfalama, departman filtrelemesinden sonra bellekte
 uygulanıyor. React tarafında "← Önceki"/"Sonraki →" butonları eklendi.
 
+## Bölüm 20 — AI Semantik Arama
+
+`TextChunker` (sabit boyutlu, üst üste binen pencerelerle metni parçalıyor) +
+`FakeEmbeddingService` (kelimeleri MD5 ile hash'leyip deterministik bir vektör
+üreten, gerçek bir sağlayıcıya kadar köprü görevi gören sahte embedding
+servisi). Wiki sayfası oluşunca otomatik chunk'lanıp embed ediliyor,
+`GET /api/ai/search?q=...` doğal dil sorgusunu embed edip pgvector'ın cosine
+distance sıralamasıyla en anlamlı sonuçları döndürüyor - departman görünürlük
+kuralı arama sonucuna da uygulanıyor. `IEmbeddingService` bilerek bir arayüz -
+gerçek bir sağlayıcıya (Voyage AI, OpenAI vb.) geçiş sadece DI kaydını
+değiştirmekle olacak şekilde tasarlandı.
+
+## Bölüm 21 — Transactional Outbox Pattern
+
+MediatR'ın in-process `IPublisher`'ı crash-safe değildi: bir sayfa
+kaydedildikten hemen sonra process çökerse, o sayfanın embedding'i asla
+üretilmezdi. `OutboxMessage` entity'si, sayfanın KENDİSİYLE aynı
+`SaveChanges` çağrısında (atomik) yazılıyor; arka planda 5 saniyede bir
+çalışan `OutboxProcessor` (`BackgroundService`) işlenmemiş mesajları okuyup
+gerçek `Publish`'i tetikliyor. 5 başarısız denemeden sonra mesaj
+dead-letter'a düşüyor - silinmiyor, `Attempts`/`LastError` ile görünür
+kalmaya devam ediyor.
+
+## Bölüm 22 — Observability + CI/CD
+
+Serilog, varsayılan loglamanın yerini aldı. `CorrelationIdMiddleware`, her
+isteğe bir `X-Correlation-Id` kazandırıp Serilog'un "ambient" bağlamına
+ekliyor - o istek sırasında oluşan HER log satırı (EF Core sorguları, CQRS
+logları, exception handler) aynı ID'yi otomatik taşıyor. GitHub Actions
+(`.github/workflows/ci.yml`) her push/PR'da backend'i build+test ediyor
+(gerçek bir veritabanı gerektiren Integration testleri hariç) ve frontend'i
+build+lint ediyor.
+
+## Bölüm 23 — Audit Log
+
+`AuditBehavior` - generic bir MediatR pipeline behavior, sadece
+`IAuditableCommand` işaretli komutlar için devreye giriyor (Wiki sayfası
+oluşturma/silme gibi denetlenmesi gereken eylemler). `GET /api/audit-log`
+(Admin) - eylem/tarih aralığı filtresi + sayfalama ile kim ne zaman ne
+yaptığını gösteriyor.
+
+## Bölüm 24 — Şifre Kasası (Vault)
+
+Kurum içi parola/erişim bilgilerini tutan, Wiki'den tamamen bağımsız bir
+modül. Şifreleme ASP.NET Core'un kendi Data Protection API'siyle (yeni bir
+kütüphane eklenmedi). Owner-or-Admin yetkilendirme - normal kullanıcı sadece
+kendi kayıtlarını görür. "Reveal" bilerek bir Command (Query değil) - kimin
+ne zaman hangi parolayı gördüğü denetim izinde kalsın diye.
+
+## Bölüm 25 — Docker Compose tam paketleme + Rate limiting
+
+`docker compose up --build` artık SQL Server dahil HER ŞEYİ tek komutla
+ayağa kaldırıyor - önceden SQL Server Express native kurulu olmalıydı.
+Ayrıca IP/kullanıcı bazlı rate limiting eklendi: login (IP, dakikada 5),
+AI arama (kullanıcı, dakikada 20), e-posta doğrulama kodu (IP, dakikada 10),
+Vault reveal (kullanıcı, dakikada 10).
+
+## Bölüm 26 — Documents modülü: belge kütüphanesi + AI/RAG entegrasyonu
+
+Projenin en büyük tek parçası. PDF/DOCX/PPTX/XLSX/TXT gibi dosyalar
+yükleniyor, arka planda (Transactional Outbox Pattern üzerinden) metinleri
+çıkarılıyor (Docnet.Core, OpenXML SDK), parçalanıp AI'ın embedding
+pipeline'ına bağlanıyor - `GET /api/ai/search` artık wiki sayfalarını VE
+yüklenen belgeleri TEK bir birleşik sonuç listesinde döndürüyor. Ayrıca:
+belge versiyonlama (eski dosyalar arşivde kalıp indirilebilir kalıyor),
+çoklu dosya yükleme, aynı içerikli bir dosya tekrar yüklenirse (engellemeyen,
+sadece bilgilendiren) bir uyarı.
+
+## Bölüm 27 — Güvenlik sertleştirme
+
+Vault'un "reveal" uç noktasına rate limit (Bölüm 25'e ek), `IMalwareScanner`
+arayüzü (bugün no-op implementasyonlu, gerçek bir tarama motoruna DI-swap
+ile bağlanmaya hazır - `IEmbeddingService`'le aynı felsefe), yüklenen
+belgelerin Docker volume'de kalıcı olması (Bölüm 25'te eklenen Docker
+Compose paketlemesinin bir eksiğiydi).
+
 ## Sırada ne var?
 
-1. AI modülüne embedding üretimi + LLM entegrasyonu (API key'ler gelince)
-2. React tarafında gerçek routing (React Router), `Web/packages/ui`'ye gerçek
-   paylaşılan bileşenler taşınması
+1. Gerçek bir embedding/LLM sağlayıcısına geçiş (Voyage AI, OpenAI vb.) -
+   API key'ler gelince; `IEmbeddingService`'in DI kaydını değiştirmek
+   yeterli olacak şekilde tasarlandı (bkz. Bölüm 20), bu yüzden şu an API
+   key'ler gelene kadar bloklanmış durumda.
+
+Bundan öncesi için (Documents modülünün tam gün-gün kırılımı, canlı
+bulunan/düzeltilen gerçek bug'lar, mimari kararların gerekçeleri) proje
+kökündeki `CLAUDE.md` dosyasına bakılabilir - bu README'nin tersine, o
+dosya her oturumda güncelleniyor ve projenin tek eksiksiz kaynağı.
