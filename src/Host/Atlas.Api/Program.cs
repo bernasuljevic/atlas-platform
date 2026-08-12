@@ -145,6 +145,25 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             });
     });
+
+    // P7 (güvenlik sertleştirme) - Reveal, sertleştirme öncesi HİÇ rate-limit'siz
+    // olan tek yazma-dışı yan etkili Vault eylemiydi (login/ai-search/email-
+    // verification'ın hepsinde vardı, gerçek bir boşluktu). Kullanıcı bazlı
+    // (JWT NameIdentifier) - "ai-search" ile AYNI gerekçe (giriş yapılmış
+    // kullanıcı, IP bazlı olmaya gerek yok). Amaç maliyet DEĞİL, VERİ
+    // SIZINTISI riski: çalınmış bir token'la kısa sürede Vault'taki TÜM
+    // parolaları art arda "reveal" edip toplu dışarı çıkarmayı zorlaştırmak -
+    // dakikada 10, normal kullanımda (birkaç parola art arda kontrol etmek)
+    // rahatça yeterli ama toplu bir "hepsini dök" script'ini engelliyor.
+    options.AddPolicy("vault-reveal", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
 });
 
 // Swagger/OpenAPI - her modülün MediatR ile MapGet/MapPost dediği minimal API

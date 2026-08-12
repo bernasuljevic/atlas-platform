@@ -4,6 +4,7 @@ using Atlas.Modules.Documents.Infrastructure;
 using Atlas.Modules.Documents.Infrastructure.Outbox;
 using Atlas.Modules.Documents.Infrastructure.Persistence;
 using Atlas.Modules.Documents.Infrastructure.Processing;
+using Atlas.Modules.Documents.Infrastructure.Scanning;
 using Atlas.Modules.Documents.Infrastructure.Storage;
 using Atlas.Shared.CQRS.Behaviors;
 using FluentValidation;
@@ -43,6 +44,11 @@ public static class DocumentsModule
         // AYNI gerekçe: durumsuz, dış bir DB bağlantısına ihtiyacı yok (sadece
         // dosya sistemine yazıyor).
         services.AddSingleton<IFileStorageService, LocalDiskFileStorageService>();
+
+        // P7 (güvenlik sertleştirme) - Singleton, AYNI gerekçe (durumsuz).
+        // NoOpMalwareScanner GEÇİCİ (bkz. kendi dosyasındaki not) - gerçek bir
+        // tarayıcıya geçişte değişecek TEK satır burası.
+        services.AddSingleton<IMalwareScanner, NoOpMalwareScanner>();
 
         services.AddScoped<IDocumentRepository, EfDocumentRepository>();
 

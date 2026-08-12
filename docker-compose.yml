@@ -72,6 +72,15 @@ services:
       ConnectionStrings__DefaultConnection: "Server=sqlserver;Database=AtlasPlatform;User Id=sa;Password=AtlasDevPassword123!;TrustServerCertificate=True"
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=AtlasAi;Username=atlas;Password=atlas_dev_password"
       ConnectionStrings__Redis: "redis:6379"
+      # Native dev'de RootPath hiç verilmez, DocumentsModule.cs kendisi
+      # %LOCALAPPDATA%'yı hesaplar (bkz. oradaki not) - ama konteynerde
+      # %LOCALAPPDATA% diye bir şey YOK (Linux imajı) ve varsayılan da
+      # container'ın YAZILABİLİR OLMAYAN katmanına düşerdi. P7 ÖNCESİNDE bu
+      # override HİÇ yoktu - "docker compose down" yüklenen belgeleri
+      # sessizce siliyordu (DB satırları kalıyordu, StorageKey'ler artık
+      # var olmayan dosyalara işaret ediyordu). Aşağıdaki volume ile birlikte
+      # (atlas-documents-data) artık kalıcı.
+      DocumentStorage__RootPath: "/data/documents"
       # Native dev'de bu User Secrets'ta duruyor (konteynerin host'un User
       # Secrets'ına erişimi yok) - burada SADECE bu compose stack'i için
       # geçerli, ayrı bir demo anahtarı. Gerçek bir ortamda mutlaka gerçek
@@ -79,6 +88,13 @@ services:
       Jwt__Key: "docker-compose-only-dev-signing-key-never-used-elsewhere"
       Jwt__Issuer: "AtlasPlatform"
       Jwt__Audience: "AtlasPlatformUsers"
+    # Postgres/SQL Server'daki AYNI "veri kalıcı olmalı" gerekçesi - belgenin
+    # KENDİSİ (diskteki dosya) Postgres'teki embedding'lerle ya da SQL
+    # Server'daki Document satırlarıyla AYNI kalıcılık garantisine sahip
+    # olmalı, aksi halde "belge var ama dosyası yok" gibi tutarsız bir durum
+    # oluşurdu (StorageKey DB'de duruyor, indirme 404/500 verirdi).
+    volumes:
+      - atlas-documents-data:/data/documents
 
   # React SPA'yı derleyip nginx ile statik olarak sunuyor - native dev'deki
   # (npm run dev, Vite) AYNI host portuna (5173) eşleniyor ki backend'in CORS
@@ -96,3 +112,4 @@ services:
 volumes:
   atlas-postgres-data:
   atlas-sqlserver-data:
+  atlas-documents-data:

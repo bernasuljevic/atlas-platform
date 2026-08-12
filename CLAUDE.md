@@ -1157,12 +1157,36 @@ yay, önemli şeyleri anlat" talimatına göre.
 
   `dotnet test Atlas.sln`: tüm testler yeşil (24 Integration testi dahil).
 
-**Henüz yapılmayan (bu paketin geri kalanı):**
-- P7: Vault'un `POST /reveal`'ına rate-limit policy'si (şu an HİÇ yok, login/
-  ai-search'ün aksine - gerçek bir boşluk), `IMalwareScanner` arayüzü + no-op
-  implementasyonu (upload akışına takılı, `IEmbeddingService` Fake-önce
-  felsefesiyle aynı), `DocumentStorage:RootPath` için Docker volume kalıcılığı
-  (şu an `docker-compose down` yüklenen dosyaları siler, DB satırları kalır).
+- [x] **P7 - Güvenlik sertleştirme (Gün 1-3, TAMAMLANDI,
+      `feature/security-hardening` branch'inde) - "Kapsamlı Geliştirme
+      Paketi"nin SON fazı:**
+  - Gün 1: `POST /api/vault/entries/{id}/reveal` artık rate-limitli
+    (dakikada 10, kullanıcı bazlı) - login/ai-search/email-verification
+    zaten korunuyordu, reveal gerçek bir boşluktu. Amaç maliyet DEĞİL VERİ
+    SIZINTISI riski (çalınmış bir token'la toplu "reveal" script'i).
+    "ai-search" politikasıyla BİREBİR aynı `RateLimitPartition` deseni.
+  - Gün 2: `IMalwareScanner` (Documents.Application/Abstractions) +
+    `NoOpMalwareScanner` (Documents.Infrastructure) - `IEmbeddingService`nin
+    "Fake-önce" felsefesiyle AYNI desen. `UploadDocumentCommandHandler`/
+    `UploadNewDocumentVersionCommandHandler` dosyayı DİSKE YAZMADAN ÖNCE
+    tarıyor - kirli bulunursa (bugün asla) 400, Document hiç oluşmuyor.
+    Gerçek bir tarayıcıya geçişte değişecek TEK yer DI kaydı olacak.
+  - Gün 3: `docker-compose.yml`'e `DocumentStorage__RootPath=/data/documents`
+    override'ı + `atlas-documents-data` kalıcı volume'ü eklendi -
+    Postgres/SQL Server'ın ZATEN kanıtlanmış aynı deseni. Öncesinde bu
+    override hiç yoktu, `docker compose down` yüklenen belgeleri sessizce
+    siliyordu (DB satırları kalıp artık var olmayan bir dosyaya işaret
+    ediyordu). **Not:** `docker compose config` ile doğrulandı ama tam bir
+    "up --build" döngüsüyle CANLI doğrulanmadı (bu makinede native SQL
+    Server/Postgres/Redis kullanılıyor, SQL Server imajı dahil tam stack'i
+    sıfırdan ayağa kaldırmak bu değişikliğin kapsamına göre orantısız bir
+    süre gerektirirdi) - değişiklik aynı dosyadaki iki ZATEN canlı
+    doğrulanmış volume deseniyle birebir aynı yapıyı izliyor.
+
+  Test/lint yeşil (docker-compose.yml değişikliği .NET/JS kodunu
+  etkilemiyor, ayrı bir test gerektirmedi).
+
+**"Kapsamlı Geliştirme Paketi" artık TAMAMEN BİTTİ (P1-P7).**
 
 ## Sırada ne var
 
@@ -1186,16 +1210,15 @@ yay, önemli şeyleri anlat" talimatına göre.
    (Docker Compose, SignalR toast, rate limiting) VE orijinal 6 maddelik
    özellik listesinin denetimde bulunan 3 gerçek eksiği (link arama, kırmızı
    link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı.
-3. **AKTİF - "Kapsamlı Geliştirme Paketi" (yukarıdaki bölüme bkz.):** P1
-   (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) TAMAMLANDI ve
-   merge edildi (PR #6). **P4 (belge işleme pipeline'ı, Gün 1-6) TAMAMLANDI**
-   - `feature/document-processing-pipeline` branch'i merge edildi (PR #7,
-   bkz. Ders #21'deki regresyon düzeltmesi de aynı PR'da). **P5 (Documents→
-   AI/RAG entegrasyonu, Gün 1-4) TAMAMLANDI** - `feature/documents-ai-rag-integration`
-   branch'i merge edildi (PR #8). **P6 (belge versiyonlama + toplu yükleme,
-   Gün 1-5) de TAMAMLANDI** - `feature/documents-versioning-bulk-upload`
-   branch'inde, henüz push/PR edilmedi. Ardından P7 (güvenlik sertleştirme)
-   planlanıyor - "Kapsamlı Geliştirme Paketi"nin SON fazı.
+3. **"Kapsamlı Geliştirme Paketi" TAMAMEN BİTTİ (yukarıdaki bölüme bkz.):**
+   P1 (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) merge edildi
+   (PR #6). P4 (belge işleme pipeline'ı, Gün 1-6) merge edildi (PR #7, bkz.
+   Ders #21'deki regresyon düzeltmesi de aynı PR'da). P5 (Documents→AI/RAG
+   entegrasyonu, Gün 1-4) merge edildi (PR #8). P6 (belge versiyonlama +
+   toplu yükleme, Gün 1-5) merge edildi (PR #9). **P7 (güvenlik sertleştirme,
+   Gün 1-3) de TAMAMLANDI** - `feature/security-hardening` branch'inde,
+   henüz push/PR edilmedi. Paketin 19 bölümlük orijinal spec'inin TAMAMI
+   artık uygulanmış durumda.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
@@ -1253,7 +1276,8 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
 - `POST /api/vault/entries`, `PUT /api/vault/entries/{id}`, `DELETE /api/vault/entries/{id}`
   → token gerektirir, owner-or-Admin (throw-based 403).
 - `POST /api/vault/entries/{id}/reveal` → token gerektirir, owner-or-Admin,
-  audit'lenir ("PasswordEntry.Revealed" - Reveal bilerek bir Command).
+  audit'lenir ("PasswordEntry.Revealed" - Reveal bilerek bir Command),
+  kullanıcı bazlı rate-limitli (dakikada 10, P7 Gün 1).
 - `POST /api/documents/upload` (multipart: file + title/description/visibility/
   departmentName?/tags?) → token gerektirir, `IFormFile`/`[FromForm]` (JSON-bound
   record DEĞİL - minimal API'nin dosya yükleme mecburiyeti). Yanıt:
