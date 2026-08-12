@@ -1116,9 +1116,48 @@ yay, önemli şeyleri anlat" talimatına göre.
   `dotnet test Atlas.sln`: tüm testler (135+ Domain/Application/
   Infrastructure + 19 Integration testi) yeşil.
 
+- [x] **P6 - Belge versiyonlama + toplu yükleme (Gün 1-5, TAMAMLANDI,
+      `feature/documents-versioning-bulk-upload` branch'inde):**
+  - Gün 1: `DocumentVersion` (Documents.Domain) - `Document`'a FK İLE
+    BAĞLI DEĞİL (bu modülde bile FK'ler tercih edilmiyor, temizlik DB
+    cascade'ine değil Handler'ın orkestrasyonuna bırakılıyor).
+    `CreatedByUserId`/`CreatedByEmail` BİLİNÇLİ bir sadeleştirme - içeriği
+    İLK YAZAN değil, o versiyonu DEĞİŞTİREN kişi (orijinal yükleyici zaten
+    `Document.CreatedByUserId`'de duruyor). `(DocumentId, VersionNumber)`
+    composite unique index. Migration uygulandı.
+  - Gün 2: `Document.ReplaceFile` - Status BİLEREK Uploaded'a dönüyor
+    (içerik değişti, eski extraction/embedding geçersiz).
+    `UploadNewDocumentVersionCommand` - Handler ÖNCE mevcut dosyayı bir
+    `DocumentVersion`'a snapshot'layıp SONRA `ReplaceFile`'ı çağırıyor,
+    ardından var olan `DocumentUploadedEvent`'i (P4'ten beri var olan
+    pipeline'ı YENİDEN KULLANARAK) Outbox'a yazıyor - yeni bir extraction
+    akışı icat edilmedi (`ReprocessDocumentCommand`'daki AYNI fikir). Yeni
+    endpoint'ler: `POST/GET /api/documents/{id}/versions`,
+    `GET .../versions/{versionNumber}/download`. `DeleteDocumentCommandHandler`
+    artık versiyon geçmişindeki HER dosyayı da diskten temizliyor.
+  - Gün 3: `UploadDocumentCommandHandler` artık aynı `ContentHash`'e sahip
+    GÖRÜNÜR bir belge varsa uyarı döndürüyor - YÜKLEMEYİ ENGELLEMİYOR.
+    Başka departmanın `DepartmentOnly` belgesiyle eşleşme SESSİZCE yok
+    sayılıyor (varlığını bile sızdırmamak için, Ders #10'daki AYNI sınıf
+    hata). Yanıt `Guid`'den `UploadDocumentResult`'a değişti - bu,
+    `AuditBehavior`'ın "TResponse Guid'se onu ResourceId say" varsayımını
+    kırdığı için `AuditResourceId` get-only'den SETTABLE'a çevrildi
+    (`AuditDetails`'le AYNI desen) - `AuditBehavior`'ın kendisine
+    DOKUNULMADI.
+  - Gün 4: `DocumentUploadPage.jsx` artık birden fazla dosya kabul ediyor
+    (Visibility/Departman/Açıklama/Etiket ORTAK, Title sadece TEK dosyada
+    gösteriliyor, her dosya kendi adından başlık alıyor, SIRAYLA yükleniyor).
+    `DocumentDetailPage.jsx`'e versiyon geçmişi + "Yeni Versiyon Yükle"
+    formu eklendi - versiyon listesi belge state'inden AYRI bir effect'te
+    çekiliyor, yeni versiyon sonrası state iyimser GÜNCELLENMİYOR (sunucudan
+    yeniden çekiliyor).
+  - Gün 5: `DocumentVersioningIntegrationTests` (5 test) - versiyon
+    arşivleme+indirme, owner-or-Admin/"hâlâ işleniyor" guard'ları,
+    duplicate-detection'ın görünürlük filtresiyle birlikte doğru çalıştığı.
+
+  `dotnet test Atlas.sln`: tüm testler yeşil (24 Integration testi dahil).
+
 **Henüz yapılmayan (bu paketin geri kalanı):**
-- P6: `DocumentVersion` entity + migration, çoklu dosya yükleme UX,
-  `ContentHash` tabanlı duplicate-detection (engellemiyor, sadece uyarıyor).
 - P7: Vault'un `POST /reveal`'ına rate-limit policy'si (şu an HİÇ yok, login/
   ai-search'ün aksine - gerçek bir boşluk), `IMalwareScanner` arayüzü + no-op
   implementasyonu (upload akışına takılı, `IEmbeddingService` Fake-önce
@@ -1152,9 +1191,11 @@ yay, önemli şeyleri anlat" talimatına göre.
    merge edildi (PR #6). **P4 (belge işleme pipeline'ı, Gün 1-6) TAMAMLANDI**
    - `feature/document-processing-pipeline` branch'i merge edildi (PR #7,
    bkz. Ders #21'deki regresyon düzeltmesi de aynı PR'da). **P5 (Documents→
-   AI/RAG entegrasyonu, Gün 1-4) de TAMAMLANDI** - `feature/documents-ai-rag-integration`
-   branch'inde, henüz push/PR edilmedi. Ardından P6 (toplu yükleme +
-   versiyonlama), P7 (güvenlik sertleştirme) planlanıyor.
+   AI/RAG entegrasyonu, Gün 1-4) TAMAMLANDI** - `feature/documents-ai-rag-integration`
+   branch'i merge edildi (PR #8). **P6 (belge versiyonlama + toplu yükleme,
+   Gün 1-5) de TAMAMLANDI** - `feature/documents-versioning-bulk-upload`
+   branch'inde, henüz push/PR edilmedi. Ardından P7 (güvenlik sertleştirme)
+   planlanıyor - "Kapsamlı Geliştirme Paketi"nin SON fazı.
 
 **AI Semantik Arama artık TAMAMLANDI (Gün 1-6):** Domain modeli → chunking/fake
 embedding → otomatik ingestion → arama Query'si + görünürlük filtresi →
@@ -1215,7 +1256,10 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   audit'lenir ("PasswordEntry.Revealed" - Reveal bilerek bir Command).
 - `POST /api/documents/upload` (multipart: file + title/description/visibility/
   departmentName?/tags?) → token gerektirir, `IFormFile`/`[FromForm]` (JSON-bound
-  record DEĞİL - minimal API'nin dosya yükleme mecburiyeti).
+  record DEĞİL - minimal API'nin dosya yükleme mecburiyeti). Yanıt:
+  `{id, duplicateOfDocumentId?, duplicateOfTitle?}` - son ikisi doluysa
+  (P6 Gün 3) aynı içerikli GÖRÜNÜR başka bir belge var demektir, YÜKLEMEYİ
+  ENGELLEMEZ, sadece bilgilendirir.
 - `GET /api/documents` (paged), `GET /api/documents/{id}` → açık, görünürlük
   kuralı `IWikiVisibilityChecker` ile uygulanır (detay: varlığı gizle/404).
 - `GET /api/documents/{id}/download` → token gerektirir (tek dosya erişim yolu,
@@ -1226,6 +1270,16 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   Var olan StorageKey/ContentType ile `DocumentUploadedEvent`'i Outbox'a
   yeniden yazar - `POST /api/wiki/reindex`'in TEK bir belge için karşılığı
   (bulk/Admin-only DEĞİL). Extracting durumundaki bir belge için 400.
+- `POST /api/documents/{id}/versions` (multipart: file) → token gerektirir,
+  owner-or-Admin. Mevcut dosyayı bir `DocumentVersion`'a arşivleyip yenisini
+  Document'a yazar, `CurrentVersionNumber` artar, Status Uploaded'a döner
+  (yeniden işlenecek). Extracting durumundaki bir belge için 400.
+- `GET /api/documents/{id}/versions` → açık, görünürlük filtresi otomatik.
+  SADECE ESKİ versiyonları döndürür (güncel versiyon `GET /api/documents/{id}`'in
+  `currentVersionNumber` alanında).
+- `GET /api/documents/{id}/versions/{versionNumber}/download` → token
+  gerektirir, `GET /api/documents/{id}/download`'ın belirli bir eski versiyon
+  için karşılığı.
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
