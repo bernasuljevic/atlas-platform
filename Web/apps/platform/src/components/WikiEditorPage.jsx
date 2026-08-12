@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
+  BookOpen,
   Code2,
+  FileText,
   Heading2,
   Image as ImageIcon,
   Info,
@@ -13,6 +15,7 @@ import {
 import {
   createWikiFolder,
   createWikiPage,
+  getDocumentSearchSuggestions,
   getWikiFolderTree,
   getWikiPageById,
   getWikiSearchSuggestions,
@@ -304,6 +307,13 @@ function WikiEditorPage({ token }) {
   // AYNI hafif öneri endpoint'i, aynı debounce deseni. Eskiden burada mevcut
   // klasör ağacından çıkarılan SABİT bir sayfa listesi vardı - departman
   // büyüdükçe kullanışsız hale geliyordu, artık gerçek zamanlı arama var.
+  //
+  // P5 Gün 4 (Documents→AI/RAG entegrasyonu, "document:GUID" içerik-referans
+  // bloğunun P2'den ertelenen bağlanması) - Wiki VE Documents'ın öneri
+  // endpoint'leri BİRLİKTE (Promise.all) çağrılıp TEK bir listede birleşiyor.
+  // Biri başarısız olursa (ör. bir modül geçici olarak erişilemez) diğerinin
+  // sonuçları YİNE DE gösterilsin diye Promise.allSettled kullanılıyor -
+  // Promise.all olsaydı biri reddedince İKİSİ de kaybolurdu.
   function handleLinkSearchChange(e) {
     const value = e.target.value;
     setLinkSearchQuery(value);
@@ -318,8 +328,22 @@ function WikiEditorPage({ token }) {
     linkSearchDebounceRef.current = setTimeout(async () => {
       setIsSearchingLink(true);
       try {
-        const results = await getWikiSearchSuggestions(token, value);
-        setLinkSearchResults(results);
+        const [wikiOutcome, documentOutcome] = await Promise.allSettled([
+          getWikiSearchSuggestions(token, value),
+          getDocumentSearchSuggestions(token, value),
+        ]);
+
+        const wikiResults = (wikiOutcome.status === "fulfilled" ? wikiOutcome.value : [])
+          .map((p) => ({ ...p, kind: "wiki" }));
+        const documentResults = (documentOutcome.status === "fulfilled" ? documentOutcome.value : [])
+          .map((d) => ({ ...d, kind: "document" }));
+
+        // Başlık eşleşmeleri en üstte kalsın diye iki listeyi ayrı ayrı
+        // sıralamak yerine olduğu gibi art arda ekliyoruz - her iki
+        // endpoint de kendi içinde ZATEN başlık>etiket önceliğiyle sıralı
+        // döndürüyor (bkz. SearchWikiPageSuggestionsQueryHandler/
+        // SearchDocumentSuggestionsQueryHandler).
+        setLinkSearchResults([...wikiResults, ...documentResults]);
       } catch {
         setLinkSearchResults([]);
       } finally {
@@ -328,9 +352,9 @@ function WikiEditorPage({ token }) {
     }, LINK_SEARCH_DEBOUNCE_MS);
   }
 
-  function handleSelectExistingPage(page) {
-    setLinkText(linkText || page.title);
-    setLinkTarget(`wiki:${page.id}`);
+  function handleSelectExistingPage(item) {
+    setLinkText(linkText || item.title);
+    setLinkTarget(`${item.kind === "document" ? "document" : "wiki"}:${item.id}`);
   }
 
   // Kırmızı link (bkz. markdown.jsx) - aranan başlıkla eşleşen bir sayfa
@@ -596,7 +620,7 @@ function WikiEditorPage({ token }) {
                 </Button>
               </div>
               <Input
-                placeholder="Atlas içi bağlantı için sayfa ara..."
+                placeholder="Atlas içi bağlantı için sayfa ya da belge ara..."
                 value={linkSearchQuery}
                 onChange={handleLinkSearchChange}
                 className="text-sm"
@@ -609,16 +633,20 @@ function WikiEditorPage({ token }) {
                       Aranıyor...
                     </p>
                   ) : linkSearchResults.length > 0 ? (
-                    linkSearchResults.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleSelectExistingPage(p)}
-                        className="block w-full truncate px-2 py-1 text-left text-xs hover:bg-[var(--brand-accent)]/10"
-                      >
-                        {p.title} <span style={{ opacity: 0.6 }}>· {p.departmentName}</span>
-                      </button>
-                    ))
+                    linkSearchResults.map((p) => {
+                      const SourceIcon = p.kind === "document" ? FileText : BookOpen;
+                      return (
+                        <button
+                          key={`${p.kind}-${p.id}`}
+                          type="button"
+                          onClick={() => handleSelectExistingPage(p)}
+                          className="flex w-full items-center gap-1.5 truncate px-2 py-1 text-left text-xs hover:bg-[var(--brand-accent)]/10"
+                        >
+                          <SourceIcon size={12} className="shrink-0" style={{ opacity: 0.6 }} />
+                          {p.title} <span style={{ opacity: 0.6 }}>· {p.departmentName}</span>
+                        </button>
+                      );
+                    })
                   ) : (
                     // Kırmızı link teklifi - Wikipedia'daki gibi, aranan
                     // başlıkla eşleşen bir sayfa yoksa "henüz yok ama

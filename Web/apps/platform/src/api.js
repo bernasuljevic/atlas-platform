@@ -100,7 +100,7 @@ export async function getWikiPages(accessToken, pageNumber = 1, pageSize = 10) {
 }
 
 // Üst bardaki arama kutusunun harf harf çağırdığı hafif öneri endpoint'i -
-// searchWikiPages'teki (AI/anlam bazlı) aramadan BİLEREK ayrı, bkz.
+// searchByMeaning'teki (AI/anlam bazlı) aramadan BİLEREK ayrı, bkz.
 // backend'deki SearchWikiPageSuggestionsQuery'nin notu.
 export async function getWikiSearchSuggestions(accessToken, queryText) {
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
@@ -111,6 +111,23 @@ export async function getWikiSearchSuggestions(accessToken, queryText) {
 
   if (!response.ok) {
     throw new Error("Öneriler yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// getWikiSearchSuggestions'ın Documents tarafındaki karşılığı (P5 Gün 4) -
+// WikiEditorPage'in link penceresi ikisini BİRLİKTE çağırıp tek bir listede
+// birleştiriyor (bkz. handleLinkSearchChange).
+export async function getDocumentSearchSuggestions(accessToken, queryText) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(
+    `${API_URL}/api/documents/search-suggestions?q=${encodeURIComponent(queryText)}`,
+    { headers }
+  );
+
+  if (!response.ok) {
+    throw new Error("Belge önerileri yüklenemedi");
   }
 
   return response.json();
@@ -173,9 +190,12 @@ export async function getWikiPageById(accessToken, pageId) {
   return response.json();
 }
 
-// fromUtc/toUtc opsiyonel - normal semantik aramaya EK, isteğe bağlı bir
-// tarih daraltması (bkz. SearchWikiPagesByMeaningQuery'deki not).
-export async function searchWikiPages(accessToken, queryText, topN = 5, { fromUtc, toUtc } = {}) {
+// P5 (Documents→AI/RAG entegrasyonu) ile backend'deki SearchByMeaningQuery'ye
+// paralel isimlendirildi (eskiden searchWikiPages) - dönen her sonuç artık
+// {sourceType: "WikiPage"|"Document", resourceId, ...} taşıyor (bkz.
+// WikiSearch.jsx'teki kullanım). fromUtc/toUtc opsiyonel - normal semantik
+// aramaya EK, isteğe bağlı bir tarih daraltması.
+export async function searchByMeaning(accessToken, queryText, topN = 5, { fromUtc, toUtc } = {}) {
   const params = new URLSearchParams({ q: queryText, topN });
   if (fromUtc) params.set("fromUtc", fromUtc);
   if (toUtc) params.set("toUtc", toUtc);
