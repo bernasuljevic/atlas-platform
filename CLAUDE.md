@@ -1308,12 +1308,15 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
 
-**`README.md` GÜNCEL DEĞİL (2026-08-12 itibarıyla fark edildi):** "Bölüm 19 —
-Sayfalama"da kalmış bir öğrenme günlüğü - AI Semantik Arama, Transactional
-Outbox Pattern, Audit log, Vault, Documents modülü, "Kapsamlı Geliştirme
-Paketi" (P1-P7) dahil olmak üzere sonraki HİÇBİR şeyden bahsetmiyor. Eskiden
-burada "Bölüm 10'a kadar güncel" notu vardı - artık YANLIŞ, kaldırıldı. Bu
-dosya (CLAUDE.md) projenin TEK güncel/eksiksiz kaynağı - "Şu ana kadar
-tamamlananlar", "Kapsamlı Geliştirme Paketi" ve "Endpoint referansı"
-bölümlerine bak. README'yi güncellemek/birleştirmek ayrı bir iş olarak
-kullanıcıya bırakıldı (henüz istenmedi).
+**`README.md` 2026-08-12'de güncellendi** - eskiden "Bölüm 19 — Sayfalama"da
+kalmış bir öğrenme günlüğüydü (AI Semantik Arama, Outbox Pattern, Audit log,
+Vault, Documents, "Kapsamlı Geliştirme Paketi" P1-P7'den hiç bahsetmiyordu).
+Artık Bölüm 27'ye kadar (özet seviyesinde, gün-gün DEĞİL - her büyük özellik
+için birkaç satırlık bir "Bölüm") güncel; ayrıca giriş paragrafı ve mimari
+ağacı (Audit/Vault/Documents modülleri, Atlas.Shared.Text) da yenilendi.
+**Yine de bu dosya (CLAUDE.md) projenin TEK eksiksiz kaynağı** - README
+bilerek portföy/genel bakış seviyesinde tutuldu (gün-gün kırılım, canlı
+bulunan/düzeltilen gerçek bug'lar, mimari kararların tam gerekçeleri burada,
+"Şu ana kadar tamamlananlar"/"Kapsamlı Geliştirme Paketi"/"Endpoint
+referansı" bölümlerinde). README'yi tekrar güncellerken bu dengeyi (özet
+vs. tam detay) koru - CLAUDE.md'nin bir kopyasına dönüştürme.
