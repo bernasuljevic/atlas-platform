@@ -46,6 +46,9 @@ public static class DocumentsModule
 
         services.AddScoped<IDocumentRepository, EfDocumentRepository>();
 
+        // P6: versiyonlama - IDocumentRepository'yle AYNI Scoped gerekçe.
+        services.AddScoped<IDocumentVersionRepository, EfDocumentVersionRepository>();
+
         // Transactional Outbox Pattern - Wiki'nin Gün 1-3'ünün BİREBİR kopyası.
         services.AddScoped<IOutboxWriter, EfOutboxWriter>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
