@@ -15,6 +15,14 @@ public interface IDocumentRepository
 
     Task<IReadOnlyList<Document>> GetAllAsync(CancellationToken ct = default);
 
+    // P6 Gün 3 (duplicate-detection) - GetAllAsync gibi FİLTRESİZ (görünürlük
+    // Handler'da uygulanır) ama tüm tabloyu belleğe çekmek yerine DB
+    // seviyesinde ContentHash'e göre daraltıyor (bkz. DocumentConfiguration'daki
+    // önceden açılmış index) - upload her seferinde tüm belgeleri belleğe
+    // çekmenin GetAllAsync'in "veri hacmi büyürse yeniden değerlendirilir"
+    // YAGNI kararına aykırı düşeceği düşünülüp baştan hedefli sorgulandı.
+    Task<IReadOnlyList<Document>> GetAllByContentHashAsync(string contentHash, CancellationToken ct = default);
+
     // P4 Gün 3'te Wiki'nin IUnitOfWork deseni burada da devrede - SaveChangesAsync
     // BİLEREK yok, her metot sadece change tracker'a ekliyor. Kalıcı hale
     // getirmek çağıran Handler'ın IUnitOfWork.SaveChangesAsync'i (genelde bir

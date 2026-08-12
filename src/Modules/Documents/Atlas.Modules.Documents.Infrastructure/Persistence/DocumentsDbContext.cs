@@ -11,6 +11,7 @@ public class DocumentsDbContext : DbContext
 
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

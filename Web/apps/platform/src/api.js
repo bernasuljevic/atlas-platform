@@ -582,6 +582,87 @@ export async function downloadDocument(accessToken, id) {
   window.URL.revokeObjectURL(objectUrl);
 }
 
+// P6 (versiyonlama) - uploadDocument'ın AYNI multipart deseni, ama
+// Title/Visibility/Departman/Açıklama/Etiket YOK (dosya değiştirmek AYRI
+// bir sorumluluk - bkz. backend'deki UploadNewDocumentVersionCommand notu).
+export async function uploadNewDocumentVersion(accessToken, documentId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/${documentId}/versions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu belgeye yeni versiyon yükleme yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    const firstError = body?.errors && Object.values(body.errors)[0]?.[0];
+    throw new Error(firstError ?? body?.detail ?? "Yeni versiyon yüklenemedi");
+  }
+}
+
+export async function getDocumentVersions(accessToken, documentId) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const response = await fetch(`${API_URL}/api/documents/${documentId}/versions`, { headers });
+
+  if (response.status === 404) {
+    throw new Error("Bu belge artık mevcut değil ya da görme yetkin yok.");
+  }
+  if (!response.ok) {
+    throw new Error("Versiyon geçmişi yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// downloadDocument ile BİREBİR AYNI desen (blob + geçici object URL) - tek
+// fark hedef URL'in bir versiyon numarası taşıması.
+export async function downloadDocumentVersion(accessToken, documentId, versionNumber) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/documents/${documentId}/versions/${versionNumber}/download`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Versiyon indirilemedi");
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  const fileName = match ? match[1] : "belge";
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 // Favoriler/Pinler - eskiden TAMAMEN localStorage'daydı (bkz. WikiArticlePage.jsx'in
 // eski togglePin/toggleFavorite'i), artık gerçek, kullanıcı bazlı bir backend
 // tablosu. Toggle endpoint'leri dönüş değerinde işlemden SONRAKİ durumu (bool)

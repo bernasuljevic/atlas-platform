@@ -7,16 +7,19 @@ namespace Atlas.Modules.Documents.Application.Documents.Commands;
 public class DeleteDocumentCommandHandler : IRequestHandler<DeleteDocumentCommand>
 {
     private readonly IDocumentRepository _documentRepository;
+    private readonly IDocumentVersionRepository _documentVersionRepository;
     private readonly IFileStorageService _fileStorageService;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
     public DeleteDocumentCommandHandler(
-        IDocumentRepository documentRepository, IFileStorageService fileStorageService,
-        IOutboxWriter outboxWriter, IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
+        IDocumentRepository documentRepository, IDocumentVersionRepository documentVersionRepository,
+        IFileStorageService fileStorageService, IOutboxWriter outboxWriter, IUnitOfWork unitOfWork,
+        ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
+        _documentVersionRepository = documentVersionRepository;
         _fileStorageService = fileStorageService;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
@@ -41,10 +44,25 @@ public class DeleteDocumentCommandHandler : IRequestHandler<DeleteDocumentComman
         // Disk'teki dosya HEMEN (senkron) temizleniyor - Outbox'ı beklemiyor,
         // çünkü dosya silme kendi başına atomicity gerektirmeyen, tekrar
         // denenebilir (idempotent - StorageKey zaten yoksa no-op) bir işlem.
-        // DocumentDeletedEvent ise AI'ın (Gün 5) embedding'leri temizlemesi
-        // İÇİN - Wiki'nin WikiPageDeletedEvent'iyle AYNI gerekçe, henüz kimse
-        // dinlemiyor ama Outbox'a yazılması Document'in KENDİSİYLE atomik olmalı.
+        // DocumentDeletedEvent ise AI'ın embedding'leri temizlemesi İÇİN -
+        // Wiki'nin WikiPageDeletedEvent'iyle AYNI gerekçe, Outbox'a yazılması
+        // Document'in KENDİSİYLE atomik olmalı.
         await _fileStorageService.DeleteAsync(document.StorageKey, cancellationToken);
+
+        // P6 (versiyonlama): güncel dosyanın YANINDA, geçmişteki HER versiyonun
+        // da kendi diskteki dosyası var (bkz. DocumentVersion) - onlar da
+        // temizlenmezse "yetim" dosyalar olarak sonsuza kadar diskte kalırlardı.
+        // Önce dosyaları sil (mevcut StorageKey temizliğiyle AYNI best-effort/
+        // idempotent gerekçe), SONRA satırları toplu sil - AI'ın embedding
+        // temizliğinden FARKLI olarak bu satır silme işlemi Outbox üzerinden
+        // DEĞİL, burada doğrudan yapılıyor çünkü versiyon geçmişi tamamen
+        // Documents modülünün kendi iç verisi (başka bir modül dinlemiyor).
+        var versions = await _documentVersionRepository.GetByDocumentIdAsync(document.Id, cancellationToken);
+        foreach (var version in versions)
+        {
+            await _fileStorageService.DeleteAsync(version.StorageKey, cancellationToken);
+        }
+        await _documentVersionRepository.DeleteAllForDocumentAsync(document.Id, cancellationToken);
 
         _outboxWriter.Enqueue(new DocumentDeletedEvent(document.Id));
 
