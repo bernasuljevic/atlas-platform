@@ -15,6 +15,18 @@ public static class DocumentsEndpoints
     {
         var group = app.MapGroup("/api/documents").WithTags("Documents");
 
+        // POST /api/wiki/reindex ile AYNI gerekçe: embedding sağlayıcısı
+        // değişince (Fake -> gerçek) var olan TÜM belgeler yeniden işlensin.
+        // ReprocessDocument'ın (owner-or-Admin, tekil) AKSİNE Admin-only VE
+        // bulk - farklı bir senaryoya hizmet ediyor, bkz. ReindexDocumentsCommand.
+        group.MapPost("/reindex", async (IMediator mediator) =>
+        {
+            var count = await mediator.Send(new ReindexDocumentsCommand());
+            return Results.Ok(new { reindexedCount = count });
+        })
+        .WithName("ReindexDocuments")
+        .RequireAuthorization(policy => policy.RequireRole("Admin"));
+
         // GetWikiPages ile AYNI desen - açık endpoint, görünürlük filtresi
         // ICurrentUserAccessor'dan (varsa) otomatik uygulanıyor. Anonim bir
         // istek sadece Public belgeleri görür.

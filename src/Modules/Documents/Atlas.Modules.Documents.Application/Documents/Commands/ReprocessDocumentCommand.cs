@@ -4,14 +4,14 @@ using MediatR;
 namespace Atlas.Modules.Documents.Application.Documents.Commands;
 
 /// <summary>
-/// POST /api/wiki/reindex'in Documents modülündeki karşılığı - AMA bulk/Admin
-/// bir bakım aracı DEĞİL, TEK bir belgeyi hedefliyor ve owner-or-Admin (Delete/
-/// Update ile AYNI yetki deseni). Gerekçe: Wiki'nin reindex'i "embedding
-/// sağlayıcısı değişti, HERKESİ yeniden işle" senaryosu için var; Documents'ta
-/// asıl ihtiyaç "bu TEK belge Failed durumunda kaldı (ör. o an desteklenmeyen
-/// bir uzantıydı, sonradan bir processor eklendi ya da geçici bir disk hatası
-/// vardı) - sahibi/Admin elle yeniden tetiklesin" - bu yüzden Admin-only bulk
-/// yerine owner-or-Admin tekil bir komut seçildi.
+/// TEK bir belgeyi hedefleyen, owner-or-Admin (Delete/Update ile AYNI yetki
+/// deseni) bir araç - "bu TEK belge Failed durumunda kaldı (ör. o an
+/// desteklenmeyen bir uzantıydı, sonradan bir processor eklendi ya da geçici
+/// bir disk hatası vardı) - sahibi/Admin elle yeniden tetiklesin" senaryosu
+/// için. **Bulk/Admin-only eşdeğeri artık VAR** - `ReindexDocumentsCommand`
+/// ("embedding sağlayıcısı değişti, HERKESİ yeniden işle" senaryosu, Wiki'nin
+/// `ReindexWikiPagesCommand`'ıyla aynı gerekçe) - ikisi birbirinin YERİNE
+/// geçmiyor, farklı ihtiyaçlara hizmet eden iki ayrı araç.
 ///
 /// Handler YENİ bir extraction akışı YAZMIYOR - DocumentUploadedEvent'i (var
 /// olan StorageKey/ContentType/FileExtension ile) Outbox'a yeniden yazıyor,

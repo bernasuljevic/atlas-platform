@@ -1305,11 +1305,49 @@ sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
 
 **Test & CI Sertleştirme paketi artık TAMAMEN BİTTİ (Gün 1-5) ve `master`'da.**
 
+## Documents modülüne toplu (bulk) reindex eklendi (2026-08-12)
+
+LLM key geçişine hazırlık denetimi sırasında bulunan gerçek bir eksik
+kapatıldı: Wiki'nin `POST /api/wiki/reindex`'i (embedding sağlayıcısı
+değişince var olan TÜM sayfaları yeniden işleten Admin aracı) vardı, ama
+Documents'ta eşdeğeri hiç yoktu - `POST /api/documents/{id}/reprocess` SADECE
+tek bir belgeyi hedefliyordu (owner-or-Admin, "bu belge Failed kaldı" senaryosu
+için baştan BİLEREK bulk yapılmamıştı, bkz. `ReprocessDocumentCommand`'ın
+orijinal yorumu). Yeni `ReindexDocumentsCommand`/Handler + `POST
+/api/documents/reindex` (Admin-only) bu boşluğu kapatıyor - ikisi birbirinin
+YERİNE geçmiyor, farklı senaryolara hizmet ediyor.
+
+**Wiki'nin reindex'inden TEK mimari fark:** Wiki'nin `ReindexWikiPagesCommand`'ı
+Outbox Pattern'den ÖNCE yazıldığı için hâlâ `IPublisher.Publish` kullanıyor
+(retrofit edilmedi) - Documents'ın reindex'i BİLEREK `IOutboxWriter` kullanıyor,
+çünkü modülün geri kalanı (Upload/Delete/Reprocess) zaten Outbox'a yazıyor;
+yüzlerce belgeyi senkron `Publish` ile işlemek, Outbox'ın çözdüğü "atomiklik/
+crash-safety" garantisini bulk bir işlemde tekrar kaybetmek olurdu. Durum
+(Ready/Failed/Extracting) fark etmeksizin TÜM belgeler için `DocumentUploadedEvent`
+tek bir `SaveChangesAsync`'te (atomik) kuyruğa yazılıyor - `DocumentUploadedEventHandler`
+(zaten var olan, Gün 3'ten beri değişmeyen) bunları ilk yüklemedekiyle birebir
+aynı şekilde işleyip Extracting→Ready/Failed geçişini kendisi yapıyor. İki yeni
+unit test (`Atlas.Modules.Documents.Application.Tests`, var olan Fake'lerle) +
+tüm solution (`dotnet test Atlas.sln --filter "Category!=Integration"`) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
-   (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-07-28,
+   (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-08-12,
+   geçiş öncesi hazırlık denetimi):** "sadece DI kaydını değiştir" cümlesi
+   Application/Domain katmanları için doğru ama TAM resim değil - gerçek geçiş
+   ayrıca şunları gerektirecek: (a) sağlayıcı/model kararı + API key (kod
+   `EmbeddingDimensions.Standard = 1024`'ün yorumunda Voyage AI'a hazırlanmış
+   görünüyor ama kesinleşmedi), (b) projenin İLK dış HTTP entegrasyonu (`IHttpClientFactory`
+   şu an hiç kullanılmıyor) - yeni bir `Infrastructure` sınıfı + hata/timeout
+   yönetimi, (c) `Jwt:Key`'le AYNI gerekçeyle key'in User Secrets'a gitmesi,
+   (d) gerçek API'lerin batch/token limitine göre `EmbedAsync`'in büyük
+   listeleri alt-batch'lere bölmesi (Fake'te sınır yoktu), (e) var olan TÜM
+   embedding'lerin (Fake'in ürettiği, yeni sağlayıcıyla uyumsuz) toplu olarak
+   yeniden üretilmesi - Wiki (`/api/wiki/reindex`) VE Documents
+   (`/api/documents/reindex`, yukarıdaki bölüme bkz. - bu denetimde bulunup
+   AYRICA kapatılan eksik) ikisi de artık hazır. **Not (2026-07-28,
    kullanıcı gözlemi):** Arama şu an "başlığa göre eşleşiyormuş" hissi
    verebiliyor - kod tarafında bu YANLIŞ, canlı test edilip kanıtlandı
    (`SearchByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,
@@ -1424,8 +1462,13 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   owner-or-Admin (throw-based 403), silme diskteki dosyayı da temizler.
 - `POST /api/documents/{id}/reprocess` → token gerektirir, owner-or-Admin.
   Var olan StorageKey/ContentType ile `DocumentUploadedEvent`'i Outbox'a
-  yeniden yazar - `POST /api/wiki/reindex`'in TEK bir belge için karşılığı
-  (bulk/Admin-only DEĞİL). Extracting durumundaki bir belge için 400.
+  yeniden yazar - "bu TEK belge Failed kaldı" senaryosu için (bulk/Admin-only
+  DEĞİL). Extracting durumundaki bir belge için 400.
+- `POST /api/documents/reindex` → sadece Admin rolü. `POST /api/wiki/reindex`'in
+  Documents karşılığı - var olan TÜM belgeler için (durum fark etmeksizin)
+  `DocumentUploadedEvent`'i toplu olarak Outbox'a yeniden yazar - embedding
+  sağlayıcısı değişikliği sonrası kullanılacak bir bakım aracı.
+  `reprocess`'in YERİNE geçmiyor, ayrı bir senaryoya hizmet ediyor.
 - `POST /api/documents/{id}/versions` (multipart: file) → token gerektirir,
   owner-or-Admin. Mevcut dosyayı bir `DocumentVersion`'a arşivleyip yenisini
   Document'a yazar, `CurrentVersionNumber` artar, Status Uploaded'a döner
