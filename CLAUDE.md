@@ -1308,4 +1308,12 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
 
-Detaylı notlar için `README.md`'ye bak (Bölüm 10'a kadar güncel).
+**`README.md` GÜNCEL DEĞİL (2026-08-12 itibarıyla fark edildi):** "Bölüm 19 —
+Sayfalama"da kalmış bir öğrenme günlüğü - AI Semantik Arama, Transactional
+Outbox Pattern, Audit log, Vault, Documents modülü, "Kapsamlı Geliştirme
+Paketi" (P1-P7) dahil olmak üzere sonraki HİÇBİR şeyden bahsetmiyor. Eskiden
+burada "Bölüm 10'a kadar güncel" notu vardı - artık YANLIŞ, kaldırıldı. Bu
+dosya (CLAUDE.md) projenin TEK güncel/eksiksiz kaynağı - "Şu ana kadar
+tamamlananlar", "Kapsamlı Geliştirme Paketi" ve "Endpoint referansı"
+bölümlerine bak. README'yi güncellemek/birleştirmek ayrı bir iş olarak
+kullanıcıya bırakıldı (henüz istenmedi).
