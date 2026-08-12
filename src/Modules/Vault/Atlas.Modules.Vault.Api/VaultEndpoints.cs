@@ -84,13 +84,17 @@ public static class VaultEndpoints
         // günceliyor. GET'in kendisini asla yan etkili yapmıyoruz (bir GET
         // isteğinin veri değiştirmemesi/denetim izi bırakmaması REST'in temel
         // kuralı) - POST kullanılması da bu yüzden.
+        // P7: rate-limit eklendi (bkz. Program.cs'teki "vault-reveal" notu) -
+        // login/ai-search/email-verification zaten korunuyordu, bu gerçek
+        // bir boşluktu.
         group.MapPost("/{id:guid}/reveal", async (Guid id, IMediator mediator) =>
         {
             var password = await mediator.Send(new RevealPasswordEntryCommand(id));
             return Results.Ok(new { password });
         })
         .WithName("RevealPasswordEntry")
-        .RequireAuthorization();
+        .RequireAuthorization()
+        .RequireRateLimiting("vault-reveal");
 
         return app;
     }
