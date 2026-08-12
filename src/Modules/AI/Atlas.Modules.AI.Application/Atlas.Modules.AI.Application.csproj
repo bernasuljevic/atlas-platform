@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Modules.AI.Domain\Atlas.Modules.AI.Domain.csproj" />
     <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+    <!-- P4 Gün 1 - TextChunker artık burada (bkz. Shared.Text/Chunking/TextChunker.cs'teki taşıma notu). -->
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Text\Atlas.Shared.Text.csproj" />
   </ItemGroup>
 
   <ItemGroup>

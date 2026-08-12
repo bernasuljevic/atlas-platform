@@ -1,6 +1,7 @@
 using Atlas.IntegrationTests.Fakes;
 using Atlas.Modules.Audit.Infrastructure.Persistence;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
+using Atlas.Modules.Documents.Infrastructure.Persistence;
 using Atlas.Modules.Wiki.Infrastructure.Persistence;
 using Atlas.Shared.Caching.Abstractions;
 using Microsoft.AspNetCore.Hosting;
@@ -81,6 +82,20 @@ public class AtlasApiFactory : WebApplicationFactory<Program>
             services.AddDbContext<AuditDbContext>(options =>
             {
                 options.UseInMemoryDatabase($"AuditTestDb-{_dbSuffix}");
+                options.UseInternalServiceProvider(inMemoryProviderServices);
+            });
+
+            // Documents modülü de InMemory'e çevriliyor (P4 Gün 6) - AYNI gerekçe.
+            // Not: DocumentsModule'ün kendi IFileStorageService'i (LocalDiskFileStorageService)
+            // BİLEREK değiştirilmedi - dosyalar gerçek diske (%LOCALAPPDATA%\
+            // AtlasPlatformDocuments) yazılıyor, bu üretimdeki gerçek davranışı
+            // (özellikle IDocumentProcessor'ların gerçek dosya içeriği okuması
+            // gerektiği için) doğru yansıtıyor. Testler oluşturdukları belgeleri
+            // sildiğinde (DeleteDocumentCommandHandler) dosyalar da temizleniyor.
+            services.RemoveAll<DbContextOptions<DocumentsDbContext>>();
+            services.AddDbContext<DocumentsDbContext>(options =>
+            {
+                options.UseInMemoryDatabase($"DocumentsTestDb-{_dbSuffix}");
                 options.UseInternalServiceProvider(inMemoryProviderServices);
             });
 

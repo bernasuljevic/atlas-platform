@@ -1,6 +1,9 @@
 using Atlas.Modules.Documents.Application.Abstractions;
 using Atlas.Modules.Documents.Application.Documents.Commands;
+using Atlas.Modules.Documents.Infrastructure;
+using Atlas.Modules.Documents.Infrastructure.Outbox;
 using Atlas.Modules.Documents.Infrastructure.Persistence;
+using Atlas.Modules.Documents.Infrastructure.Processing;
 using Atlas.Modules.Documents.Infrastructure.Storage;
 using Atlas.Shared.CQRS.Behaviors;
 using FluentValidation;
@@ -11,9 +14,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Atlas.Modules.Documents.Api;
 
-// Gün 2'de sadece storage+persistence host'a bağlanmıştı (DbContext'in DI'dan
-// çözülebilir olması, migration tooling'in çalışabilmesi için). Gün 3'te
-// MediatR/FluentValidation kaydı eklendi - ilk Command (UploadDocumentCommand) geldi.
+// P3 Gün 2'de sadece storage+persistence host'a bağlanmıştı, Gün 3'te MediatR/
+// FluentValidation kaydı eklendi. P4 Gün 2'de Outbox altyapısı eklendi (boş
+// çalışıyordu). P4 Gün 3'te kuyruk ilk kez besleniyor: DocumentUploadedEvent +
+// PlainTextDocumentProcessor + DocumentUploadedEventHandler (Infrastructure).
 public static class DocumentsModule
 {
     public static IServiceCollection AddDocumentsModule(this IServiceCollection services, IConfiguration configuration)
@@ -42,9 +46,33 @@ public static class DocumentsModule
 
         services.AddScoped<IDocumentRepository, EfDocumentRepository>();
 
+        // Transactional Outbox Pattern - Wiki'nin Gün 1-3'ünün BİREBİR kopyası.
+        services.AddScoped<IOutboxWriter, EfOutboxWriter>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
+        services.AddHostedService<OutboxProcessor>();
+
+        // IDocumentProcessor'lar - Singleton, FakeEmbeddingService'le AYNI gerekçe
+        // (durumsuz, dış kaynağa bağlı değil). Her biri kendi uzantı kümesine
+        // "evet" diyor (bkz. CanProcess), IEnumerable<IDocumentProcessor> hepsini
+        // otomatik topluyor - yeni bir format desteği eklemek SADECE yeni bir
+        // AddSingleton satırı, mevcut hiçbir processor'a dokunulmuyor.
+        services.AddSingleton<IDocumentProcessor, PlainTextDocumentProcessor>();
+        services.AddSingleton<IDocumentProcessor, PdfDocumentProcessor>();
+        services.AddSingleton<IDocumentProcessor, OpenXmlWordDocumentProcessor>();
+        services.AddSingleton<IDocumentProcessor, OpenXmlPresentationDocumentProcessor>();
+        services.AddSingleton<IDocumentProcessor, OpenXmlSpreadsheetDocumentProcessor>();
+
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<UploadDocumentCommand>();
+
+            // AI modülünün AIModule.cs'inde bulunan AYNI hatayı BURADA baştan
+            // önlüyoruz: DocumentUploadedEventHandler Documents.Infrastructure'da
+            // yaşıyor, RegisterServicesFromAssemblyContaining<UploadDocumentCommand>
+            // SADECE Documents.Application assembly'sini tarar - bu satır
+            // olmasaydı handler hiç kayıt olmaz, event sessizce hiç dinlenmezdi.
+            cfg.RegisterServicesFromAssemblyContaining<DocumentUploadedEventHandler>();
+
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 

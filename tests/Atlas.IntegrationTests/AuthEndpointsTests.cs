@@ -1,32 +1,48 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 
 namespace Atlas.IntegrationTests;
 
 [Trait("Category", "Integration")]
 public class AuthEndpointsTests : IClassFixture<AtlasApiFactory>
 {
+    private readonly AtlasApiFactory _factory;
     private readonly HttpClient _client;
 
     public AuthEndpointsTests(AtlasApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
     [Fact]
-    public async Task Register_Sonra_Login_BasariylaTokenDoner()
+    public async Task Register_DogrulaSonraLogin_BasariylaTokenDoner()
     {
-        var email = $"test-{Guid.NewGuid()}@atlas.local";
+        // register/login/verify-email üçünü ayrı ayrı çağırmak yerine
+        // AuthTestHelper kullanıyoruz - REGRESYON notu için bkz. AuthTestHelper.cs'deki
+        // özet: e-posta doğrulama zorunluluğu eklendiğinde bu testin (ve register+login
+        // yapan diğer tüm Integration testlerinin) eski hali 403 ile kırılıyordu.
+        var accessToken = await AuthTestHelper.RegisterVerifyAndLoginAsync(
+            _client, _factory, "Entegrasyon Testi", "TestSifre123!");
 
-        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new
+        Assert.False(string.IsNullOrWhiteSpace(accessToken));
+    }
+
+    [Fact]
+    public async Task DogrulanmamisEposta_Login_403Doner()
+    {
+        // AuthTestHelper'ın atladığı (bilerek atladığı) senaryo - doğrulama
+        // ADIMI YAPILMADAN login denenirse LoginCommandHandler'ın
+        // EmailVerified kontrolüne takılıp 403 dönmesi gerekiyor (401 DEĞİL -
+        // kimlik/şifre doğru, sadece işlem henüz yapılamıyor).
+        var email = $"{Guid.NewGuid()}@atlas.local";
+
+        await _client.PostAsJsonAsync("/api/auth/register", new
         {
             email,
             fullName = "Entegrasyon Testi",
             password = "TestSifre123!"
         });
-
-        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
 
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
         {
@@ -34,11 +50,7 @@ public class AuthEndpointsTests : IClassFixture<AtlasApiFactory>
             password = "TestSifre123!"
         });
 
-        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
-
-        var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("accessToken").GetString()));
-        Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("refreshToken").GetString()));
+        Assert.Equal(HttpStatusCode.Forbidden, loginResponse.StatusCode);
     }
 
     [Fact]
@@ -53,6 +65,10 @@ public class AuthEndpointsTests : IClassFixture<AtlasApiFactory>
             password = "DogruSifre123!"
         });
 
+        // Şifre yanlışsa LoginCommandHandler doğrulama durumuna hiç bakmadan
+        // null dönüyor (bkz. Handle metodundaki sıralama) - bu yüzden bu test
+        // e-posta doğrulanmamış olsa bile hep 401 vermeye devam ediyor,
+        // AuthTestHelper'a ihtiyacı yok.
         var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
         {
             email,

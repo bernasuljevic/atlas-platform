@@ -20,31 +20,12 @@ public class WikiEndpointsTests : IClassFixture<AtlasApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<string> RegisterAndLoginAsync()
-    {
-        var email = $"wiki-test-{Guid.NewGuid()}@atlas.local";
-
-        // Departman ARTIK ZORUNLU - CreateWikiPageCommandHandler, normal bir
-        // kullanıcının sayfasını her zaman kendi (gerçek, JWT'deki) departmanına
-        // kaydediyor; departmansız bir kullanıcı sayfa oluşturamaz (bkz.
-        // "Sayfa oluşturmak için bir departmana ait olmalısınız" hatası).
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            email,
-            fullName = "Wiki Test Kullanıcısı",
-            password = "TestSifre123!",
-            department = "IT"
-        });
-
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
-        {
-            email,
-            password = "TestSifre123!"
-        });
-
-        var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accessToken").GetString()!;
-    }
+    // Departman ARTIK ZORUNLU - CreateWikiPageCommandHandler, normal bir
+    // kullanıcının sayfasını her zaman kendi (gerçek, JWT'deki) departmanına
+    // kaydediyor; departmansız bir kullanıcı sayfa oluşturamaz (bkz.
+    // "Sayfa oluşturmak için bir departmana ait olmalısınız" hatası).
+    private Task<string> RegisterAndLoginAsync() =>
+        AuthTestHelper.RegisterVerifyAndLoginAsync(_client, _factory, "Wiki Test Kullanıcısı", "TestSifre123!", "IT");
 
     [Fact]
     public async Task SayfaOlustur_SonraListelendiginde_GorunurOluyor()

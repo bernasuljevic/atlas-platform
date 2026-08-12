@@ -40,22 +40,8 @@ public class AiSearchEndpointsTests : IClassFixture<AtlasApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<string> RegisterAndLoginAsync(string department)
-    {
-        var email = $"ai-search-test-{Guid.NewGuid()}@atlas.local";
-
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            email,
-            fullName = "AI Arama Test Kullanıcısı",
-            password = "TestSifre123!",
-            department
-        });
-
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestSifre123!" });
-        var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accessToken").GetString()!;
-    }
+    private Task<string> RegisterAndLoginAsync(string department) =>
+        AuthTestHelper.RegisterVerifyAndLoginAsync(_client, _factory, "AI Arama Test Kullanıcısı", "TestSifre123!", department);
 
     private async Task<Guid> CreateWikiPageAsync(
         string token, string title, string content, string departmentName, string visibility)

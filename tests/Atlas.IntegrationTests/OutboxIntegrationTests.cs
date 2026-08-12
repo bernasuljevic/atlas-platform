@@ -36,22 +36,8 @@ public class OutboxIntegrationTests : IClassFixture<AtlasApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<string> RegisterAndLoginAsync()
-    {
-        var email = $"outbox-test-{Guid.NewGuid()}@atlas.local";
-
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            email,
-            fullName = "Outbox Test Kullanıcısı",
-            password = "TestSifre123!",
-            department = "IT"
-        });
-
-        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new { email, password = "TestSifre123!" });
-        var body = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
-        return body.GetProperty("accessToken").GetString()!;
-    }
+    private Task<string> RegisterAndLoginAsync() =>
+        AuthTestHelper.RegisterVerifyAndLoginAsync(_client, _factory, "Outbox Test Kullanıcısı", "TestSifre123!", "IT");
 
     [Fact]
     public async Task SayfaOlusturulunca_AyniAndaOutboxMesajiDaYaziliyor()

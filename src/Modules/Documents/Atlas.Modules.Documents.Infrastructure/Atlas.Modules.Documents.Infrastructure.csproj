@@ -10,6 +10,16 @@
   <ItemGroup>
     <ProjectReference Include="..\Atlas.Modules.Documents.Domain\Atlas.Modules.Documents.Domain.csproj" />
     <ProjectReference Include="..\Atlas.Modules.Documents.Application\Atlas.Modules.Documents.Application.csproj" />
+    <!-- P4 Gün 3 - DocumentUploadedEventHandler'ın ihtiyaçları: event tipleri
+         (Contracts) ve TextChunker (Text). -->
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Contracts\Atlas.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Text\Atlas.Shared.Text.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
+    <PackageReference Include="MediatR" Version="12.4.1" />
   </ItemGroup>
 
   <ItemGroup>

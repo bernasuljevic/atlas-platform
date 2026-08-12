@@ -8,11 +8,14 @@ namespace Atlas.Modules.Documents.Application.Documents.Commands;
 public class UpdateDocumentCommandHandler : IRequestHandler<UpdateDocumentCommand>
 {
     private readonly IDocumentRepository _documentRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
-    public UpdateDocumentCommandHandler(IDocumentRepository documentRepository, ICurrentUserAccessor currentUser)
+    public UpdateDocumentCommandHandler(
+        IDocumentRepository documentRepository, IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
+        _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
 
@@ -36,5 +39,6 @@ public class UpdateDocumentCommandHandler : IRequestHandler<UpdateDocumentComman
         request.AuditDetails = document.Title;
 
         await _documentRepository.UpdateAsync(document, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }
