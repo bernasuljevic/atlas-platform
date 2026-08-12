@@ -1176,17 +1176,131 @@ yay, önemli şeyleri anlat" talimatına göre.
     Postgres/SQL Server'ın ZATEN kanıtlanmış aynı deseni. Öncesinde bu
     override hiç yoktu, `docker compose down` yüklenen belgeleri sessizce
     siliyordu (DB satırları kalıp artık var olmayan bir dosyaya işaret
-    ediyordu). **Not:** `docker compose config` ile doğrulandı ama tam bir
-    "up --build" döngüsüyle CANLI doğrulanmadı (bu makinede native SQL
-    Server/Postgres/Redis kullanılıyor, SQL Server imajı dahil tam stack'i
-    sıfırdan ayağa kaldırmak bu değişikliğin kapsamına göre orantısız bir
-    süre gerektirirdi) - değişiklik aynı dosyadaki iki ZATEN canlı
-    doğrulanmış volume deseniyle birebir aynı yapıyı izliyor.
+    ediyordu).
+
+**Sonradan (2026-08-12, Test & CI sertleştirme paketinin Gün 1'i) tam bir
+"up --build" döngüsüyle CANLI DOĞRULANDI:** `docker compose up -d --build`
+ile tüm stack sıfırdan ayağa kaldırıldı, bir kullanıcı kaydedilip
+doğrulandı, bir belge yüklendi (indirildi, byte-birebir eşleşti,
+`status: "Ready"` - embedding pipeline'ı da container içinde sorunsuz
+çalıştı). Sonra `docker compose down` (volume'ler SİLİNMEDEN) + `docker
+compose up -d` ile TÜM container'lar (sqlserver dahil) sıfırdan yeniden
+oluşturuldu - aynı belge tekrar indirildi, içerik byte-birebir AYNIYDI.
+Kod değişikliği gerekmedi, sadece P7 Gün 3'ün doğru çalıştığının kanıtıydı.
 
   Test/lint yeşil (docker-compose.yml değişikliği .NET/JS kodunu
   etkilemiyor, ayrı bir test gerektirmedi).
 
 **"Kapsamlı Geliştirme Paketi" artık TAMAMEN BİTTİ (P1-P7).**
+
+## Test & CI Sertleştirme (2026-08-12, API key'ler gelene kadar sırada ne var
+sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
+
+`chore/test-ci-hardening` branch'inde, 4 günlük bir paket:
+
+- [x] **Gün 1 - Docker Compose belge volume'ü canlı doğrulandı:** P7 Gün
+      3'teki `atlas-documents-data` volume'ü tam bir `docker compose up -d
+      --build` döngüsüyle test edildi - belge yüklendi, TÜM container'lar
+      (sqlserver dahil) `docker compose down` (volume'ler silinmeden) +
+      `up -d` ile sıfırdan yeniden oluşturuldu, dosya byte-birebir aynı
+      kaldı. Kod değişikliği gerekmedi.
+- [x] **Gün 2 - Integration testleri CI'a taşındı:** Yeni "Integration
+      Tests" job'ı (backend'den ayrı, paralel) - SQL Server/Postgres/Redis
+      servis container'ları + health check'ler, `ConnectionStrings__*`
+      ortam değişkeni override'ları (appsettings.json'daki yerel `.\SQLEXPRESS`
+      Windows Authentication CI'da çalışamaz). **CI'a taşınınca BULUNAN
+      GERÇEK BUG:** ilk çalıştırmada 6 test "Database 'AtlasPlatform'
+      already exists" hatasıyla patladı - xUnit'in varsayılan test sınıfı
+      paralelliği, her sınıfın kendi `AtlasApiFactory`'sinin (dolayısıyla
+      gerçek SQL Server'a bağlı `VaultDbContext` migration'ının - Vault
+      BİLEREK InMemory'e çevrilmiyor) AYNI ANDA "veritabanı yok, oluşturayım"
+      durumuna düşüp `CREATE DATABASE` için yarışmasına yol açtı. Yerel
+      geliştirmede hiç görülmedi çünkü "AtlasPlatform" veritabanı zaten
+      haftalardır var (Migrate() idempotent) - CI'da veritabanı HER
+      ÇALIŞTIRMADA sıfırdan olduğu için yarış ortaya çıktı. Çözüm:
+      `xunit.runner.json` (`parallelizeTestCollections: false`) - test
+      sınıflarının paralel çalışması kapatıldı (yerelde 24/24 test hâlâ
+      geçiyor, 30s'den 45s'e çıktı). Branch protection'a "Integration
+      Tests" üçüncü zorunlu check olarak eklendi.
+
+  Gün 1-2 için PR #13 açık (kullanıcının "sadece bu adımı push'la" istisnai
+  onayıyla - GitHub Actions'ı yerel simüle edecek bir araç olmadığı için CI
+  değişikliğinin GERÇEK bir Actions çalıştırmasıyla doğrulanması
+  gerekiyordu).
+
+- [x] **Gün 3 - Documents modülüne Application-katmanı unit test projesi:**
+      Yeni `Atlas.Modules.Documents.Application.Tests` - `Atlas.Modules.AI.
+      Application.Tests`'in aynı deseni (elle yazılmış fake'ler, mocking
+      kütüphanesi YOK). `FakeDocumentRepository`/`FakeDocumentVersionRepository`/
+      `FakeFileStorageService`/`FakeMalwareScanner`/`FakeOutboxWriter`/
+      `FakeUnitOfWork`/`FakeWikiVisibilityChecker` - 7 fake, DocumentsDbContext'in
+      InMemory'e çevrilip GERÇEK bir integration test'in ihtiyaç duyduğu
+      SQL Server/Docker olmadan Handler'ları izole test edebilmek için.
+      18 test: `UploadDocumentCommandHandler` (departmansız kullanıcı hatası,
+      malware taraması başarısız olunca HİÇBİR ŞEY kalıcı olmuyor, başarılı
+      yüklemenin event'i kuyruğa ekliyor, ContentHash duplicate tespiti hem
+      görünür hem GİZLİ - farklı departman - senaryosu), `UploadNewDocumentVersionCommandHandler`
+      (not-found, owner-olmayan 403, "hâlâ işleniyor" guard'ı, başarılı
+      snapshot+replace, Admin başkasının belgesini versiyonlayabiliyor),
+      `DeleteDocumentCommandHandler` (not-found, 403, TÜM versiyon
+      dosyalarının temizlenmesi, Admin bypass), `ReprocessDocumentCommandHandler`
+      (not-found, 403, guard, var olan StorageKey'le yeniden kuyruklama).
+      **Bu testlerin asıl değeri integration testlerin YERİNE geçmek değil -
+      integration testler hâlâ gerçek SQL Server'a karşı Outbox/EF Core
+      davranışını doğruluyor (bkz. P4 Gün 6), bu yeni proje SADECE Handler'ın
+      İŞ MANTIĞINI (kim neyi yapabilir, hangi durumda hangi hata) saniyeler
+      içinde, Docker'a hiç ihtiyaç duymadan test ediyor** - günlük geliştirme
+      döngüsünde çok daha hızlı bir geri bildirim katmanı. `dotnet test
+      Atlas.sln` yeniden çalıştırıldı: TÜMÜ yeşil (Domain/Application/
+      Infrastructure testleri + 18 yeni test + 24 Integration testi).
+
+- [x] **Gün 4-5 - Frontend'e otomatik test altyapısı (Vitest + React Testing
+      Library):** Backend'in "hızlı, dış bağımlılıksız test katmanı" fikrinin
+      (bkz. Gün 3) frontend karşılığı - şimdiye kadar frontend'in HİÇ otomatik
+      testi yoktu, sadece `npm run lint`/`npm run build` + tarayıcıda elle
+      doğrulama vardı. `vitest`/`@testing-library/react`/`@testing-library/
+      jest-dom`/`@testing-library/user-event`/`jsdom` eklendi - ayrı bir
+      `vitest.config.js` DEĞİL, var olan `vite.config.js`'e bir `test` bloğu
+      (Vitest zaten Vite'ın kendi config'ini okuyabiliyor, ayrı bir dosya
+      gereksiz bir kopya olurdu). `src/test/setup.js` - jest-dom matcher'larını
+      (`toBeInTheDocument()` vb.) `expect()`'e ekliyor.
+
+      İki katman test yazıldı: (1) **saf mantık** - `dateUtils.test.js`
+      (Ders #19'daki "...ZZ" bug'ının regresyon testi - bu düzeltme daha önce
+      SADECE manuel gözlemle korunuyordu), `jwt.test.js` (JWT claim çözümleme,
+      Türkçe karakter senaryosu dahil), `passwordGenerator.test.js`
+      (uzunluk/kategori garantisi/belirsiz karakter hariç tutma/gerçek
+      rastgelelik). (2) **gerçek bir component render'ı** - `WikiSearch.test.jsx`,
+      BİLEREK eklendi çünkü sadece pure-function testleri "test altyapısı
+      kuruldu" iddiasını TAM kanıtlamıyordu (jsdom/RTL'in DOM'a gerçekten
+      render edip kullanıcı etkileşimini simüle ettiğini göstermiyordu).
+      `../api`'deki `searchByMeaning` `vi.mock` ile taklit edildi, component
+      `MemoryRouter` ile sarmalandı (`useNavigate` bir Router context'i
+      gerektiriyor). 4 senaryo: wiki sayfası + belge sonucunun `sourceType`'a
+      göre AYRIŞTIRILMASI (ikon + hedef rota + skor yüzdesi), boş sonuç mesajı,
+      API hata durumunda hata mesajı (sonuç listesi render EDİLMİYOR), boş
+      sorguyla submit'in arama tetiklemediği (buton zaten disabled).
+
+      **Kendi test kodumda bulunan bir hata (proje kodunda değil):**
+      `jwt.test.js`'in `fakeToken` yardımcı fonksiyonu ilk halinde doğrudan
+      `btoa(JSON.stringify(obj))` çağırıyordu - Türkçe karakter (ş/ğ/ü/ö/ç/İ)
+      içeren bir payload'da `InvalidCharacterError` fırlattı, çünkü `btoa()`
+      SADECE Latin-1 (0-255) kabul ediyor. `TextEncoder` ile önce gerçek
+      UTF-8 baytlarına çevirip SONRA base64'leyecek şekilde düzeltildi -
+      `jwt.js`'in kendisi bu durumu zaten doğru işliyordu (decode tarafında),
+      hata sadece test fixture'ımdaydı.
+
+      CI'ın `frontend` job'ına yeni bir "Test" adımı eklendi (`npm run test
+      --workspace=web`, Lint ile Build arasında) - ayrı bir job AÇILMADI,
+      backend'in Integration testlerinin aksine bu testlerin dış bağımlılığı
+      (Docker/gerçek DB) yok, aynı job'da hızlıca çalışıyor. Yerelde
+      doğrulandı: `npx vitest run` → 4 dosya, 17 test, hepsi yeşil;
+      `npm run lint`/`npm run build` de temiz.
+
+  Dört gün de (Gün 1-5) tamamlandı - PR #13'e Gün 3-5 commit'leri eklenecek,
+  kullanıcının açık "push'la" talimatı beklenip push edilecek (Gün 2'deki
+  "Evet, onaylıyorum" SADECE o adımın CI doğrulaması için istisnaydı, genel
+  bir yeniden yetkilendirme değildi).
 
 ## Sırada ne var
 

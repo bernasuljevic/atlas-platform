@@ -24,14 +24,88 @@ jobs:
       - name: Build
         run: dotnet build Atlas.sln --no-restore --configuration Release
 
-      # Atlas.IntegrationTests derleniyor (build hatası burada da yakalanır)
-      # ama ÇALIŞTIRILMIYOR - gerçek SQL Server/Postgres/Redis'e ihtiyaç
-      # duyuyor, henüz servis container'larıyla CI'a taşınmadı (bkz.
-      # AtlasApiFactory.cs'teki not, tests/*.cs'teki [Trait("Category",
-      # "Integration")] işaretleri). Domain/Application/Infrastructure
-      # testlerinin hepsi fake/in-memory - dış bağımlılık yok.
+      # Integration testleri (gerçek SQL Server/Postgres/Redis gerektiriyor)
+      # BİLEREK burada değil, ayrı "integration-tests" job'ında - hızlı
+      # geri bildirim (bu job servis container'ı beklemeden birkaç
+      # saniyede biter) paralel olarak devam etsin diye. Domain/Application/
+      # Infrastructure testlerinin hepsi fake/in-memory - dış bağımlılık yok.
       - name: Test (Integration hariç)
         run: dotnet test Atlas.sln --no-build --configuration Release --filter "Category!=Integration"
+
+  # Ders #21'in çözümü: Atlas.IntegrationTests eskiden CI'da hiç
+  # çalıştırılmıyordu ("gerçek bir veritabanı gerektiriyor" gerekçesiyle
+  # bilinçli olarak dışarıda bırakılmıştı) - bu, kullanıcının bağımsız olarak
+  # eklediği bir e-posta doğrulama kuralının integration testlerin TAMAMINI
+  # (register+login yapan her sınıf) sessizce kırmasına, bunun uzun süre fark
+  # edilmemesine yol açmıştı. Artık CI'ın kendisi gerçek SQL Server/Postgres/
+  # Redis servis container'ları başlatıp bu testleri her push/PR'da çalıştırıyor.
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      # docker-compose.yml'deki sqlserver servisinin AYNISI - farklı, "CI'a
+      # özel" olduğu belli bir demo şifre kullanılıyor (gerçek bir sır değil,
+      # docker-compose.yml'deki MSSQL_SA_PASSWORD'la AYNI gerekçe).
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "CIOnlyDevPassword123!"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $MSSQL_SA_PASSWORD -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas_dev_password
+          POSTGRES_DB: AtlasAi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: .NET 10 kur
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Atlas.sln
+
+      - name: Build
+        run: dotnet build Atlas.sln --no-restore --configuration Release
+
+      # appsettings.json'daki YEREL geliştirme bağlantı dizeleri (.\SQLEXPRESS,
+      # Windows Authentication) CI'da (Linux runner) hiç çalışamaz - "__" (çift
+      # alt çizgi) ortam değişkeni override'ları docker-compose.yml'deki
+      # atlas-api servisiyle AYNI mekanizma. AtlasApiFactory zaten Jwt:Key'i
+      # kendi içinde sabitliyor, burada AYRICA vermeye gerek yok.
+      - name: Integration testleri çalıştır
+        env:
+          ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=AtlasPlatform;User Id=sa;Password=CIOnlyDevPassword123!;TrustServerCertificate=True"
+          ConnectionStrings__Postgres: "Host=localhost;Port=5432;Database=AtlasAi;Username=atlas;Password=atlas_dev_password"
+          ConnectionStrings__Redis: "localhost:6379"
+          DocumentStorage__RootPath: "/tmp/atlas-documents-ci"
+        run: dotnet test Atlas.sln --no-build --configuration Release --filter "Category=Integration"
 
   frontend:
     name: Frontend (build + lint)
@@ -54,6 +128,14 @@ jobs:
 
       - name: Lint
         run: npm run lint --workspace=web
+
+      # Vitest + React Testing Library (2026-08-12'de eklendi) - dateUtils/
+      # jwt/passwordGenerator gibi saf mantığı VE WikiSearch.jsx gibi gerçek
+      # bir component'in jsdom'da render+kullanıcı-etkileşimini test ediyor.
+      # Backend'in "Category!=Integration" testleri gibi dış bağımlılığı yok,
+      # bu yüzden ayrı bir job DEĞİL - aynı job'da lint/build'in yanına eklendi.
+      - name: Test
+        run: npm run test --workspace=web
 
       - name: Build
         run: npm run build --workspace=web

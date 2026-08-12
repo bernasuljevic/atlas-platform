@@ -23,6 +23,27 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- xunit.runner.json: BULUNAN GERÇEK BUG (Test & CI sertleştirme Gün 2,
+       2026-08-12, GitHub Actions'a taşınınca ORTAYA ÇIKTI) - xUnit
+       varsayılan olarak test SINIFLARINI paralel çalıştırır. Her sınıf
+       kendi AtlasApiFactory'sini (WebApplicationFactory) ayağa kaldırıyor,
+       her biri Program.cs'in TAMAMINI (dolayısıyla VaultDbContext'in gerçek
+       SQL Server migration'ını - Vault BİLEREK InMemory'e çevrilmiyor)
+       çalıştırıyor. Yerel geliştirmede bu hiç sorun ÇIKARMADI çünkü
+       "AtlasPlatform" veritabanı zaten HAFTALARDIR var (native dev'den) -
+       Migrate() idempotent, sadece eksik migration'ları uygular. AMA CI'da
+       (Gün 2) veritabanı HER ÇALIŞTIRMADA SIFIRDAN - birden fazla test
+       sınıfı AYNI ANDA "veritabanı yok, oluşturayım" durumuna düşüp
+       "CREATE DATABASE" için YARIŞTI, biri kazanıp diğerleri "Database
+       'AtlasPlatform' already exists" hatasıyla patladı (canlı, gerçek bir
+       GitHub Actions çalıştırmasında yakalandı). Çözüm: test SINIFLARININ
+       paralel çalışmasını KAPAT - bu hem yarışı ortadan kaldırıyor hem de
+       zaten paylaşılan gerçek dış kaynaklara (Postgres/SQL Server) karşı
+       çalışan testler için daha güvenli/öngörülebilir bir varsayım. -->
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Host\Atlas.Api\Atlas.Api.csproj" />
   </ItemGroup>
