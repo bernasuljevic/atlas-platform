@@ -128,6 +128,42 @@ public class Document : Entity<Guid>
 
     // P4'te DocumentUploadedEventHandler tarafından çağrılacak - bugün (P3
     // Gün 1) sadece durum makinesinin Domain tarafı hazır, kimse çağırmıyor.
+    // P6 (versiyonlama) - "yeni versiyon yükle" ile çağrılıyor. Handler'ın
+    // BU METOTTAN ÖNCE mevcut (şu ana kadar güncel olan) dosya bilgisini bir
+    // DocumentVersion'a snapshot'ladığını varsayıyor - burası sadece Document'ı
+    // YENİ dosyaya işaret edecek şekilde güncelliyor, eskiyi hiç bilmiyor
+    // (tek sorumluluk: "ben artık buyum", arşivleme Handler'ın işi).
+    // Status BİLEREK Uploaded'a dönüyor - içerik değişti, eski extraction/
+    // embedding artık geçersiz; DocumentUploadedEventHandler (P4) bunu normal
+    // bir ilk-yükleme gibi işleyip yeniden Extracting/Ready/Failed'e taşıyacak.
+    public void ReplaceFile(
+        string originalFileName, string storageKey, string contentType, string fileExtension,
+        long sizeBytes, string contentHash)
+    {
+        if (string.IsNullOrWhiteSpace(originalFileName))
+            throw new ArgumentException("Dosya adı boş olamaz.", nameof(originalFileName));
+
+        if (string.IsNullOrWhiteSpace(storageKey))
+            throw new ArgumentException("Storage key boş olamaz.", nameof(storageKey));
+
+        if (sizeBytes <= 0)
+            throw new ArgumentException("Dosya boyutu sıfırdan büyük olmalı.", nameof(sizeBytes));
+
+        if (string.IsNullOrWhiteSpace(contentHash))
+            throw new ArgumentException("İçerik hash'i boş olamaz.", nameof(contentHash));
+
+        OriginalFileName = originalFileName.Trim();
+        StorageKey = storageKey;
+        ContentType = contentType.Trim();
+        FileExtension = fileExtension.Trim().ToLowerInvariant();
+        SizeBytes = sizeBytes;
+        ContentHash = contentHash;
+        CurrentVersionNumber += 1;
+        Status = DocumentStatus.Uploaded;
+        ProcessingError = null;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
     public void MarkExtracting() => Status = DocumentStatus.Extracting;
 
     public void MarkReady()

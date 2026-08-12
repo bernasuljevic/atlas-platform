@@ -124,6 +124,47 @@ public static class DocumentsEndpoints
         .WithName("ReprocessDocument")
         .RequireAuthorization();
 
+        // P6 (versiyonlama) - Upload endpoint'iyle AYNI multipart deseni, ama
+        // Title/Visibility/DepartmentName/Description/Tags YOK (bunlar için
+        // PUT /{id} zaten var - dosya değiştirmek AYRI bir sorumluluk).
+        // owner-or-Admin yetkisi Handler'da (Delete/Update/Reprocess ile AYNI).
+        group.MapPost("/{id:guid}/versions", async (Guid id, IFormFile file, IMediator mediator) =>
+        {
+            await using var stream = file.OpenReadStream();
+            var command = new UploadNewDocumentVersionCommand(id, stream, file.FileName, file.ContentType, file.Length);
+            await mediator.Send(command);
+            return Results.Accepted();
+        })
+        .WithName("UploadNewDocumentVersion")
+        .RequireAuthorization()
+        .DisableAntiforgery();
+
+        // GetDocumentById ile AYNI "varlığı gizle" deseni (görünmüyorsa 404) -
+        // ama Handler burada null'u "belge yok/görünmüyor" İLE "belge var ama
+        // hiç eski versiyonu yok" arasında AYIRT ediyor (bkz. Query'deki not),
+        // bu yüzden boş liste 200 ile dönüyor, null 404'e çevriliyor.
+        group.MapGet("/{id:guid}/versions", async (Guid id, IMediator mediator) =>
+        {
+            var versions = await mediator.Send(new GetDocumentVersionsQuery(id));
+            return versions is null ? Results.NotFound() : Results.Ok(versions);
+        })
+        .WithName("GetDocumentVersions");
+
+        // DownloadDocument ile AYNI desen - token gerektirir, StorageKey
+        // istemciye hiç sızmıyor.
+        group.MapGet("/{id:guid}/versions/{versionNumber:int}/download", async (
+            Guid id, int versionNumber, IMediator mediator, IFileStorageService fileStorageService) =>
+        {
+            var downloadInfo = await mediator.Send(new GetDocumentVersionDownloadInfoQuery(id, versionNumber));
+            if (downloadInfo is null)
+                return Results.NotFound();
+
+            var stream = await fileStorageService.OpenReadAsync(downloadInfo.StorageKey);
+            return Results.File(stream, downloadInfo.ContentType, downloadInfo.OriginalFileName);
+        })
+        .WithName("DownloadDocumentVersion")
+        .RequireAuthorization();
+
         return app;
     }
 }
