@@ -326,6 +326,33 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     `docker compose start postgres redis` ile düzeltilebilir (Ders #9'daki
     gibi tüm stack'i değil, sadece bu iki servisi başlatmak yeterli, native
     SQL Server'a dokunmuyor).
+21. **Yeni bir production kuralı eklendiğinde, o akışı kullanan HER test
+    yardımcı fonksiyonu (helper) elden geçirilmeli - "derlendi" yeterli bir
+    kanıt değil:** Kullanıcı `LoginCommandHandler`'a bağımsız olarak bir
+    e-posta doğrulama zorunluluğu (`if (!user.EmailVerified) throw ...`)
+    eklemiş (2026-08-03 migration) - ama register+login yapan integration
+    test dosyalarındaki (`WikiEndpointsTests`, `AiSearchEndpointsTests`,
+    `OutboxIntegrationTests`, `AuthEndpointsTests`) `RegisterAndLoginAsync`
+    helper'ları hiç güncellenmemiş. Sonuç: bu kural eklendiği andan itibaren
+    HEPSİ login adımında 403 alıp kırılıyordu - ama kimse fark etmedi, çünkü
+    CI zaten "Category=Integration" testlerini atlıyor (gerçek Postgres/
+    Redis'e ihtiyaç duyduğundan, bkz. `.github/workflows/ci.yml`) ve
+    `dotnet test tests/Atlas.IntegrationTests` en son ne zaman elle
+    çalıştırılmış belli değil. Documents pipeline'ı için YENİ bir integration
+    test dosyası yazılırken (P4 Gün 6, 2026-08-12) kendi testlerim de AYNI
+    şekilde 403 alınca ortaya çıktı - benim P4 işimin bir parçası değildi,
+    bağımsız keşfedilen bir regresyondu. Düzeltme: `AuthTestHelper.
+    RegisterVerifyAndLoginAsync` (AuthDbContext test host'unda InMemory
+    olduğu için doğrulama kodunu gerçek bir e-posta kutusu açmadan doğrudan
+    DB'den okuyup `POST /api/auth/verify-email`'e gönderiyor) - dört dosya da
+    buna geçirildi, `AuthEndpointsTests`'e regresyonun kendisini kilitleyen
+    yeni bir test eklendi. Genel ders: Ders #15/#19'daki "bir kuralı SADECE
+    bir yerde değiştirip diğer tüketicilerini unutmak" hatasının bir başka
+    türü - burada tüketici production kodu değil, test altyapısıydı; production
+    kodu (register/login akışının kendisi) hiçbir zaman bozuk değildi, SADECE
+    onu doğrulayan testler görünmez şekilde kırılmıştı. "Testler mevcut, o
+    zaman güvenlik ağı sağlam" varsayımı, o testlerin GERÇEKTEN çalıştırıldığı
+    (ve CI'ın onları atlamadığı) doğrulanmadan yapılmamalı.
 
 ## Şu ana kadar tamamlananlar
 
@@ -981,8 +1008,7 @@ yay, önemli şeyleri anlat" talimatına göre.
       TAM SAYFA - Dialog DEĞİL, `WikiBoard.jsx`'in Dialog'dan uzaklaşma
       tarihiyle tutarlı)/`DocumentDetailPage`. İndirme JWT'yi URL'e KOYMUYOR -
       authenticated fetch + blob + `URL.createObjectURL` ile tarayıcı indirmesi.
-- [x] **P4 Gün 1-4 - Document processing pipeline (Gün 1-4 tamamlandı, henüz
-      COMMIT EDİLMEDİ - bkz. "Sırada ne var"):**
+- [x] **P4 - Document processing pipeline (Gün 1-6, TAMAMLANDI):**
   - Gün 1: `TextChunker`, AI.Domain'den yeni paylaşılan `Atlas.Shared.Text`
     projesine taşındı (davranış değişmedi, saf statik algoritma) - artık hem
     AI hem Documents AYNI chunking algoritmasını kullanıyor, kopya kod yok.
@@ -1021,18 +1047,34 @@ yay, önemli şeyleri anlat" talimatına göre.
     geçmişi önce doğrulandı). 4 gerçek dosya (pdf/docx/pptx/xlsx, programatik
     üretildi) yüklenip hepsinin doğru metni çıkardığı canlı doğrulandı
     (Outbox payload'ları SQL'den doğrudan incelenerek).
+  - Gün 5: `ReprocessDocumentCommand` + `POST /api/documents/{id}/reprocess` -
+    Wiki'nin `POST /api/wiki/reindex`'iyle AYNI gerekçe (Failed bir belgeyi
+    elle yeniden tetikleyebilme) ama Admin-only bulk DEĞİL, owner-or-Admin,
+    TEK bir belgeyi hedefliyor (Delete/Update ile aynı yetki deseni). Handler
+    yeni bir extraction akışı yazmıyor - var olan StorageKey/ContentType/
+    FileExtension ile `DocumentUploadedEvent`'i Outbox'a yeniden yazıyor, zaten
+    var olan `DocumentUploadedEventHandler` bunu ilk yüklemedekiyle birebir
+    aynı şekilde işliyor. Extracting durumundaki bir belge için erken 400 -
+    çift tıklamanın aynı belgeyi iki kez kuyruğa sokmasını engelliyor.
+  - Gün 6: `DocumentsProcessingIntegrationTests` - Outbox atomikliği +
+    eventual-consistency (Ready/Failed geçişi + `DocumentChunksReadyEvent`) +
+    Reprocess'in owner-or-Admin/"hala işleniyor" guard'ı/yeniden kuyruklama
+    davranışı. `DocumentsDbContext` de Auth/Wiki/Audit ile AYNI gerekçeyle
+    InMemory'e çevrildi (`AtlasApiFactory`).
+    **Bu günün asıl bulgusu, P4'ün bir parçası OLMAYAN, bağımsız bir
+    regresyondu:** kullanıcının ayrıca eklediği e-posta doğrulama zorunluluğu
+    (bkz. Ders #21) register+login yapan TÜM integration testleri (Wiki/
+    AiSearch/Outbox/Auth) login adımında 403 ile kırmıştı - CI bu kategoriyi
+    zaten atladığı için (gerçek Postgres/Redis'e ihtiyaç duyduğundan) fark
+    edilmemişti. Yeni `AuthTestHelper.RegisterVerifyAndLoginAsync` (InMemory
+    `AuthDbContext`'ten doğrulama kodunu doğrudan okuyup `POST /api/auth/
+    verify-email`'e gönderiyor) dört dosyaya da uygulandı, `dotnet test
+    Atlas.sln` yeniden yeşile döndü (135+ test).
 
-**Henüz commit edilmedi:** P4 Gün 1-4'ün tüm değişiklikleri şu an local
-`master`'ın working directory'sinde uncommitted duruyor - bir feature branch
-açılıp commit/push edilmesi gerekiyor (P1-P3, Vault Gün 3 zaten
-`feature/vault-favorites-editor-v2` branch'i üzerinden PR #6 ile merge
-edildi).
+  Tüm değişiklikler `feature/document-processing-pipeline` branch'inde,
+  3 ayrı commit'te (Gün 1-4 / regresyon düzeltmesi / Gün 5-6).
 
 **Henüz yapılmayan (bu paketin geri kalanı):**
-- P4 Gün 5-6: `ReprocessDocumentCommand` + `POST /api/documents/{id}/reprocess`
-  (Wiki'nin `POST /api/wiki/reindex`'iyle aynı gerekçe - Failed bir belgeyi
-  admin/owner elle yeniden tetikleyebilsin) + Documents pipeline'ı için formal
-  integration testler (şu an sadece canlı/manuel doğrulama var).
 - P5: Documents→AI/RAG entegrasyonu - `DocumentEmbedding` (AI.Domain,
   `WikiPageEmbedding`'e paralel) + AI'ın `DocumentChunksReadyEvent`/
   `DocumentDeletedEvent`'e (zaten tanımlı, henüz DİNLENMİYOR) abone olması +
@@ -1071,11 +1113,9 @@ edildi).
    link, etiketler - yukarıdaki bölüme bkz.) hepsi tamamlandı.
 3. **AKTİF - "Kapsamlı Geliştirme Paketi" (yukarıdaki bölüme bkz.):** P1
    (Favoriler/Pinler), P2 (Editör v2), P3 (Documents temeli) TAMAMLANDI ve
-   merge edildi (PR #6). **P4 Gün 1-4 (belge işleme pipeline'ı - TextChunker
-   taşıma, Outbox retrofit, PlainText+PDF+DOCX+PPTX+XLSX processor'lar) de
-   tamamlandı AMA HENÜZ COMMIT/PUSH EDİLMEDİ** - bir sonraki adım: yeni bir
-   feature branch açıp bu değişiklikleri commit'lemek, sonra P4 Gün 5-6'ya
-   (`ReprocessDocumentCommand` + endpoint + integration testler) devam etmek.
+   merge edildi (PR #6). **P4 (belge işleme pipeline'ı, Gün 1-6) de
+   TAMAMLANDI** - `feature/document-processing-pipeline` branch'i push
+   edildi, PR açıldı (bkz. Ders #21'deki regresyon düzeltmesi de aynı PR'da).
    Ardından sırayla P5 (Documents→AI/RAG entegrasyonu), P6 (toplu yükleme +
    versiyonlama), P7 (güvenlik sertleştirme) planlanıyor.
 
@@ -1137,6 +1177,10 @@ Transactional Outbox Pattern kendi 5 günlük özelliği olarak açıldı, yukar
   `UseStaticFiles` yok).
 - `PUT /api/documents/{id}`, `DELETE /api/documents/{id}` → token gerektirir,
   owner-or-Admin (throw-based 403), silme diskteki dosyayı da temizler.
+- `POST /api/documents/{id}/reprocess` → token gerektirir, owner-or-Admin.
+  Var olan StorageKey/ContentType ile `DocumentUploadedEvent`'i Outbox'a
+  yeniden yazar - `POST /api/wiki/reindex`'in TEK bir belge için karşılığı
+  (bulk/Admin-only DEĞİL). Extracting durumundaki bir belge için 400.
 
 İlk kurulumda otomatik oluşan admin: `admin@atlas.local` / `Admin123!` (Admin rolüyle,
 SADECE tablo ilk kez boşken - tablo doluysa tekrar oluşturulmaz).
