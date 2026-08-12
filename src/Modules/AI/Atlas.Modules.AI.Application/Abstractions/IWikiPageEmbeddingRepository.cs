@@ -13,7 +13,7 @@ public interface IWikiPageEmbeddingRepository
     /// sıralamak, tablo büyüdükçe ölçeklenmezdi). Görünürlük filtresi BURADA
     /// uygulanmıyor - repository güvenlik kuralını bilmemeli, o filtre
     /// Handler'da IWikiVisibilityChecker ile yapılıyor (bkz.
-    /// SearchWikiPagesByMeaningQueryHandler).
+    /// SearchByMeaningQueryHandler).
     /// </summary>
     // fromUtc/toUtc opsiyonel - verilirse mesafe sıralamasından ÖNCE (bkz.
     // implementasyon) tarih aralığına göre daraltıyor: "bu tarih aralığındaki

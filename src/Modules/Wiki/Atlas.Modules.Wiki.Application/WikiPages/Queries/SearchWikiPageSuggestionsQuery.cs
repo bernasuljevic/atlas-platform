@@ -2,7 +2,7 @@ using MediatR;
 
 namespace Atlas.Modules.Wiki.Application.WikiPages.Queries;
 
-// SearchWikiPagesByMeaningQuery'den (AI modülü) BİLEREK AYRI: o embedding
+// SearchByMeaningQuery'den (AI modülü) BİLEREK AYRI: o embedding
 // üretip pgvector'da anlam bazlı arama yapıyor - her tuş vuruşunda çağırmak
 // pratik değil. Bu sorgu sadece başlık/içerik üzerinde basit bir alt-metin
 // (substring) eşleşmesi yapıyor, GetAllWikiPagesRawQuery'nin zaten var olan

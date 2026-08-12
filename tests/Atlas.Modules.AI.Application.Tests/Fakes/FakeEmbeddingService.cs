@@ -14,7 +14,7 @@ namespace Atlas.Modules.AI.Application.Tests.Fakes;
 /// Vektör boyutu EmbeddingDimensions.Standard (1024) - GenerateDocumentEmbeddingsCommandHandler
 /// (P5 Gün 2) gibi DocumentEmbedding.Create/WikiPageEmbedding.Create'i GERÇEKTEN
 /// çağıran Handler'lar yanlış boyutlu bir vektörde ArgumentException fırlatır;
-/// eskiden burada boyutu 1 olan bir vektör dönülüyordu (SearchWikiPagesByMeaningQueryHandlerTests'te
+/// eskiden burada boyutu 1 olan bir vektör dönülüyordu (SearchByMeaningQueryHandlerTests'te
 /// sorun çıkmıyordu çünkü o test akışı hiç Create() çağırmıyor) - artık her iki
 /// kullanım için de doğru.
 /// </summary>
