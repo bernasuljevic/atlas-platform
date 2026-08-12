@@ -11,6 +11,7 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
 {
     private readonly IDocumentRepository _documentRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IMalwareScanner _malwareScanner;
     private readonly IWikiVisibilityChecker _visibilityChecker;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
@@ -18,11 +19,12 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
 
     public UploadDocumentCommandHandler(
         IDocumentRepository documentRepository, IFileStorageService fileStorageService,
-        IWikiVisibilityChecker visibilityChecker, IOutboxWriter outboxWriter, IUnitOfWork unitOfWork,
-        ICurrentUserAccessor currentUser)
+        IMalwareScanner malwareScanner, IWikiVisibilityChecker visibilityChecker, IOutboxWriter outboxWriter,
+        IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
         _fileStorageService = fileStorageService;
+        _malwareScanner = malwareScanner;
         _visibilityChecker = visibilityChecker;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
@@ -50,6 +52,20 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
         using var buffer = new MemoryStream();
         await request.Content.CopyToAsync(buffer, cancellationToken);
         var bytes = buffer.ToArray();
+
+        // P7 (güvenlik sertleştirme) - diske YAZMADAN ÖNCE taranıyor (bugün
+        // NoOpMalwareScanner her zaman temiz diyor, bkz. IMalwareScanner'daki
+        // "Fake-önce" notu). Kirli bulunursa dosya HİÇ diske yazılmıyor,
+        // Document de HİÇ oluşturulmuyor - ArgumentException 400'e çevriliyor.
+        using (var scanStream = new MemoryStream(bytes))
+        {
+            var scanResult = await _malwareScanner.ScanAsync(scanStream, cancellationToken);
+            if (!scanResult.IsClean)
+                throw new ArgumentException(
+                    $"Bu dosya güvenlik taramasından geçemedi ({scanResult.ThreatName ?? "bilinmeyen tehdit"}).",
+                    nameof(request.Content));
+        }
+
         var contentHash = Convert.ToHexString(SHA256.HashData(bytes));
 
         // P6 Gün 3 (duplicate-detection) - YÜKLEMEYİ ENGELLEMİYOR, sadece

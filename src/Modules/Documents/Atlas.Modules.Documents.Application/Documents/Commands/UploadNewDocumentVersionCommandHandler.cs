@@ -12,18 +12,20 @@ public class UploadNewDocumentVersionCommandHandler : IRequestHandler<UploadNewD
     private readonly IDocumentRepository _documentRepository;
     private readonly IDocumentVersionRepository _documentVersionRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IMalwareScanner _malwareScanner;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserAccessor _currentUser;
 
     public UploadNewDocumentVersionCommandHandler(
         IDocumentRepository documentRepository, IDocumentVersionRepository documentVersionRepository,
-        IFileStorageService fileStorageService, IOutboxWriter outboxWriter, IUnitOfWork unitOfWork,
-        ICurrentUserAccessor currentUser)
+        IFileStorageService fileStorageService, IMalwareScanner malwareScanner, IOutboxWriter outboxWriter,
+        IUnitOfWork unitOfWork, ICurrentUserAccessor currentUser)
     {
         _documentRepository = documentRepository;
         _documentVersionRepository = documentVersionRepository;
         _fileStorageService = fileStorageService;
+        _malwareScanner = malwareScanner;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
@@ -54,6 +56,18 @@ public class UploadNewDocumentVersionCommandHandler : IRequestHandler<UploadNewD
         using var buffer = new MemoryStream();
         await request.Content.CopyToAsync(buffer, cancellationToken);
         var bytes = buffer.ToArray();
+
+        // UploadDocumentCommandHandler'daki AYNI tarama adımı - yeni versiyon
+        // da diske yazılmadan ÖNCE taranıyor.
+        using (var scanStream = new MemoryStream(bytes))
+        {
+            var scanResult = await _malwareScanner.ScanAsync(scanStream, cancellationToken);
+            if (!scanResult.IsClean)
+                throw new ArgumentException(
+                    $"Bu dosya güvenlik taramasından geçemedi ({scanResult.ThreatName ?? "bilinmeyen tehdit"}).",
+                    nameof(request.Content));
+        }
+
         var newContentHash = Convert.ToHexString(SHA256.HashData(bytes));
 
         var newFileExtension = Path.GetExtension(request.OriginalFileName).TrimStart('.');
