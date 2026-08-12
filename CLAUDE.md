@@ -1193,6 +1193,42 @@ Kod değişikliği gerekmedi, sadece P7 Gün 3'ün doğru çalıştığının ka
 
 **"Kapsamlı Geliştirme Paketi" artık TAMAMEN BİTTİ (P1-P7).**
 
+## Test & CI Sertleştirme (2026-08-12, API key'ler gelene kadar sırada ne var
+sorusuna kullanıcının 4 seçeneğin HEPSİNİ seçmesiyle açıldı)
+
+`chore/test-ci-hardening` branch'inde, 4 günlük bir paket:
+
+- [x] **Gün 1 - Docker Compose belge volume'ü canlı doğrulandı:** P7 Gün
+      3'teki `atlas-documents-data` volume'ü tam bir `docker compose up -d
+      --build` döngüsüyle test edildi - belge yüklendi, TÜM container'lar
+      (sqlserver dahil) `docker compose down` (volume'ler silinmeden) +
+      `up -d` ile sıfırdan yeniden oluşturuldu, dosya byte-birebir aynı
+      kaldı. Kod değişikliği gerekmedi.
+- [x] **Gün 2 - Integration testleri CI'a taşındı:** Yeni "Integration
+      Tests" job'ı (backend'den ayrı, paralel) - SQL Server/Postgres/Redis
+      servis container'ları + health check'ler, `ConnectionStrings__*`
+      ortam değişkeni override'ları (appsettings.json'daki yerel `.\SQLEXPRESS`
+      Windows Authentication CI'da çalışamaz). **CI'a taşınınca BULUNAN
+      GERÇEK BUG:** ilk çalıştırmada 6 test "Database 'AtlasPlatform'
+      already exists" hatasıyla patladı - xUnit'in varsayılan test sınıfı
+      paralelliği, her sınıfın kendi `AtlasApiFactory`'sinin (dolayısıyla
+      gerçek SQL Server'a bağlı `VaultDbContext` migration'ının - Vault
+      BİLEREK InMemory'e çevrilmiyor) AYNI ANDA "veritabanı yok, oluşturayım"
+      durumuna düşüp `CREATE DATABASE` için yarışmasına yol açtı. Yerel
+      geliştirmede hiç görülmedi çünkü "AtlasPlatform" veritabanı zaten
+      haftalardır var (Migrate() idempotent) - CI'da veritabanı HER
+      ÇALIŞTIRMADA sıfırdan olduğu için yarış ortaya çıktı. Çözüm:
+      `xunit.runner.json` (`parallelizeTestCollections: false`) - test
+      sınıflarının paralel çalışması kapatıldı (yerelde 24/24 test hâlâ
+      geçiyor, 30s'den 45s'e çıktı). Branch protection'a "Integration
+      Tests" üçüncü zorunlu check olarak eklendi.
+
+  Bu iki gün için PR #13 açık (kullanıcının "sadece bu adımı push'la"
+  istisnai onayıyla - GitHub Actions'ı yerel simüle edecek bir araç
+  olmadığı için CI değişikliğinin GERÇEK bir Actions çalıştırmasıyla
+  doğrulanması gerekiyordu). Gün 3-5 aynı branch'e eklenecek, TÜM paket
+  bitince tekrar push edilecek.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
