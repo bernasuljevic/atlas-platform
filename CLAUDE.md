@@ -1551,6 +1551,41 @@ tetiklenerek doğrulandı (`window.scrollTo()` bu ortamda gerçek bir `scroll`
 event'i tetiklemiyor - başka bir ortam kısıtlaması, kodun kendisi değil).
 `npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
 
+## Medium-vari "+" düğmesi (2026-08-12, kullanıcının Medium ekran görüntüsü isteği)
+
+Kullanıcı Medium'un editöründeki "+" düğmesini (tıklanınca resim/video/kod/
+embed gibi blok tiplerini gösteren bir satır) örnek gösterip "bizde de olsun"
+dedi. **Yeni bir ekleme mekanizması İCAT EDİLMEDİ** - `WikiEditorPage.jsx`'te
+zaten var olan `SlashCommandMenu`/`SLASH_ITEMS` (satır başında "/" yazınca
+açılan blok menüsü, Faz 2'den beri var) TEK gerçek eksikti: görünür,
+keşfedilebilir bir tetikleyicisi yoktu, sadece "/" kısayolunu BİLENLER
+kullanabiliyordu.
+
+- [x] **Araç çubuğunun İLK öğesi olarak yuvarlak bir "+" düğmesi eklendi**
+      (`handlePlusButtonClick`) - diğer dikdörtgen `Button`'lardan BİLEREK
+      görsel olarak ayrışıyor (yuvarlak, `--brand-accent` renginde) ki
+      Medium'daki gibi "keşfedilebilir, farklı bir şey" hissi versin. Var
+      olan ~15 butonluk uzun araç çubuğuna DOKUNULMADI (kaldırılan/gizlenen
+      hiçbir şey yok) - "+" SADECE aynı blok menüsüne "/" yazmaya gerek
+      kalmadan ek bir yol.
+- [x] **`handleSlashSelect` iki tetikleyiciyi de destekleyecek şekilde
+      dallandırıldı:** "/" ile açıldığında `slashTriggerPosRef.current` dolu
+      oluyor (kaldırılacak bir "/" karakteri var), "+" düğmesiyle açıldığında
+      BİLEREK `null` (kaldırılacak bir tetikleyici karakter yok, doğrudan
+      `applyToolbarInsert` ile mevcut imleç konumuna ekleniyor). **Canlı
+      testte bulunacaktı ama ÖNCEDEN fark edilip önlendi:** `handleSlashSelect`
+      eskiden `triggerPos === null` durumunda SESSİZCE hiçbir şey yapmadan
+      dönüyordu (`if (!el || triggerPos === null) return;`) - "+" düğmesi bu
+      koşulu tetiklediği için, düzeltilmeseydi düğme görünüşte çalışır ama
+      hiçbir şey EKLEMEZDİ.
+
+Canlı doğrulandı: "+" düğmesi menüyü açıyor, bir blok seçilince doğru
+sözdizimi içeriğe ekleniyor ("Kod Bloğu" seçilince `` ```\nkod\n``` `` doğru
+eklendi), menü kapanıyor; AYRICA eski "/" tetiklemesi de (regresyon
+kontrolü) hâlâ birebir aynı şekilde çalışıyor - "/" karakteri doğru
+kaldırılıp yerine blok ekleniyor. `npm run lint`/`npm run build`/
+`npx vitest run` (24/24) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

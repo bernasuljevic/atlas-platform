@@ -9,6 +9,7 @@ import {
   Info,
   ListChecks,
   Minus,
+  Plus,
   Table2,
   Video,
 } from "lucide-react";
@@ -252,11 +253,25 @@ function WikiEditorPage({ token }) {
     }
   }
 
+  // "/" yazarak AÇILDIYSA triggerPos dolu - önce o "/" karakterini kaldırıp
+  // SONRA bloğu ekliyoruz. Medium-vari "+" düğmesiyle AÇILDIYSA (bkz.
+  // aşağıdaki handlePlusButtonClick) triggerPos BİLEREK null bırakılıyor -
+  // kaldırılacak bir tetikleyici karakter yok, doğrudan mevcut imleç
+  // konumuna ekleniyor (applyToolbarInsert ile AYNI davranış). Aynı
+  // SLASH_ITEMS/SlashCommandMenu'yü İKİ farklı tetikleyicinin paylaşması
+  // için tek bir handler'da dallanıyor - iki ayrı ekleme mekanizması İCAT
+  // EDİLMEDİ.
   function handleSlashSelect(item) {
     const triggerPos = slashTriggerPosRef.current;
-    const el = document.getElementById(CONTENT_TEXTAREA_ID);
     setIsSlashMenuOpen(false);
-    if (!el || triggerPos === null) return;
+
+    if (triggerPos === null) {
+      applyToolbarInsert(item.before, item.after, item.placeholder);
+      return;
+    }
+
+    const el = document.getElementById(CONTENT_TEXTAREA_ID);
+    if (!el) return;
 
     // Önce tetikleyici "/" karakterini metinden çıkarıyoruz - kullanıcı bir
     // blok seçtiğinde geride "/video" gibi bir kalıntı kalmasın.
@@ -277,6 +292,20 @@ function WikiEditorPage({ token }) {
         setTimeout(() => restoreFocusAndCursor(result.cursorPos), 0);
       }
     }, 0);
+  }
+
+  // Medium'daki "+" düğmesinin karşılığı - SlashCommandMenu'yü "/" yazmaya
+  // gerek kalmadan, tek tıkla açan görünür bir tetikleyici (kullanıcı
+  // isteği: "artı işareti ve yanında eklediğimiz özellikleri direkt
+  // kullanma şansımız olsun"). YENİ bir menü/ekleme mantığı İCAT EDİLMEDİ -
+  // "/" ile AYNI SLASH_ITEMS listesini, AYNI SlashCommandMenu'yü açıyor,
+  // sadece triggerPos'u BİLEREK null'a sıfırlıyor (bkz. handleSlashSelect'teki
+  // dallanma) çünkü kaldırılacak bir "/" karakteri yok.
+  function handlePlusButtonClick() {
+    slashTriggerPosRef.current = null;
+    setIsSlashMenuOpen((open) => !open);
+    setIsLinkPopoverOpen(false);
+    setIsImagePopoverOpen(false);
   }
 
   function handleInsertLink() {
@@ -439,6 +468,29 @@ function WikiEditorPage({ token }) {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={CONTENT_TEXTAREA_ID}>İçerik</Label>
           <div className="flex flex-wrap items-center gap-1 rounded-t-lg border border-b-0 border-[var(--border)] bg-[var(--code-bg)] p-1.5">
+            {/* Medium-vari "+" düğmesi (kullanıcı isteği, 2026-08-12) -
+                araç çubuğunun İLK öğesi, bilerek YUVARLAK ve diğer
+                dikdörtgen Button'lardan görsel olarak AYRIŞIYOR ki "burada
+                farklı, keşfedilebilir bir şey var" hissi versin - tıpkı
+                Medium'daki gibi. Aşağıdaki uzun buton listesinin YERİNE
+                geçmiyor (hiçbiri kaldırılmadı) - SADECE aynı blok menüsüne
+                (SlashCommandMenu) "/" yazmayı bilmeye gerek kalmadan tek
+                tıkla ulaşmanın ek bir yolu. */}
+            <button
+              type="button"
+              onClick={handlePlusButtonClick}
+              title="Blok ekle"
+              aria-label="Blok ekle"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border hover:bg-[var(--brand-accent)]/10"
+              style={{
+                borderColor: "var(--brand-accent)",
+                color: "var(--brand-accent)",
+                background: isSlashMenuOpen ? "var(--brand-accent-bg)" : "transparent",
+              }}
+            >
+              <Plus size={15} />
+            </button>
+            <div className="mx-0.5 h-5 w-px shrink-0" style={{ background: "var(--border)" }} />
             {/* H1-H6 arası bir seviye seçip "Ekle"ye basınca o seviyede bir
                 başlık ekleniyor - tek bir "Başlık" düğmesi (eskiden sabit
                 H2) yerine, WikiArticlePage/markdown.jsx artık 6 seviyeyi de
