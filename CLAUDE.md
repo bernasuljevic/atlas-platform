@@ -1389,6 +1389,31 @@ implementasyon.
 5. Bir arama yapıp sonuçların anlam benzerliğine göre (kelime örtüşmesine göre
    DEĞİL) sıralandığını canlı doğrula.
 
+## Makale okunabilirliği - "Okuma Süresi" eklendi (2026-08-12)
+
+Şirketten (Rıdvan) gelen eski bir geri bildirim ("Medium gibi birkaç siteyi
+kontrol edip belki ek özellikler ekleyebiliriz") denetlendi. **Önemli
+düzeltme:** İçindekiler (TOC, scroll-spy ile aktif başlık takibi, mobilde
+çekmece), Okuma Ayarları (yazı boyutu/satır genişliği/satır aralığı/tema,
+`ReadingSettingsPanel.jsx`) ve Tam Ekran Okuma Modu **ZATEN VARDI**
+(`WikiArticlePage.jsx`, 2026-08-07 tarihli birden fazla kullanıcı geri
+bildirimi turuyla inşa edilmiş) - bu, CLAUDE.md'nin "Şu ana kadar
+tamamlananlar" listesine hiç girmemiş, GERÇEK bir dokümantasyon boşluğuydu
+(kod var, kayıt yok). Denetimde tek somut EKSİK bulundu: Medium'un "X dakika
+okuma" göstergesinin bir karşılığı yoktu.
+
+`readingTime.js` (yeni, `dateUtils.js` ile AYNI desen - saf fonksiyon + kendi
+Vitest testi) - 200 kelime/dakika varsayımıyla kaba bir tahmin üretiyor,
+kod bloklarını/`:::` blok işaretlerini/link URL'lerini (SADECE link metnini
+sayıyor) kelime sayısına KATMIYOR - aksi halde uzun bir kod örneği ya da uzun
+bir URL süreyi yapay olarak şişirirdi. `WikiArticlePage.jsx`'teki mevcut
+"Bilgi Kutusu"na (Departman/Erişim/Oluşturan/Tarih'in yanına) "Okuma Süresi"
+satırı olarak eklendi - yeni bir UI alanı İCAT EDİLMEDİ, var olan desene
+uyduruldu. Canlı doğrulandı: "Atlas Platformu Geliştirici Kılavuzu" (en uzun
+sayfa) için "~4 dk" gösterdi, doğru sırada (Tarih'ten sonra, Etiketler'den
+önce) render edildi. 7 yeni test (`readingTime.test.js`) + tüm frontend test
+suite'i (24/24) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

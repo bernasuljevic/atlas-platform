@@ -29,6 +29,7 @@ import {
 } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
+import { estimateReadingMinutes } from "../readingTime";
 import { renderWikiMarkdown } from "../markdown";
 import DiscussionPanel from "./DiscussionPanel";
 import ReadingSettingsPanel, { FONT_SIZE_PX, LINE_HEIGHT_VALUE, LINE_WIDTH_VALUE } from "./ReadingSettingsPanel";
@@ -273,6 +274,17 @@ function WikiArticlePage({ token }) {
   // order of Hooks" uyarısı).
   const { nodes, headings } = useMemo(
     () => renderWikiMarkdown(page?.content ?? ""),
+    [page?.content]
+  );
+
+  // Medium'un "X dakika okuma" göstergesi (Rıdvan'ın "Medium gibi birkaç
+  // siteyi kontrol edip ek özellik ekleyebiliriz" geri bildiriminin tek
+  // somut, henüz yapılmamış parçasıydı - İçindekiler/scroll-spy/okuma
+  // ayarları zaten vardı, bkz. readingTime.js). Ayrı bir useMemo - headings/
+  // nodes render'ıyla farklı bir sorumluluk, aynı `page?.content` bağımlılığı
+  // dışında birbirinden bağımsız.
+  const readingMinutes = useMemo(
+    () => estimateReadingMinutes(page?.content ?? ""),
     [page?.content]
   );
 
@@ -773,6 +785,10 @@ function WikiArticlePage({ token }) {
                     <div className="flex justify-between px-2.5 py-1">
                       <span className="font-semibold text-[var(--text-h)]">Tarih</span>
                       <span className="text-[var(--text)]">{formatUtcTimestamp(page.createdAtUtc)}</span>
+                    </div>
+                    <div className="flex justify-between px-2.5 py-1">
+                      <span className="font-semibold text-[var(--text-h)]">Okuma Süresi</span>
+                      <span className="text-[var(--text)]">~{readingMinutes} dk</span>
                     </div>
                     {tagList.length > 0 && (
                       <div className="p-2.5">
