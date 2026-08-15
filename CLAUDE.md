@@ -1330,24 +1330,77 @@ aynı şekilde işleyip Extracting→Ready/Failed geçişini kendisi yapıyor. �
 unit test (`Atlas.Modules.Documents.Application.Tests`, var olan Fake'lerle) +
 tüm solution (`dotnet test Atlas.sln --filter "Category!=Integration"`) yeşil.
 
+## Voyage AI embedding entegrasyonu - key olmadan yapılabilecek TÜM hazırlık (2026-08-12)
+
+Kullanıcı "şirket key'i sonra verecek, o gelmeden ne yapılabilir" diye sordu -
+madde 1'deki (a)-(e) listesinden key'e bağlı OLMAYAN her şey şimdiden yazılıp
+test edildi. **DI kaydı hâlâ `FakeEmbeddingService`'te** - hiçbir davranış
+değişmedi, bu bilerek "kanatta bekleyen, anahtarı çevirmeyi bekleyen" bir
+implementasyon.
+
+- **`VoyageEmbeddingService`** (AI.Infrastructure/Embeddings) - Voyage AI'ın
+  `POST /v1/embeddings` sözleşmesine göre yazıldı (endpoint/alan adları resmi
+  dokümantasyondan doğrulandı, tahmin edilmedi). Batch bölme: Voyage tek
+  istekte en fazla 1000 metin kabul ediyor, `texts.Chunk(1000)` ile bölünüyor
+  (`.NET`'in kendi `Chunk()`'ı yeterliydi, elle bir bölme algoritması
+  YAZILMADI). Toplam token bütçesi (modele göre 120K-1000K) BİLEREK ayrıca
+  hesaplanmıyor - `truncation: true` Voyage'ın aşırı uzun TEK bir metni
+  kendisinin kesmesini sağlıyor, tam bir tokenizer eklemek şimdilik YAGNI.
+  Sıra garantisi (`IEmbeddingService`'in "çıktı[i] = girdi[i]" sözleşmesi)
+  Voyage'ın dönüş sırasına GÜVENMEDEN, her elemanın kendi döndürdüğü `index`
+  alanına göre doğru pozisyona yazılmasıyla sağlanıyor.
+- **Retry:** 429/5xx/network/timeout GEÇİCİ sayılıp üstel geri çekilmeyle
+  (1sn, 2sn) en fazla 3 deneme yapılıyor; 400/401 gibi KALICI hatalar hiç
+  tekrar denenmeden fırlatılıyor (geçersiz bir key'le her çağrının 3 katı
+  gereksiz istek atmaması için). Polly gibi bir kütüphane EKLENMEDİ - tek bir
+  dış çağrı noktası için elle yazılmış bir döngü yeterliydi (gereksiz
+  bağımlılık eklememe ilkesi).
+- **Fail-fast boyut kontrolü:** dönen vektör `EmbeddingDimensions.Standard`
+  (1024) ile eşleşmiyorsa hemen hata fırlatılıyor - Ders #15'teki (sıfır-vektör
+  → NaN → tüm arama isteği çöktü) sınıftan bir hatanın pgvector'a ulaşmadan
+  yakalanması.
+- **`VoyageAiOptions`** - `ApiKey` appsettings.json'da DEĞİL (Jwt:Key'le AYNI
+  gerekçe, Ders #16), `Model`/`BaseUrl` appsettings.json'da (`"VoyageAi"`
+  bölümü, gizli değiller). `AIModule.cs`'e `AddHttpClient<VoyageEmbeddingService>`
+  (typed client, Authorization header'ı DI çözümlenirken Options'tan kuruluyor)
+  + `Configure<VoyageAiOptions>` eklendi - **key BOŞKEN bile** uygulama
+  sorunsuz açılıyor (canlı doğrulandı: `dotnet run`, `/health` → 200), sadece
+  gerçek bir çağrı yapılırsa Voyage 401 döner.
+- **Testler key GEREKTİRMİYOR:** `FakeHttpMessageHandler` (mocking kütüphanesi
+  yok, projenin kendi Fake deseni) ile `HttpClient` gerçek ağa hiç çıkmadan
+  test ediliyor - 6 yeni test (boş girdi, sıra garantisi/ters index, 1000+
+  metnin bölünmesi, 429'da retry, 401'de retry YOK, yanlış boyutta fail-fast).
+  `dotnet test Atlas.sln --filter "Category!=Integration"` yeşil (Documents
+  bulk reindex'ten sonra: 138 test).
+
+**Key geldiğinde yapılacaklar (runbook):**
+1. `dotnet user-secrets set "VoyageAi:ApiKey" "..."` (KENDİ terminalinden -
+   Ders #16, Claude'un çalıştırdığı bir komut kullanıcının kendi shell'ine
+   görünmeyebilir).
+2. `AIModule.cs`'te TEK satır: `AddSingleton<IEmbeddingService, FakeEmbeddingService>()`
+   → `AddScoped<IEmbeddingService, VoyageEmbeddingService>()` (Singleton
+   DEĞİL - artık `HttpClient` gibi dış bir kaynağı sarmalıyor, bkz. "Service
+   Lifetime kuralı").
+3. `Model`/`output_dimension` kararını (appsettings.json'daki `"VoyageAi:Model"`)
+   gerçek key'e karşı doğrula - `EmbeddingDimensions.Standard`in (1024) seçilen
+   modelin gerçek çıktısıyla eştiği canlı test edilmeli.
+4. `POST /api/wiki/reindex` + `POST /api/documents/reindex` (Admin) - var olan
+   TÜM Fake-üretimi embedding'leri gerçek sağlayıcıyla yeniden üret.
+5. Bir arama yapıp sonuçların anlam benzerliğine göre (kelime örtüşmesine göre
+   DEĞİL) sıralandığını canlı doğrula.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
-   (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-08-12,
-   geçiş öncesi hazırlık denetimi):** "sadece DI kaydını değiştir" cümlesi
-   Application/Domain katmanları için doğru ama TAM resim değil - gerçek geçiş
-   ayrıca şunları gerektirecek: (a) sağlayıcı/model kararı + API key (kod
-   `EmbeddingDimensions.Standard = 1024`'ün yorumunda Voyage AI'a hazırlanmış
-   görünüyor ama kesinleşmedi), (b) projenin İLK dış HTTP entegrasyonu (`IHttpClientFactory`
-   şu an hiç kullanılmıyor) - yeni bir `Infrastructure` sınıfı + hata/timeout
-   yönetimi, (c) `Jwt:Key`'le AYNI gerekçeyle key'in User Secrets'a gitmesi,
-   (d) gerçek API'lerin batch/token limitine göre `EmbedAsync`'in büyük
-   listeleri alt-batch'lere bölmesi (Fake'te sınır yoktu), (e) var olan TÜM
-   embedding'lerin (Fake'in ürettiği, yeni sağlayıcıyla uyumsuz) toplu olarak
-   yeniden üretilmesi - Wiki (`/api/wiki/reindex`) VE Documents
-   (`/api/documents/reindex`, yukarıdaki bölüme bkz. - bu denetimde bulunup
-   AYRICA kapatılan eksik) ikisi de artık hazır. **Not (2026-07-28,
+   (bu, API key'ler gelene kadar bloklanmış durumda). **Güncel durum
+   (2026-08-12):** yukarıdaki "Voyage AI embedding entegrasyonu" bölümüne bkz -
+   key'e bağlı OLMAYAN TÜM hazırlık (gerçek Infrastructure sınıfı, batch/retry/
+   fail-fast mantığı, HttpClient altyapısı, testler, Wiki+Documents bulk
+   reindex) bitti. Kalan tek şey gerçekten key'e bağlı: (a) User Secrets'a
+   key'in girilmesi, (b) DI kaydının tek satır değişmesi, (c) `Model`/boyut
+   kararının gerçek key'e karşı doğrulanması, (d) toplu reindex'in
+   tetiklenmesi - yukarıdaki runbook. **Not (2026-07-28,
    kullanıcı gözlemi):** Arama şu an "başlığa göre eşleşiyormuş" hissi
    verebiliyor - kod tarafında bu YANLIŞ, canlı test edilip kanıtlandı
    (`SearchByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,
