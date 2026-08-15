@@ -76,50 +76,66 @@
 }
 
 .dark {
-  --text: #cbd5e1;
-  --text-h: #f8fafc;
-  --bg: #1b2025;
-  --page-bg: #121619;
-  --border: #2b333c;
-  --code-bg: #232930;
-  /* DÜZELTME: #34d399 (parlak nane yeşili) beyaz metinle sadece 1.92:1 WCAG
-     kontrastı veriyordu (hesaplanıp doğrulandı) - "Herkese Açık" rozeti gibi
-     üzerinde BEYAZ METİN olan yerlerde neredeyse okunmuyordu. Aynı ton
-     ailesinde (~158° hue), sistematik olarak taranıp beyaz metinle 4.53:1
-     (WCAG AA eşiğini geçiyor) VE sayfa zeminiyle 4.01:1 veren bu koyulaştırılmış
-     değere düşürüldü. */
+  /* UI/UX denetimi (2026-08-12): dark mode eskiden soğuk bir slate/grafit
+     paletiydi (--bg: #1b2025, mavimsi) - light mode'un krem/kahve karakteriyle
+     HİÇ akrabalığı yoktu, iki tema "aynı ürün" gibi hissettirmiyordu. Aşağıdaki
+     değerler AYNI koyuluk/luminance seviyesini korurken (WCAG kontrastları
+     bozulmasın diye) tonu mavi-griden sıcak kahve/espresso ailesine çekiyor -
+     light moddaki krem/kahve paletinin KOYU ucu gibi. */
+  --text: #d9d0c2;
+  --text-h: #f5efe3;
+  --bg: #1e1710;
+  --page-bg: #16110b;
+  --border: #392e21;
+  --code-bg: #251e14;
+  /* DÜZELTME (önceki not korunuyor - hâlâ geçerli): #34d399 (parlak nane
+     yeşili) beyaz metinle sadece 1.92:1 WCAG kontrastı veriyordu (hesaplanıp
+     doğrulandı) - "Herkese Açık" rozeti gibi üzerinde BEYAZ METİN olan
+     yerlerde neredeyse okunmuyordu. Aynı ton ailesinde (~158° hue), sistematik
+     olarak taranıp beyaz metinle 4.53:1 (WCAG AA eşiğini geçiyor) VE sayfa
+     zeminiyle 4.01:1 veren bu koyulaştırılmış değere düşürüldü. Yeni, daha
+     koyu/sıcak zeminle (--page-bg: #16110b) kontrast SADECE artıyor - yeniden
+     ölçmeye gerek yok. */
   --brand-accent: #1d8660;
   --brand-accent-bg: rgba(29, 134, 96, 0.18);
   --brand-accent-border: rgba(29, 134, 96, 0.5);
-  --social-bg: rgba(35, 41, 48, 0.5);
+  --social-bg: rgba(37, 30, 20, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
-  --background: #1b2025;
-  --foreground: #f8fafc;
-  --card: #1b2025;
-  --card-foreground: #f8fafc;
-  --popover: #1b2025;
-  --popover-foreground: #f8fafc;
-  --primary: #34d399;
-  --primary-foreground: #121619;
-  --secondary: #232930;
-  --secondary-foreground: #f8fafc;
-  --muted: #232930;
-  --muted-foreground: #cbd5e1;
-  --accent: #232930;
-  --accent-foreground: #f8fafc;
-  --border: #2b333c;
-  --input: #2b333c;
-  --ring: #34d399;
-  --sidebar: #1b2025;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-primary: #34d399;
-  --sidebar-primary-foreground: #121619;
-  --sidebar-accent: #232930;
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #2b333c;
-  --sidebar-ring: #34d399;
+  /* BULUNAN GERÇEK BUG (denetim sırasında): --primary üç farklı yerde üç
+     farklı değer taşıyordu (#34d399 burada, #24654f aşağıdaki İKİNCİ .dark
+     bloğunda - bkz. dosyanın sonu) - CSS kaskad kuralı gereği SONRAKİ blok
+     kazanıyordu, yani bu satırdaki değer aslında hiç render EDİLMİYORDU
+     (ölü kod). İkisi de yukarıdaki WCAG-doğrulanmış --brand-accent'le
+     (#1d8660) UYUŞMUYORDU. Artık ikisi de --brand-accent'e eşitlendi - tek
+     bir doğruluk kaynağı, shadcn Button/Input gibi bileşenler de aynı
+     yeşili kullanıyor. */
+  --background: #1e1710;
+  --foreground: #f5efe3;
+  --card: #1e1710;
+  --card-foreground: #f5efe3;
+  --popover: #1e1710;
+  --popover-foreground: #f5efe3;
+  --primary: #1d8660;
+  --primary-foreground: #ffffff;
+  --secondary: #251e14;
+  --secondary-foreground: #f5efe3;
+  --muted: #251e14;
+  --muted-foreground: #d9d0c2;
+  --accent: #251e14;
+  --accent-foreground: #f5efe3;
+  --border: #392e21;
+  --input: #392e21;
+  --ring: #1d8660;
+  --sidebar: #1e1710;
+  --sidebar-foreground: #f5efe3;
+  --sidebar-primary: #1d8660;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #251e14;
+  --sidebar-accent-foreground: #f5efe3;
+  --sidebar-border: #392e21;
+  --sidebar-ring: #1d8660;
 }
 
 html,
@@ -292,38 +308,46 @@ body {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Bu ikinci ".dark" bloğu shadcn'in kendi init akışından kalma, YUKARIDAKİ
+   ilk ".dark" bloğuyla hiç birleştirilmemiş (aynı dosyada iki ayrı ".dark"
+   seçicisi - CSS kaskad kuralı gereği SONRAKİ, yani BU blok kazanıyor).
+   Denetim sırasında bulunan --primary çelişkisi yüzünden burası da
+   yukarıdakiyle AYNI sıcak kahve/yeşil paletine çekildi - tam bir mimari
+   temizlik (iki bloğu birleştirmek) bu değişikliğin kapsamı dışında
+   bırakıldı, ama artık en azından İKİSİ DE aynı değerleri taşıyor, hangisinin
+   kazandığının önemi kalmadı. */
 .dark {
-  --background: #1b2025;
-  --foreground: #e6ebf0;
-  --card: #1b2025;
-  --card-foreground: #e6ebf0;
-  --popover: #1b2025;
-  --popover-foreground: #e6ebf0;
-  --primary: #24654f;
+  --background: #1e1710;
+  --foreground: #f5efe3;
+  --card: #1e1710;
+  --card-foreground: #f5efe3;
+  --popover: #1e1710;
+  --popover-foreground: #f5efe3;
+  --primary: #1d8660;
   --primary-foreground: #ffffff;
-  --secondary: #232930;
-  --secondary-foreground: #e6ebf0;
-  --muted: #232930;
-  --muted-foreground: #94a1ac;
-  --accent: #232930;
-  --accent-foreground: #e6ebf0;
+  --secondary: #251e14;
+  --secondary-foreground: #f5efe3;
+  --muted: #251e14;
+  --muted-foreground: #d9d0c2;
+  --accent: #251e14;
+  --accent-foreground: #f5efe3;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #2b333c;
-  --input: #2b333c;
-  --ring: #24654f;
+  --border: #392e21;
+  --input: #392e21;
+  --ring: #1d8660;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: #1b2025;
-  --sidebar-foreground: #e6ebf0;
-  --sidebar-primary: #24654f;
+  --sidebar: #1e1710;
+  --sidebar-foreground: #f5efe3;
+  --sidebar-primary: #1d8660;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #232930;
-  --sidebar-accent-foreground: #e6ebf0;
-  --sidebar-border: #2b333c;
-  --sidebar-ring: #24654f;
+  --sidebar-accent: #251e14;
+  --sidebar-accent-foreground: #f5efe3;
+  --sidebar-border: #392e21;
+  --sidebar-ring: #1d8660;
 }
 
 @layer base {

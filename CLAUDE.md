@@ -1414,6 +1414,68 @@ sayfa) için "~4 dk" gösterdi, doğru sırada (Tarih'ten sonra, Etiketler'den
 önce) render edildi. 7 yeni test (`readingTime.test.js`) + tüm frontend test
 suite'i (24/24) yeşil.
 
+## UI/UX Denetimi ve Uygulanan Düzeltmeler (2026-08-12)
+
+Kullanıcının "yeşil + krem + kahve tonları, sarı yok, sade, kompakt sidebar"
+hedefine göre mevcut frontend'in canlı DOM/CSS incelemesi yapıldı (kod hiç
+değiştirilmeden önce - `getComputedStyle` ile ölçülen gerçek renk/spacing/
+font değerleri, ekran görüntüsü bu ortamda alınamadığı için). **Önemli
+bulgu:** Light mode ZATEN hedefteki krem+yeşil paleti taşıyordu (`--bg:
+#f9f6ef`, `--brand-accent: #1b4d3e`, sarı hiç yok) - asıl kopukluk dark
+mode'daydı. Denetim raporunun tamamı onaylandıktan sonra 5 madde uygulandı:
+
+- [x] **Dark mode paleti ısıtıldı + gerçek bir `--primary` çelişkisi
+      düzeltildi:** Dark mode eskiden soğuk bir slate/grafit paletiydi
+      (`--bg: #1b2025`, mavimsi) - light mode'un krem/kahve karakteriyle hiç
+      akrabalığı yoktu. `--bg`/`--page-bg`/`--border`/`--code-bg`/`--text`/
+      `--text-h` AYNI koyuluk/luminance seviyesi korunarak (WCAG kontrastları
+      bozulmasın diye) mavi-griden sıcak kahve/espresso ailesine çekildi
+      (`--bg: #1e1710`, `--page-bg: #16110b` vb.). **Denetim sırasında bulunan
+      GERÇEK bug:** `index.css`'te İKİ AYRI `.dark` bloğu vardı (biri elle
+      yazılmış, öbürü shadcn init'inden kalma, hiç birleştirilmemiş) -
+      `--primary` üç farklı yerde üç farklı değer taşıyordu (`#34d399`,
+      `#24654f`), CSS kaskad kuralı gereği SONRAKİ blok kazanıyordu, yani
+      ikisinden biri hiç render edilmeyen ölü koddu; ayrıca ikisi de
+      WCAG-doğrulanmış `--brand-accent`'le (`#1d8660`, bkz. eski kontrast
+      düzeltmesi notu) UYUŞMUYORDU. Üçü de tek bir değere (`#1d8660`)
+      birleştirildi - iki `.dark` bloğunun kendisi BİLEREK birleştirilmedi
+      (daha büyük bir mimari temizlik, bu denetimin kapsamı dışında
+      bırakıldı), ama artık hangisinin kazandığının önemi kalmadı.
+- [x] **H1/H2/H3 gövde metninin (16px) üzerine çıkarıldı:** H2 (15px) gövde
+      metninden KÜÇÜKTÜ, sadece kalın yazı tipi hiyerarşiyi taşıyordu -
+      Wikipedia'nın kendi tipografisiyle (H2 gözle görülür büyük) karşılaştırınca
+      ters bir hiyerarşiydi. `HEADING_SIZES` (markdown.jsx): 21/15/12 →
+      24/19/17px. H4-H6 BİLEREK dokunulmadı (orijinal tasarım kararı onları
+      H3'ün altında küçük bir "etiket" tonunda tutmaktı, denetim SADECE
+      H1-H3'ü işaretlemişti).
+- [x] **Ana sayfa hero başlığı büyütüldü, ama ÖLÇÜLÜ:** `text-lg` (15.75px) →
+      `text-xl` (17.5px) - `text-2xl`'e SIÇRANMADI, çünkü bu satır zaten
+      "Karşılama alanı küçültülsün" (2026-08-07 spec'i) kararıyla bilinçli
+      olarak ince tutulmuştu; audit'in "hero zayıf" bulgusuyla o geçmiş
+      kararı ÇELİŞTİRMEDEN tek kademelik bir denge bulundu.
+- [x] **Makale sağ paneli (Bilgi Kutusu + Okuma Ayarları) daraltıldı:**
+      260/280px → 200/240px (`GRID_TEMPLATES`, `WikiArticlePage.jsx`) - panel
+      içeriği (Departman/Erişim/Oluşturan/Tarih/Okuma Süresi/Etiketler) zaten
+      o genişliği doldurmuyordu, içerik sütunu bu daralmadan +40px kazandı.
+      TOC genişliğine (200/220px) BİLEREK dokunulmadı, denetim SADECE sağ
+      paneli "gereksiz geniş" işaretlemişti.
+- [x] **Sarı/amber kontrolü:** `CALLOUT_CONFIG`'de (markdown.jsx) hiç sarı/amber
+      YOK - "warning"/"error" ikisi de düz `"red"` kullanıyor. Doğrulandı,
+      düzeltme gerekmedi (hedef sadece "sarı kullanılmamalı" diyordu).
+
+**Denetimde "bug" olarak işaretlenip SONRADAN YANLIŞ ÇIKAN bir bulgu:**
+İçindekiler'in "genişlet" düğmesinin grid kolonunu büyütmediği düşünülmüştü -
+uygulamaya geçerken TEMİZ bir sayfa yüklemesinde YENİDEN test edildi ve
+DOĞRU çalıştığı görüldü (220px'e genişliyor). Muhtemelen ilk ölçüm sırasında
+bir zamanlama/stale-state sorunu vardı - "düzeltme" YAPILMADI, çünkü
+düzeltilecek gerçek bir sorun yoktu. Genel ders: bir "bug" bulgusunu
+düzeltmeye geçmeden önce TEMİZ bir ortamda yeniden üretmeye çalışmak gerekir -
+burada bu adım atılıp gerçek olmayan bir düzeltmeden kaçınıldı.
+
+Tüm değişiklikler canlı doğrulandı (light+dark mod, `getComputedStyle` ile
+gerçek piksel/hex değerleri okunarak) + `dotnet build` gerekmedi (sadece
+frontend) + `npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

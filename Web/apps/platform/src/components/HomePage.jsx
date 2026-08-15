@@ -308,7 +308,13 @@ function HomePage({ token }) {
           ince bir şeride indirildi. */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: "var(--border)" }}>
         <div>
-          <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+          {/* UI/UX denetimi (2026-08-12): text-lg (15.75px) bir karşılama
+              başlığı için zayıf ölçülmüştü - ama yukarıdaki yorumdaki
+              "Karşılama alanı küçültülsün" kararıyla ÇELİŞMEMEK için text-2xl
+              gibi büyük bir sıçrama YAPILMADI, sadece bir kademe (text-xl,
+              17.5px) - şeridin "ince" karakteri korunuyor, sadece başlık artık
+              MiniStat rakamlarından (text-xs) daha net ayrışıyor. */}
+          <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
             Atlas Wiki'ye hoş geldiniz{fullName ? `, ${fullName}` : ""}!
           </h1>
           <p className="text-xs" style={{ color: "var(--text)", opacity: 0.75 }}>

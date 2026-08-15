@@ -66,13 +66,17 @@ function findFolderPath(folders, targetFolderId, path = []) {
 // string'leri görebiliyor, bu yüzden olası her kombinasyon burada ayrı ayrı
 // yazılı duruyor, çalışma zamanında sadece HANGİSİNİN kullanılacağı seçiliyor).
 // DÖRDÜNCÜ geçişte (2026-08-07 - "8. Grid Yapısı: 230px | 1100-1200px |
-// 280px") sağ panel 240/260'tan 260/280'e çıkarıldı - 1650px'lik üst sınırda
-// (bkz. article'ın max-w'si) content track'i böylece TAM istenen aralığa
-// (~1100-1200px) düşüyor: 1650 - 220(TOC) - 280(panel) - 48(2 gap) = 1102px.
+// 280px") sağ panel 240/260'tan 260/280'e çıkarılmıştı.
+// BEŞİNCİ geçiş - UI/UX denetimi (2026-08-12, "sidebarlar daha kompakt
+// olmalı"): panel 260/280'den 200/240'a geri indirildi. Bilgi Kutusu'ndaki
+// satırlar (Departman/Erişim/Oluşturan/Tarih/Okuma Süresi/Etiketler) zaten
+// o genişliği doldurmuyordu - içerik sütunu (`1fr` track) bu daralmadan
+// doğrudan kazançlı çıkıyor. TOC genişliğine BİLEREK dokunulmadı (denetimde
+// sadece sağ panel "gereksiz geniş" olarak işaretlenmişti).
 const GRID_TEMPLATES = {
-  "toc-open|panel-open": "lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px]",
+  "toc-open|panel-open": "lg:grid-cols-[200px_1fr_200px] xl:grid-cols-[220px_1fr_240px]",
   "toc-open|panel-closed": "lg:grid-cols-[200px_1fr_44px] xl:grid-cols-[220px_1fr_44px]",
-  "toc-closed|panel-open": "lg:grid-cols-[44px_1fr_260px] xl:grid-cols-[44px_1fr_280px]",
+  "toc-closed|panel-open": "lg:grid-cols-[44px_1fr_200px] xl:grid-cols-[44px_1fr_240px]",
   "toc-closed|panel-closed": "lg:grid-cols-[44px_1fr_44px] xl:grid-cols-[44px_1fr_44px]",
 };
 
