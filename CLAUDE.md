@@ -1476,6 +1476,40 @@ Tüm değişiklikler canlı doğrulandı (light+dark mod, `getComputedStyle` ile
 gerçek piksel/hex değerleri okunarak) + `dotnet build` gerekmedi (sadece
 frontend) + `npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
 
+## "Modernize et" turu (2026-08-12, denetim raporunun hemen ardından)
+
+Kullanıcı "siteyi aç ve daha modernize et" dedi - denetim raporunun ("sade
+kal, abartma") sınırları İÇİNDE, iki somut ekleme yapıldı:
+
+- [x] **Sticky header:** `WikiLayout.jsx`'teki `<header>` eskiden
+      `position: static` idi - sayfa kaydırılınca arama/tema/bildirim gibi
+      her an erişilebilir olması gereken kontroller TAMAMEN gözden
+      kayboluyordu. Artık `sticky top-0 z-20`, opak `var(--bg)` zemini
+      koruyor (backdrop-blur/yarı-saydamlık BİLEREK eklenmedi - "sade" hedefine
+      gereksiz bir gösteriş olurdu). Canlı doğrulandı: 800px scroll sonrası
+      `header.getBoundingClientRect().top` hâlâ 0.
+- [x] **Ana sayfa kartlarına hover mikro-etkileşimi:** `ArticleCard`
+      (HomePage.jsx) zaten `hover:shadow-md` taşıyordu - buna küçük bir
+      kaldırma (`hover:-translate-y-0.5`) ve sınır renginin yeşile dönmesi
+      (`hover:border-[var(--brand-accent-border)]`) eklendi. Bunu yapabilmek
+      için sınır rengi inline `style`'dan Tailwind class'ına taşınmak
+      ZORUNDAYDI - inline style, AYNI özellik için `:hover` pseudo-class'ından
+      BAĞIMSIZ olarak her zaman dış CSS kuralını ezer, bu yüzden eskisi gibi
+      `style={{ borderColor: "var(--border)" }}` kalsaydı hover rengi hiç
+      görünmezdi.
+
+**Doğrulama sınırlaması (dürüstçe not edilsin):** Hover mikro-etkileşimini bu
+ortamın otomasyon aracıyla (simüle edilmiş fare hareketi) GÖRSEL olarak
+doğrulayamadım - `element.matches(':hover')` `true` dönmesine rağmen
+`getComputedStyle` değişmedi. Ama bu ortamın kendi sınırlaması olduğu
+doğrulandı: benim EKLEMEDİĞİM, koddan ÖNCEDEN var olan `hover:shadow-md`
+sınıfı da AYNI testte tepki vermedi - yani gerçek bir regresyon değil, CDP
+tabanlı simüle hover'ın bu ortamda `:hover` stil çözümlemesini gerçek fare
+gibi tetiklememesi. CSS kuralının kendisi (`sheet.cssRules` içinde doğru
+selector/specificity ile) doğru derlendiği ayrıca doğrulandı. `npm run lint`/
+`npm run build`/`npx vitest run` (24/24) yeşil, sticky header (layout/scroll
+davranışı gerçekten test edilebilir olduğu için) tam doğrulandı.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

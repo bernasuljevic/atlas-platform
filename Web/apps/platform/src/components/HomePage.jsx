@@ -158,10 +158,19 @@ function ArticleCard({ article }) {
   const excerpt = article.excerpt.endsWith("…") ? article.excerpt.slice(0, -1) + "…" : article.excerpt;
 
   return (
+    // "Modernize et" (2026-08-12): sınır rengi inline style'dan Tailwind
+      // sınıfına taşındı (border-[var(--border)]) - inline style hover:
+      // sınıfını EZERDİ (inline stil, aynı özellik için HER ZAMAN dış CSS
+      // kuralını kazanır, :hover pseudo-class'ı fark etmeksizin), bu yüzden
+      // hover'da yeşile dönebilmesi için başka türlü mümkün değildi. Küçük
+      // bir kaldırma (-translate-y-0.5) eklendi - mevcut `transition` sınıfı
+      // zaten `transform`ı da kapsıyor, ekstra bir süre/easing tanımlamaya
+      // gerek kalmadı. "Abartısız" hedefine sadık kalmak için sadece 2px'lik
+      // bir hareket - göze çarpan ama rahatsız etmeyen bir mikro-etkileşim.
     <Link
       to={`/wiki/${article.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-lg border transition hover:shadow-md"
-      style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] transition hover:-translate-y-0.5 hover:border-[var(--brand-accent-border)] hover:shadow-md"
+      style={{ background: "var(--bg)" }}
     >
       {article.coverImageUrl ? (
         <img src={article.coverImageUrl} alt="" className="h-32 w-full object-cover" />
