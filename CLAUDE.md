@@ -1510,6 +1510,47 @@ selector/specificity ile) doğru derlendiği ayrıca doğrulandı. `npm run lint
 `npm run build`/`npx vitest run` (24/24) yeşil, sticky header (layout/scroll
 davranışı gerçekten test edilebilir olduğu için) tam doğrulandı.
 
+## Eksik-özellik listesi - Gün 1: Okuma ilerleme çubuğu + arama derin link (2026-08-12)
+
+19 bölümlük "Atlas İçerik Sistemi" spec'inin tekrar denetlenmesinde bulunan
+10+ eksikten (bkz. o denetimin özeti) en düşük riskli, tamamen frontend olan
+ikisiyle başlandı - CLAUDE.md'nin "büyük özellik birden fazla küçük adıma
+bölünsün" kuralına göre, hepsi tek seferde YAPILMADI.
+
+- [x] **Okuma İlerleme Çubuğu** - `WikiArticlePage.jsx`'te makalenin
+      tepesi/altı viewport'a göre hesaplanan, sticky header'ın (50px) hemen
+      altına sabitlenen ince (2px) bir çubuk. Kısa sayfalarda (tek ekrana
+      sığan) hiç GÖSTERİLMİYOR - "gereksiz UI elementiyle doldurma" spec
+      notuna uyuluyor. Tam ekran okuma modu BİLEREK kapsam dışı (kendi ayrı
+      `overflow-y-auto` scroll konteynerini kullanıyor, window scroll değil -
+      ayrı bir izleme mantığı gerektirirdi).
+- [x] **Arama sonucundan ilgili bölüme derin link** - `WikiSearch.jsx`
+      artık eşleşen chunk metnini `navigate(..., { state: { chunkText } })`
+      ile taşıyor, `WikiArticlePage` chunk'ın ham içerikteki konumunu bulup
+      (`markdown.jsx`'e eklenen `lineIndex` alanı sayesinde) EN YAKIN ÖNCEKİ
+      başlığa kaydırıyor - backend'e YENİ BİR ALAN EKLENMEDİ (chunk<->başlık
+      ilişkisi backend'de hiç saklanmıyor, TextChunker sabit boyutlu pencere
+      kullanıyor, başlık sınırlarını bilmiyor). **Canlı testte bulunan gerçek
+      bir hata:** snippet'i chunk'ın BAŞINDAN almak yanlıştı - bir chunk
+      sıkça bir bölüm SINIRINI ortadan kesiyor (ilk cümlesi ÖNCEKİ bölümün
+      son cümlesi, geri kalanı YENİ bölüm), bu yüzden yanlış (bir önceki)
+      başlığa kaydırıyordu. Düzeltme: snippet chunk'ın ORTASINDAN alınıyor -
+      bir chunk'ın "asıl konusu" neredeyse hep ortasında, sınır-kesme etkisi
+      sadece uçlarda oluyor. Canlı doğrulandı (gerçek bir arama yapılıp
+      tıklanarak): "departman bazlı görünürlük" araması artık doğru şekilde
+      "Departman Bazlı Erişim" başlığını aktif işaretliyor (önceden yanlışlıkla
+      bir önceki başlığı - "CQRS Komutu" - işaretliyordu).
+
+**Doğrulama sınırlaması (dürüstçe not edilsin):** Bu ortamın Browser
+pane'i "compositing" yapmıyor (screenshot da bu yüzden çalışmıyor) - bu
+yüzden `scrollIntoView({behavior:"smooth"})` GERÇEKTEN kaydırmıyor (aynı
+hedefe `behavior:"instant"` ile manuel test edilince ANINDA çalıştığı
+kanıtlandı - kod doğru, gerçek kullanıcılarda sorunsuz çalışacak). Okuma
+ilerleme çubuğunun matematiği de aynı şekilde manuel `scroll` event'i
+tetiklenerek doğrulandı (`window.scrollTo()` bu ortamda gerçek bir `scroll`
+event'i tetiklemiyor - başka bir ortam kısıtlaması, kodun kendisi değil).
+`npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

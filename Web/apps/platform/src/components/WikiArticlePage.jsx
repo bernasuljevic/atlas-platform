@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   Building2,
   ChevronRight,
@@ -87,6 +87,7 @@ const GRID_TEMPLATES = {
 function WikiArticlePage({ token }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { userId, isAdmin } = useMemo(() => getUserInfoFromToken(token), [token]);
 
   const [page, setPage] = useState(null);
@@ -327,6 +328,104 @@ function WikiArticlePage({ token }) {
     return () => observer.disconnect();
   }, [headings, isFullscreen]);
 
+  // Okuma İlerleme Çubuğu (spec: "Uzun rehberlerde üst tarafta çok küçük bir
+  // reading progress indicator... Ancak minimal olmalı, sayfayı gereksiz UI
+  // elementleriyle doldurma") - makalenin tepesi viewport'un tepesine
+  // ulaştığında 0%, altı viewport'un altına ulaştığında 100%. BİLEREK SADECE
+  // normal (tam ekran OLMAYAN) modda çalışıyor - tam ekran modu KENDİ ayrı
+  // scroll konteynerini kullanıyor (`overflow-y-auto`, window scroll DEĞİL),
+  // bunu da desteklemek ayrı bir izleme mantığı gerektirirdi; "Day 1" kapsamı
+  // bilerek normal moda sınırlı tutuldu, istenirse ayrı bir adımda genişletilir.
+  const articleRef = useRef(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  // "Kısa sayfada çubuk gösterme" kararı BİLEREK ayrı bir state - `articleRef.
+  // current`'ı doğrudan JSX'te okumak, ref'in AYNI render'daki elemana henüz
+  // bağlanmamış olabileceği (ref'ler commit SONRASI dolar) bir "bir render
+  // geride" hatasına yol açardı; bunun yerine effect içinde HESAPLANIP state'e
+  // yazılıyor, JSX sadece bu state'i okuyor.
+  const [showProgressBar, setShowProgressBar] = useState(false);
+
+  useEffect(() => {
+    if (isFullscreen) return undefined;
+
+    function handleScroll() {
+      const article = articleRef.current;
+      if (!article) return;
+
+      // `article.offsetTop` KULLANILMADI - `offsetTop`, en yakın
+      // KONUMLANDIRILMIŞ (position: static OLMAYAN) ata elemana göre
+      // ölçülüyor, o atanın kim olduğu bu düzende garanti değil (canlı test
+      // sırasında yanlış/sabit "0" değer üretiği yakalandı). `getBoundingClientRect()`
+      // + o anki `window.scrollY` toplamı, ata zincirinden TAMAMEN bağımsız,
+      // her zaman doğru bir MUTLAK sayfa konumu veriyor.
+      const rect = article.getBoundingClientRect();
+      const articleTop = rect.top + window.scrollY;
+      const articleHeight = article.offsetHeight;
+      const viewportHeight = window.innerHeight;
+
+      // Makale, tek bir ekrana zaten sığıyorsa (kısa sayfa) ilerleme kavramı
+      // anlamsız - çubuk hiç gösterilmiyor.
+      if (articleHeight <= viewportHeight) {
+        setShowProgressBar(false);
+        return;
+      }
+      setShowProgressBar(true);
+
+      const scrollable = articleHeight - viewportHeight;
+      const scrolled = window.scrollY - articleTop;
+      const percent = Math.min(100, Math.max(0, (scrolled / scrollable) * 100));
+      setReadingProgress(percent);
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [isFullscreen, page?.content]);
+
+  // Arama sonucundan derin link (spec: "AI search sonucunda kullanıcı
+  // doğrudan ilgili bölüme yönlendirilebilmeli") - WikiSearch.jsx, eşleşen
+  // chunk metnini `navigate(..., { state: { chunkText } })` ile buraya
+  // taşıyor. Backend'de chunk<->başlık ilişkisi HİÇ SAKLANMIYOR (embedding'ler
+  // sabit boyutlu bir kayan pencereyle bölünüyor, başlık sınırlarını
+  // BİLMİYOR) - bu yüzden eşleştirme İSTEMCİ tarafında, kaba ama yeterli bir
+  // yöntemle yapılıyor: chunk metninin HAM içerikteki konumunu bulup, o
+  // konumdan ÖNCE gelen EN YAKIN başlığı seçiyoruz (markdown.jsx'teki
+  // `lineIndex` bunun için eklendi). Backend'e yeni bir alan eklemeden,
+  // TAMAMEN mevcut veriyle çözülüyor.
+  useEffect(() => {
+    const chunkText = location.state?.chunkText;
+    if (!chunkText || !page?.content || headings.length === 0) return;
+
+    // DÜZELTME (canlı test sırasında yakalandı): snippet'i chunk'ın
+    // BAŞINDAN almak yanlıştı - `TextChunker` sabit boyutlu bir kayan
+    // pencereyle böldüğü için bir chunk sıkça bir bölüm SINIRINI ortadan
+    // kesiyor (ör. bir chunk'ın ilk cümlesi ÖNCEKİ bölümün son cümlesi,
+    // geri kalanı YENİ bölümün tamamı olabiliyor - tam olarak bu örnekte
+    // yaşandı: chunk "...odaklanıyor.\n\n# Departman Bazlı Erişim\n\n..."
+    // şeklindeydi, ilk 60 karakter hâlâ ÖNCEKİ bölümdeydi, sonuç yanlış
+    // başlığa (bir önceki, "CQRS Komutu") kaydırıyordu). Chunk'ın ORTASINDAN
+    // bir snippet almak çok daha güvenilir - bir chunk'ın "asıl konusu"
+    // neredeyse hep ortasında, sınır-kesme etkisi sadece uçlarda oluyor.
+    const middle = Math.max(0, Math.floor(chunkText.trim().length / 2) - 30);
+    const snippet = chunkText.trim().slice(middle, middle + 60);
+    const charIndex = page.content.indexOf(snippet);
+    if (charIndex === -1) return; // eşleşme bulunamadı - sessizce vazgeç, sayfa tepesinde kalır
+
+    const lineIndex = page.content.slice(0, charIndex).split("\n").length - 1;
+    const nearestHeading = [...headings].reverse().find((h) => h.lineIndex <= lineIndex);
+    if (!nearestHeading) return; // eşleşme İLK başlıktan ÖNCE - kaydırmaya gerek yok
+
+    const timeoutId = setTimeout(() => {
+      document.getElementById(nearestHeading.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveHeadingId(nearestHeading.id);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [location.state, page?.content, headings]);
+
   if (isLoading) {
     return <p style={{ color: "var(--text)" }}>Yükleniyor...</p>;
   }
@@ -474,7 +573,22 @@ function WikiArticlePage({ token }) {
     // sınırlı kalıyor - WikiLayout'un kendi `p-4 md:p-6` dolgusu (16-24px)
     // zaten spec'in istediği "24-40px kenar boşluğu" aralığında, ayrıca bir
     // şey eklemeye gerek yok.
-    <article className="mx-auto max-w-[1650px] text-left text-[15px]">
+    <article ref={articleRef} className="mx-auto max-w-[1650px] text-left text-[15px]">
+      {/* Okuma İlerleme Çubuğu - global sticky header'ın (WikiLayout.jsx,
+          ölçülen yüksekliği 50px) HEMEN ALTINA sabitleniyor. `top-[50px]`
+          BİLEREK sabit bir piksel değeri - bu dosyada zaten var olan bir
+          emsal var (scroll-spy'ın IntersectionObserver rootMargin'i de aynı
+          şekilde header yüksekliğine göre elle ayarlanmış, bkz. yukarıdaki
+          "56px BİLEREK küçük tutuldu" notu). Header'ın yüksekliği değişirse
+          ikisi birlikte güncellenmeli. */}
+      {showProgressBar && (
+        <div className="fixed top-[50px] right-0 left-0 z-10 h-[2px]" style={{ background: "var(--border)" }}>
+          <div
+            className="h-full"
+            style={{ width: `${readingProgress}%`, background: "var(--brand-accent)", transition: "width 0.1s linear" }}
+          />
+        </div>
+      )}
       {/* Breadcrumb */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         {/* Kullanıcı referans mockup'ı (2026-08-07, "buna benzer olsun") -

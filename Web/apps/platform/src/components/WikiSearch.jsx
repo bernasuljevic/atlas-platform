@@ -129,7 +129,15 @@ function WikiSearch({ token, initialQuery }) {
                 return (
                   <div
                     key={`${r.sourceType}-${r.resourceId}`}
-                    onClick={() => navigate(targetPath)}
+                    onClick={() =>
+                      // Wiki sayfaları için eşleşen chunk metnini router state'iyle
+                      // taşıyoruz - WikiArticlePage bunu, sayfanın kendi başlık
+                      // listesindeki EN YAKIN ÖNCEKİ başlığı bulup oraya
+                      // kaydırmak için kullanıyor ("→ ilgili bölüm" deneyimi,
+                      // Documents için henüz yok - belgelerin kendi başlık/TOC
+                      // sistemi yok).
+                      navigate(targetPath, isDocument ? undefined : { state: { chunkText: r.chunkText } })
+                    }
                     className="cursor-pointer rounded-lg border border-[var(--border)] p-3 hover:bg-[var(--brand-accent)]/10"
                   >
                     <div className="mb-1 flex items-center justify-between gap-2">

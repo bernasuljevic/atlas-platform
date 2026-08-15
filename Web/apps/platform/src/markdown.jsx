@@ -464,7 +464,12 @@ export function renderWikiMarkdown(content) {
       const id = slugify(text, usedSlugs);
       const HeadingTag = HEADING_TAGS[level];
 
-      headings.push({ id, text, level });
+      // lineIndex - arama sonucundan tıklanınca "eşleşen chunk hangi
+      // başlığın altında" hesaplayabilmek için (bkz. WikiArticlePage'in
+      // "arama sonucundan derin link" mantığı) - satır bazlı bir konum,
+      // en yakın ÖNCEKİ başlığı bulmak için yeterli, karakter hassasiyeti
+      // gerekmiyor.
+      headings.push({ id, text, level, lineIndex: i });
       blocks.push(
         <HeadingTag key={`h-${blocks.length}`} id={id} className={`scroll-mt-20 ${HEADING_SIZES[level]}`} style={{ color: "var(--text-h)" }}>
           {renderInline(text, `h-${blocks.length}`)}
