@@ -1586,6 +1586,67 @@ kontrolü) hâlâ birebir aynı şekilde çalışıyor - "/" karakteri doğru
 kaldırılıp yerine blok ekleniyor. `npm run lint`/`npm run build`/
 `npx vitest run` (24/24) yeşil.
 
+## Kalıcı Bildirim Geçmişi - Gün 1/2: Backend (2026-08-15)
+
+Kullanıcı Medium'un sağ sütunundaki "Write" kartını + "Staff Picks" akışını
+örnek gösterip "bildirim için de böyle bir şey ekleyelim" dedi.
+`AskUserQuestion` ile netleştirildi: sadece kozmetik bir "yakında" kartı DEĞİL,
+**gerçek, kalıcı bir bildirim geçmişi** isteniyor. Notifications modülü
+2026-08-15'e kadar TAMAMEN ephemeral'dı (`Class1.cs` placeholder'ları hâlâ
+duruyordu - Domain/Application katmanları hiç kullanılmamıştı) - sadece
+SignalR ile anlık toast, hiçbir yerde saklama yoktu. Bu modüle ilk kez
+gerçek bir Domain/Application/Infrastructure katmanı eklendi.
+
+- [x] **`NotificationEntry` (Notifications.Domain)** - AuditLogEntry'nin AYNI
+      denormalizasyon desenini taşıyor (Title/DepartmentName/Visibility/
+      ActorEmail kopyalanıyor, Auth/Wiki'nin tablolarına referans YOK).
+      **Kritik olan asıl gerekçe süs değil:** DepartmentName/Visibility
+      buradan, `GetNotificationsQueryHandler`'ın Wiki listesi/AI aramasıyla
+      AYNI `IWikiVisibilityChecker`'ı uygulayabilmesi İÇİN var - bu alanlar
+      olmasaydı, DepartmentOnly bir sayfanın oluşturulduğu bilgisi (başlığıyla
+      birlikte) o departmanda OLMAYAN kullanıcılara da sızardı (Ders #10'daki
+      SINIFTAN bir hata, bu sefer BAŞTAN önlendi).
+- [x] **`WikiPageCreatedEvent` genişletildi:** `CreatedByEmail` (Notifications'ın
+      "kim oluşturdu" göstermesi için, "Content" alanının eklenme gerekçesiyle
+      AYNI desen) + `IsReindexReplay = false` (varsayılan). **Bu ikinci alan
+      olmadan bulunacak GERÇEK bir bug BAŞTAN önlendi:** `POST /api/wiki/reindex`
+      var olan TÜM sayfalar için bu event'i yeniden yayınlıyor (embedding
+      sağlayıcısı değişince AI'ın yeniden işlemesi için) - AI'ın handler'ı
+      için sorun değil ama Notifications'ın YENİ kalıcı geçmişi için BÜYÜK
+      bir sorun olurdu: bir reindex çalıştırmak, haftalar önce oluşturulmuş
+      HER sayfa için "az önce oluşturuldu" gibi SAHTE kayıtlar ekleyip
+      geçmişi anlamsızlaştırırdı. `WikiPageCreatedEventHandler`
+      (Notifications.Infrastructure) artık `IsReindexReplay` true ise hem
+      SignalR toast'ını HEM kalıcı kaydı ATLIYOR.
+- [x] **Kalıcı yazma best-effort** - AI'ın embedding-üretim handler'ıyla AYNI
+      gerekçe (try/catch, rethrow YOK, sadece `LogWarning`) - bir DB yazma
+      hatası SignalR toast'ının gönderilmesini ENGELLEMEMELİ.
+- [x] **`GetNotificationsQuery` + `GET /api/notifications?take=10`** (token
+      gerektiriyor - AI arama endpoint'iyle AYNI gerekçe, sonuçlar zaten
+      departmana göre filtreleniyor). `NotificationsDbContext` - Audit/Vault/
+      Documents ile AYNI SQL Server veritabanı (`AtlasPlatform`), kendi
+      `notifications.*` şeması. Migration uygulandı.
+
+**Canlı doğrulandı (üç ayrı senaryo, gerçek kullanıcılarla):**
+1. Public bir sayfa oluşturulunca doğru veriyle (title/departman/actor email)
+   kalıcı kayıt oluştu.
+2. **Güvenlik testi (en kritik olan):** DepartmentOnly bir IK sayfası
+   oluşturuldu - IT departmanındaki (email doğrulanmış) bir test kullanıcısı
+   `GET /api/notifications` çağırınca SADECE Public sayfayı gördü, IK'nın
+   gizli bildirimi listede HİÇ YOKTU. Admin ise ikisini de gördü (bypass).
+3. `POST /api/wiki/reindex` (19 sayfa) tetiklendi - bildirim sayısı reindex
+   ÖNCESİ ve SONRASI birebir aynı (2) kaldı, `IsReindexReplay` doğru
+   çalıştığı kanıtlandı.
+
+`dotnet build Atlas.sln` (0 uyarı/hata) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` (regresyon yok, `WikiPageCreatedEvent`'i doğrudan
+oluşturan hiçbir test dosyası bulunmadı - constructor değişikliği güvenliydi).
+Test verisi (2 sayfa + 2 bildirim kaydı) canlı doğrulama sonrası temizlendi.
+
+**Gün 2 (frontend) henüz YAPILMADI:** Medium-vari "Yazmaya başla" kartı +
+sağ sidebar'da bu yeni `GET /api/notifications`'ı kullanan bir bildirim
+paneli + "Son Güncellemeler"in gerçek bir sağ sütuna taşınması.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

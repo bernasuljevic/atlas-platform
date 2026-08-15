@@ -243,6 +243,7 @@ app.MigrateAiDatabase();
 app.MigrateAuditDatabase();
 app.MigrateVaultDatabase();
 app.MigrateDocumentsDatabase();
+app.MigrateNotificationsDatabase();
 
 // ============================================================
 // MODÜL ENDPOINT KAYITLARI

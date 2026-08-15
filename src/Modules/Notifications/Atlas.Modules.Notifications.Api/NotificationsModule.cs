@@ -1,4 +1,10 @@
+using Atlas.Modules.Notifications.Application.Abstractions;
+using Atlas.Modules.Notifications.Application.Notifications.Queries;
 using Atlas.Modules.Notifications.Infrastructure;
+using Atlas.Modules.Notifications.Infrastructure.Persistence;
+using Atlas.Shared.CQRS.Behaviors;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,6 +16,15 @@ public static class NotificationsModule
     {
         var redisConnectionString = configuration.GetConnectionString("Redis")
             ?? throw new InvalidOperationException("'Redis' bağlantı dizesi appsettings.json'da bulunamadı.");
+
+        // Audit/Vault/Documents ile AYNI SQL Server veritabanı (AtlasPlatform),
+        // kendi "notifications" şemasıyla - 2026-08-15'e kadar bu modülün hiç
+        // veritabanı bağlantısı yoktu (tamamen ephemeral SignalR), bkz. NotificationEntry.
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("'DefaultConnection' bağlantı dizesi appsettings.json'da bulunamadı.");
+
+        services.AddDbContext<NotificationsDbContext>(options => options.UseSqlServer(connectionString));
+        services.AddScoped<INotificationRepository, EfNotificationRepository>();
 
         // AddSignalR(): Hub altyapısını (bağlantı yönetimi, mesajlaşma) DI'a kaydeder.
         //
@@ -27,13 +42,39 @@ public static class NotificationsModule
         services.AddSignalR()
             .AddStackExchangeRedis(redisConnectionString);
 
-        // WikiPageCreatedEventHandler, Infrastructure projesinde yaşıyor - MediatR'a
-        // "bu assembly'yi de tara, INotificationHandler implementasyonlarını bul" diyoruz.
+        // İKİ ayrı assembly taranıyor - AI/Documents modüllerindeki AYNI bug'ı
+        // (handler'ın yaşadığı assembly taranmadığı için event'in sessizce hiç
+        // dinlenmemesi) BAŞTAN önlemek için: GetNotificationsQuery Application'da,
+        // WikiPageCreatedEventHandler Infrastructure'da yaşıyor -
+        // RegisterServicesFromAssemblyContaining<T> SADECE T'nin bulunduğu
+        // assembly'yi tarar, ikinci satır OLMASAYDI handler kayıt olmazdı.
         services.AddMediatR(cfg =>
         {
+            cfg.RegisterServicesFromAssemblyContaining<GetNotificationsQuery>();
             cfg.RegisterServicesFromAssemblyContaining<WikiPageCreatedEventHandler>();
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Host, NotificationsDbContext'in varlığından habersiz - sadece bu metodu
+    /// çağırır (Auth/Wiki/AI/Audit/Vault/Documents'taki MigrateXDatabase ile
+    /// aynı desen).
+    /// </summary>
+    public static void MigrateNotificationsDatabase(this IApplicationBuilder app)
+    {
+        using var scope = app.ApplicationServices.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+
+        if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            db.Database.EnsureCreated();
+        }
+        else
+        {
+            db.Database.Migrate();
+        }
     }
 }

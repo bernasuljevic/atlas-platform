@@ -87,7 +87,8 @@ public class CreateWikiPageCommandHandler : IRequestHandler<CreateWikiPageComman
         await _wikiPageRepository.AddAsync(page, cancellationToken);
 
         _outboxWriter.Enqueue(
-            new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString()));
+            new WikiPageCreatedEvent(
+                page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString(), page.CreatedByEmail));
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
