@@ -839,6 +839,70 @@ export async function getNotifications(accessToken, take = 10) {
   return response.json();
 }
 
+// Header'daki zil ikonunun unread badge'i için (2026-08-17) - deleteComment'teki
+// AYNI 401->refresh->tekrar dene deseni.
+export async function getUnreadNotificationCount(accessToken) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/notifications/unread-count`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Okunmamış bildirim sayısı yüklenemedi");
+  }
+
+  const data = await response.json();
+  return data.count;
+}
+
+export async function markNotificationRead(accessToken, notificationId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Bildirim okundu işaretlenemedi");
+  }
+}
+
+export async function markAllNotificationsRead(accessToken) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/notifications/read-all`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Bildirimler okundu işaretlenemedi");
+  }
+}
+
 export async function getPinnedPages(accessToken) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pinned`, {

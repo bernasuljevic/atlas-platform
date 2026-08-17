@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowRight,
   Bell,
@@ -27,6 +27,7 @@ import {
   getPinnedPages,
   getWikiDashboard,
   getWikiPages,
+  getWikiSearchSuggestions,
 } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
@@ -80,48 +81,6 @@ function MiniStat({ icon, value, label, variant }) {
       </span>
       <span style={{ opacity: onGradient ? 0.85 : 0.7 }}>{label}</span>
     </span>
-  );
-}
-
-// "Hızlı Erişim" artık büyük bir Panel/kart değil, üstte küçük ikonlu bir
-// düğme şeridi (kullanıcı spec'i, "5. Hızlı Erişim - büyük kartlar yerine
-// küçük aksiyon butonları"). `to` (React Router linki) VEYA `href` (aynı
-// sayfa içinde bir çapaya kaydırmak için, ör. #son-guncellemeler) kabul
-// ediyor - ikisi birden verilmez. `disabled` HÂLÂ destekleniyor (WikiLayout'taki
-// "Bildirimler (yakında)" Bell düğmesiyle AYNI desende bir title tooltip'i
-// gösterir, gerçek bir backend'i olmayan özellikler için) - Favoriler/
-// Pinlenenler artık gerçek bir backend'e sahip olduğu için BU İKİSİ disabled
-// değil (bkz. UserPageFavorite/UserPagePin, Wiki.Domain).
-function QuickActionButton({ icon, label, to, href, disabled }) {
-  const classes =
-    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition hover:bg-[var(--brand-accent)]/10";
-  const style = {
-    borderColor: "var(--border)",
-    color: "var(--text-h)",
-    opacity: disabled ? 0.55 : 1,
-    cursor: disabled ? "not-allowed" : "pointer",
-  };
-
-  if (disabled) {
-    return (
-      <button type="button" className={classes} style={style} title={`${label} (yakında)`}>
-        {icon} {label}
-      </button>
-    );
-  }
-
-  if (href) {
-    return (
-      <a href={href} className={classes} style={style}>
-        {icon} {label}
-      </a>
-    );
-  }
-
-  return (
-    <Link to={to} className={classes} style={style}>
-      {icon} {label}
-    </Link>
   );
 }
 
@@ -358,14 +317,84 @@ function RecentArticlesCarousel({ articles }) {
 // hiçbir yer bu URL parametresini OKUMUYORDU - bağlanmamış bir uçtu,
 // WikiBoard.jsx'e `useSearchParams` eklenerek TAMAMLANDI (Hero'ya özel bir
 // ikinci arama mekanizması İCAT EDİLMEDİ).
-function HeroSection({ fullName }) {
+const HERO_SEARCH_DEBOUNCE_MS = 250;
+
+// Hero arama kutusu (2026-08-17, "her harfte akıllı tahmin" isteği) - eskiden
+// SADECE Enter'da /wiki/pages?q=...'a yönlendiren düz bir kutuydu. Header'daki
+// WikiLayout.jsx'in arama kutusuyla AYNI altyapıyı (getWikiSearchSuggestions,
+// AYNI debounce süresi) kullanıyor - bu endpoint zaten başlık/etiket/içerik
+// üzerinden eşleşiyor (bkz. SearchWikiPageSuggestionsQueryHandler'daki
+// "başlık > etiket > içerik" katmanları). AI'ın semantic search'ü (/api/ai/search)
+// BİLİNÇLİ OLARAK kullanılmadı - dakikada 20 istekle rate-limitli (bkz.
+// "ai-search" politikası) ve anlam bazlı arama için tasarlandı, tuş-bazlı bir
+// typeahead'de HER harfte çağırmak hem rate limit'i hızla tüketirdi hem de
+// yanlış araç olurdu (semantic search "cümleye benzer" arıyor, typeahead
+// "başlığı bununla başlayan/eşleşen" arıyor - iki farklı ihtiyaç).
+function HeroSection({ fullName, token }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  function handleChange(e) {
+    const value = e.target.value;
+    setQuery(value);
+    setHighlightedIndex(-1);
+    clearTimeout(debounceRef.current);
+
+    if (!value.trim()) {
+      setSuggestions([]);
+      setIsOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await getWikiSearchSuggestions(token, value);
+        setSuggestions(results);
+        setIsOpen(true);
+      } catch {
+        setSuggestions([]);
+      }
+    }, HERO_SEARCH_DEBOUNCE_MS);
+  }
+
+  function goToSuggestion(s) {
+    setIsOpen(false);
+    setQuery("");
+    navigate(`/wiki/${s.id}`);
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+      goToSuggestion(suggestions[highlightedIndex]);
+      return;
+    }
     if (!query.trim()) return;
+    setIsOpen(false);
     navigate(`/wiki/pages?q=${encodeURIComponent(query.trim())}`);
+  }
+
+  function handleKeyDown(e) {
+    if (!isOpen || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
   }
 
   return (
@@ -377,16 +406,56 @@ function HeroSection({ fullName }) {
         Tüm bilgi ve belgelere tek yerden ulaşın, paylaşın ve birlikte geliştirin.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-5 flex max-w-lg gap-2">
+      <form onSubmit={handleSubmit} className="relative mt-5 flex max-w-lg gap-2">
         <div className="relative flex-1">
           <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 opacity-60" style={{ color: "#0d222b" }} />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => query.trim() && suggestions.length > 0 && setIsOpen(true)}
+            onBlur={() => setTimeout(() => setIsOpen(false), 150)}
             placeholder="Aramak istediğiniz konuyu yazın..."
             className="w-full rounded-lg py-2.5 pr-3 pl-9 text-sm outline-none"
             style={{ background: "rgba(255,255,255,0.96)", color: "#0d222b" }}
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-autocomplete="list"
           />
+
+          {isOpen && (
+            <div
+              className="absolute top-full left-0 z-20 mt-1.5 w-full overflow-hidden rounded-lg border shadow-lg"
+              style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+            >
+              {suggestions.length === 0 ? (
+                <p className="px-3 py-3 text-sm" style={{ color: "var(--text)", opacity: 0.7 }}>
+                  Eşleşen bir sayfa bulunamadı.
+                </p>
+              ) : (
+                suggestions.map((s, idx) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={() => goToSuggestion(s)}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    className="flex w-full items-start gap-2 px-3 py-2 text-left"
+                    style={{ background: idx === highlightedIndex ? "var(--brand-accent-bg)" : "transparent" }}
+                  >
+                    <FileText size={14} className="mt-0.5 shrink-0 opacity-50" style={{ color: "var(--text)" }} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium" style={{ color: "var(--text-h)" }}>
+                        {s.title}
+                      </span>
+                      <span className="block truncate text-xs" style={{ color: "var(--text)", opacity: 0.65 }}>
+                        {s.departmentName} · {s.excerpt}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
         <Button type="submit" style={{ background: "#0d222b", color: "#ffffff" }} className="hover:opacity-90">
           Ara
@@ -984,7 +1053,7 @@ const RECENT_ARTICLES_TOTAL = 1 + RECENT_ARTICLES_PAGE_SIZE * 3;
 // Giriş yapınca artık doğrudan makale listesine değil buraya (Dashboard)
 // geliniyor (bkz. App.jsx - /wiki index route'u).
 function HomePage({ token }) {
-  const { isAdmin, fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
+  const { fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState(null);
 
@@ -1018,7 +1087,12 @@ function HomePage({ token }) {
   const recentArticles = gridArticles.slice(1);
   const recentUpdates = (dashboard?.recentlyUpdated ?? []).slice(0, 5);
 
-  const [activeTab, setActiveTab] = useState("home");
+  // ?tab=talk (2026-08-17) - sidebar'ın kompakt "Tartışma" ikonu (bkz.
+  // WikiLayout.jsx'teki COMPACT_NAV_ITEMS) `activeTab`'in local state
+  // OLMASI yüzünden doğrudan bir route'a link veremiyordu - WikiBoard.jsx'in
+  // `?q=` ile arama sorgusunu URL'den okuma deseniyle AYNI çözüm.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (searchParams.get("tab") === "talk" ? "talk" : "home"));
 
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-2 text-left md:px-6">
@@ -1052,16 +1126,6 @@ function HomePage({ token }) {
         </div>
       </div>
 
-      {/* Hızlı Erişim şeridi */}
-      <div className="flex flex-wrap items-center gap-2">
-        <QuickActionButton icon={<ListChecks size={14} />} label="Tüm Sayfalar" to="/wiki/pages" />
-        <QuickActionButton icon={<Clock size={14} />} label="Son Güncellenenler" href="#son-guncellemeler" />
-        <QuickActionButton icon={<Star size={14} />} label="Favoriler" to="/wiki/favorites" />
-        <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" to="/wiki/pinned" />
-        <QuickActionButton icon={<Video size={14} />} label="Video Merkezi" to="/wiki/videos" />
-        {isAdmin && <QuickActionButton icon={<ShieldCheck size={14} />} label="Audit Log" to="/audit-log" />}
-      </div>
-
       {error && <p style={{ color: "red" }} className="text-xs">{error}</p>}
 
       {activeTab === "talk" ? (
@@ -1077,7 +1141,7 @@ function HomePage({ token }) {
       ) : dashboard && (
         <>
           {/* (1) HERO - Görsel Tasarım Yenileme Gün 2 */}
-          <HeroSection fullName={fullName} />
+          <HeroSection fullName={fullName} token={token} />
 
           {/* (2) İstatistik şeridi - eskiden Hero'nun içindeydi, artık
               Hero'nun HEMEN ALTINDA, ayrı ince bir satır (Hero'nun gradient
