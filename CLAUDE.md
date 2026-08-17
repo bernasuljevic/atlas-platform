@@ -2430,6 +2430,70 @@ sorunundan doğan bağımsız bir bug avı.
 (regresyon yok) + `dotnet test tests/Atlas.IntegrationTests` (24/24) +
 `npm run lint`/`build`/`test` (32/32) yeşil.
 
+## Eksik-özellik listesi - D Grubu, son madde: Video transkript indeksleme (2026-08-17)
+
+D grubunun bloklu tutulan son maddesi - önce gerçek durum araştırıldı
+(`WebSearch`, hafızadan değil): **hiçbir platform üçüncü taraf bir videonun
+transkriptini almak için resmi/güvenilir bir API sunmuyor.** YouTube'un resmi
+API'si (`captions.download`) SADECE kendi sahip olduğunuz videoda çalışıyor
+([Google Developers](https://developers.google.com/youtube/v3/docs/captions/download)).
+Gayrı-resmi `timedtext` endpoint'i çalışıyor ama YouTube ToS'unun 5.B maddesini
+açıkça ihlal ediyor + habersiz kırılabiliyor. Vimeo'nun `texttracks` API'si
+belirsiz (public video için client-credentials yeterli mi, dokümantasyondan
+kesin doğrulanamadı). Loom'da resmi bir yol hiç yok, sadece dokümante
+edilmemiş bir GraphQL endpoint'i var. `AskUserQuestion` ile kullanıcıya dört
+gerçekçi yol sunuldu (manuel transkript alanı / Vimeo-only resmi API denemesi
+/ ses indirip Whisper / ertele) - kullanıcı **manuel transkript alanını**
+seçti: sıfır dış API/ToS bağımlılığı, bugün tam çalışır.
+
+- [x] **`:::transcript` - `:::video` bloğunun İÇİNDE yeni bir bölüm sınırı**
+      (markdown.jsx) - AYRI bir fence DEĞİL (kendi kapanışı YOK, video
+      bloğunun kendi kapanış `:::`ına kadar geri kalan HER şeyi, satır
+      sonları KORUNARAK - caption gibi tek satıra birleştirilmeden -
+      transkript sayıyor). Bilerek nested bir `:::...:::` fence'i OLARAK
+      TASARLANMADI - iç içe aynı kapanış işaretini kullanmak, hangisinin
+      "gerçek" kapanış olduğu belirsizliğini yaratırdı.
+      `VideoBlock` artık `transcript` prop'u alıyor, native `<details>/
+      <summary>` ile (harici bir "accordion" kütüphanesi EKLENMEDİ)
+      VARSAYILAN KAPALI bir bölüm gösteriyor - uzun bir transkript sayfayı
+      otomatik şişirmesin diye.
+      **`videoExtraction.js`'teki `extractVideosFromContent` de AYNI
+      düzeltmeyi gerektirdi** (canlı koda geçmeden ÖNCE fark edilip
+      önlendi) - Video Merkezi galerisi aynı sözdizimini bağımsız
+      parse ediyor, transkript bölümü caption'dan ayıklanmasaydı galeri
+      kartında "İlk satır ... koca bir transkript metni ..." gibi anlamsız
+      bir alt yazı görünürdü.
+- [x] **Backend'e HİÇBİR değişiklik gerekmedi** - bu tasarımın asıl
+      kazancı: transkript metni sayfanın markdown İÇERİĞİNİN bir parçası
+      olarak saklanıyor, mevcut `TextChunker`/embedding pipeline'ı
+      (`GenerateWikiPageEmbeddingsCommandHandler`) sayfanın TÜM içeriğini
+      zaten chunk'layıp embed ediyor - transkript de bu chunk'ların içine
+      doğal olarak giriyor. "İndeksleme" ayrı bir mekanizma DEĞİL, var
+      olan mekanizmanın doğal bir sonucu.
+- [x] **Editör UI - "Transkript" araç çubuğu düğmesi + `SLASH_ITEMS` girdisi**
+      (WikiEditorPage.jsx) - "🎬 Video" düğmesinin HEMEN yanına, AYNI
+      "imlecin konumuna güven" deseniyle (diğer tüm araç çubuğu düğmeleri
+      gibi, yeni bir kısıtlama İCAT EDİLMEDİ). Kullanıcının imleci var olan
+      bir video bloğunun İÇİNE (caption'dan sonra, kapanıştan önce)
+      koyup tıklaması bekleniyor - düğmenin `title` attribute'u bunu
+      açıklıyor.
+
+**Canlı doğrulandı (gerçek backend + tarayıcı, uçtan uca):** transkriptinde
+eşsiz bir kelime (`flamingotelefonu839`) geçen bir video bloklu sayfa
+oluşturuldu - render edilen sayfada "Transkript" `<details>` VARSAYILAN
+KAPALI geldi, tıklanınca açılıp tam metni gösterdi. **Asıl kritik test:**
+`GET /api/ai/search?q=flamingotelefonu839` bu sayfayı gerçek, sıfır olmayan
+bir skorla (0.19) EN ÜST sonuç olarak döndürdü - transkriptin GERÇEKTEN
+indekslendiğinin kanıtı, backend'e dokunulmadığı iddiasını doğruluyor.
+Editördeki "🎬 Video"/"Transkript" düğmelerinin doğru şablonu ürettiği de
+ayrıca doğrulandı. 2 yeni test (`videoExtraction.test.js` - transkriptin
+caption'a karışmaması). `npm run lint`/`build`/`test` (38/38) yeşil. Test
+verisi (1 sayfa, embedding'i ve bildirimi dahil) temizlendi.
+
+**"Eksik-özellik listesi D grubu" artık TAMAMEN BİTTİ** - link/embed
+otomatik algılama (Gün 1), Vault paylaşım modeli (Gün 2-4), video transkript
+indeksleme (bu bölüm). D grubunun orijinal 3 maddesi de tamamlandı.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

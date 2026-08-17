@@ -66,6 +66,37 @@ describe("extractVideosFromContent", () => {
     const content = ":::info\nBu bir video değil.\n:::\n\n```\nhttps://www.youtube.com/watch?v=xxxxxxxxxxx\n```";
     expect(extractVideosFromContent(content)).toEqual([]);
   });
+
+  // Video Transkripti (D grubu takip, 2026-08-17) - ":::transcript" metni
+  // caption'a KARIŞMAMALI (markdown.jsx'teki VideoBlock render katmanıyla
+  // AYNI parsing kuralı, iki ayrı yerde iki ayrı davranış YAŞAMASIN).
+  it("':::transcript' bölümünü caption'a KARIŞTIRMAZ - sadece caption satırları döner", () => {
+    const content = [
+      ":::video",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "Tanıtım videosu",
+      ":::transcript",
+      "Merhaba, bu videoda...",
+      "ikinci satır transkript",
+      ":::",
+    ].join("\n");
+
+    expect(extractVideosFromContent(content)).toEqual([
+      { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", caption: "Tanıtım videosu" },
+    ]);
+  });
+
+  it("caption'ı olmayan ama transkripti olan bir video bloğunda caption boş string olur", () => {
+    const content = [
+      ":::video",
+      "https://vimeo.com/76979871",
+      ":::transcript",
+      "Sadece transkript var, alt yazı yok.",
+      ":::",
+    ].join("\n");
+
+    expect(extractVideosFromContent(content)).toEqual([{ url: "https://vimeo.com/76979871", caption: "" }]);
+  });
 });
 
 describe("isRecognizedVideoUrl", () => {

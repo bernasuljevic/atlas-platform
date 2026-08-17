@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import {
   BookOpen,
+  Captions,
   Code2,
   FileText,
   Heading2,
@@ -86,6 +87,21 @@ const SLASH_ITEMS = [
     before: ":::video\n",
     after: "\n:::",
     placeholder: "YouTube/Vimeo/Loom linki ya da video dosyası URL'si",
+  },
+  // Video Transkripti (D grubu takip, 2026-08-17) - AYRI bir blok tipi
+  // DEĞİL, var olan bir ":::video ... :::" bloğunun İÇİNE eklenen bir
+  // bölüm (bkz. markdown.jsx'teki ":::transcript" notu). Kullanıcının
+  // imleci video bloğunun İÇİNDE (caption'dan SONRA, kapanış ":::"tan
+  // ÖNCE) olması bekleniyor - diğer araç çubuğu düğmeleri de AYNI şekilde
+  // "imlecin konumuna güven" mantığıyla çalışıyor, yeni bir kısıtlama
+  // İCAT EDİLMEDİ.
+  {
+    key: "video-transcript",
+    label: "Video Transkripti",
+    icon: Captions,
+    before: ":::transcript\n",
+    after: "",
+    placeholder: "Platformun kendi arayüzünden (\"Transkripti göster\") kopyaladığınız metni buraya yapıştırın",
   },
   {
     key: "image",
@@ -769,6 +785,33 @@ function WikiEditorPage({ token }) {
               }
             >
               🎬 Video
+            </Button>
+            {/* Video Transkripti (D grubu takip, 2026-08-17) - "video
+                transkript indeksleme" iş kaleminin karşılığı. YouTube/Vimeo/
+                Loom'un üçüncü taraf videolar için resmi/güvenilir bir
+                transkript API'si YOK (araştırıldı, kullanıcıyla birlikte
+                karara varıldı) - bu yüzden OTOMATİK çekme yerine kullanıcı
+                platformun kendi arayüzünden kopyaladığı metni buraya
+                yapıştırıyor. İmlecin bir video bloğunun İÇİNDE olması
+                bekleniyor (Callout/Video düğmeleriyle AYNI "imlece güven"
+                deseni). Transkript metni sayfa içeriğinin bir parçası
+                olduğu için AYRI bir indeksleme adımı gerekmiyor - mevcut
+                AI embedding pipeline'ı zaten sayfanın tüm içeriğini
+                chunk'lıyor. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                applyToolbarInsert(
+                  ":::transcript\n",
+                  "",
+                  "Platformun kendi arayüzünden (\"Transkripti göster\") kopyaladığınız metni buraya yapıştırın"
+                )
+              }
+              title="İmleci bir video bloğunun içine (alt yazıdan sonra, kapanıştan önce) koyup tıklayın"
+            >
+              <Captions size={14} className="mr-1" /> Transkript
             </Button>
             {/* Hizalı resim - metnin ImageBlock'un aksine (her zaman ortada,
                 sabit boyutta) metnin YANINA konup metnin etrafından dolanması

@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, Check, CheckCircle2, Copy, FileText, Info, Maximize2, PlayCircle, X, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  Captions,
+  Check,
+  CheckCircle2,
+  Copy,
+  FileText,
+  Info,
+  Maximize2,
+  PlayCircle,
+  X,
+  XCircle,
+} from "lucide-react";
 import { LOOM_PATTERN, VIDEO_FILE_PATTERN, VIMEO_PATTERN, YOUTUBE_PATTERN } from "./videoExtraction";
 
 // Kasıtlı olarak KÜÇÜK, ELLE YAZILMIŞ bir render katmanı - dışarıdan bir
@@ -381,7 +393,20 @@ function ImageBlock({ src, alt }) {
 // mantığının (YouTube/Vimeo/Loom/dosya/düz-link) TEK bir yerde yaşamaya
 // devam etmesi için VideoCenterPage.jsx bunu DOĞRUDAN tekrar kullanıyor,
 // aynı mantığı ikinci bir yerde KOPYALAMIYOR.
-export function VideoBlock({ url, caption }) {
+//
+// transcript (D grubu takip, 2026-08-17 - "video transkript indeksleme")
+// - YouTube/Vimeo/Loom'un üçüncü taraf bir videonun transkriptini otomatik
+// çekebileceğimiz resmi/güvenilir bir API'si YOK (bkz. o günün araştırması:
+// YouTube'un resmi API'si SADECE kendi videonuz için çalışıyor, gayrı-resmi
+// endpoint'ler ToS'u ihlal ediyor) - bu yüzden OTOMATİK ÇEKME yerine
+// KULLANICININ platformun KENDİ arayüzünden ("Transkripti göster") kopyalayıp
+// yapıştırdığı bir metin. Bu metnin AYRICA bir "indeksleme" mekanizmasına
+// ihtiyacı YOK - transkript, sayfanın markdown İÇERİĞİNİN bir parçası olarak
+// saklanıyor, mevcut TextChunker/embedding pipeline'ı sayfanın TÜM içeriğini
+// zaten chunk'layıp embed ediyor (bkz. GenerateWikiPageEmbeddingsCommandHandler),
+// transkript de bu chunk'ların içine doğal olarak giriyor - backend'de HİÇBİR
+// değişiklik gerekmedi.
+export function VideoBlock({ url, caption, transcript }) {
   const youtubeMatch = url.match(YOUTUBE_PATTERN);
   const vimeoMatch = !youtubeMatch && url.match(VIMEO_PATTERN);
   const loomMatch = !youtubeMatch && !vimeoMatch && url.match(LOOM_PATTERN);
@@ -441,6 +466,26 @@ export function VideoBlock({ url, caption }) {
         <figcaption className="mt-1.5 text-center text-[13px] italic opacity-75" style={{ color: "var(--text)" }}>
           {caption}
         </figcaption>
+      )}
+      {transcript && (
+        // Native <details>/<summary> - harici bir "accordion" bileşeni EKLENMEDİ,
+        // tarayıcının kendi katlanabilir öğesi yeterli. VARSAYILAN KAPALI -
+        // uzun bir transkript (30dk'lık bir videonun transkripti kolayca
+        // binlerce kelime olabiliyor) sayfayı otomatik ŞİŞİRMESİN diye.
+        <details className="mt-2 rounded-lg border text-sm" style={{ borderColor: "var(--border)" }}>
+          <summary
+            className="flex cursor-pointer items-center gap-1.5 px-3 py-2 font-medium select-none"
+            style={{ color: "var(--text-h)" }}
+          >
+            <Captions size={14} /> Transkript
+          </summary>
+          <div
+            className="border-t px-3 py-2.5 whitespace-pre-line"
+            style={{ borderColor: "var(--border)", color: "var(--text)", opacity: 0.85 }}
+          >
+            {transcript}
+          </div>
+        </details>
       )}
     </figure>
   );
@@ -629,13 +674,30 @@ export function renderWikiMarkdown(content) {
 
     // Video - callout ile AYNI ":::<tip>" ... ":::" ailesi, aynı yere kondu.
     // İçindeki ilk dolu satır URL, kalanı (varsa) alt yazı.
+    //
+    // ":::transcript" (D grubu takip, 2026-08-17) - AYRI bir fence DEĞİL,
+    // aynı ":::video ... :::" bloğunun İÇİNDE tek satırlık bir bölüm
+    // sınırı - kendi kapanışı YOK, sadece video bloğunun kendi kapanış
+    // ":::"ına kadar geri kalan HER şeyi (satır sonları KORUNARAK, caption
+    // gibi tek satıra birleştirilmeden) transkript sayıyor. Bilerek NESTED
+    // bir ":::...:::" fence'i OLARAK tasarlanmadı - iç içe aynı "`:::`"
+    // kapanış işaretini kullanmak, dış video bloğunun kendi kapanışıyla
+    // hangisinin "gerçek" kapanış olduğu belirsizliğini yaratırdı.
     const videoMatch = line.trim().match(/^:::video$/);
     if (videoMatch) {
       flushParagraph();
       i++;
       const videoLines = [];
+      const transcriptLines = [];
+      let inTranscript = false;
       while (i < lines.length && lines[i].trim() !== ":::") {
-        videoLines.push(lines[i]);
+        if (!inTranscript && lines[i].trim() === ":::transcript") {
+          inTranscript = true;
+        } else if (inTranscript) {
+          transcriptLines.push(lines[i]);
+        } else {
+          videoLines.push(lines[i]);
+        }
         i++;
       }
       i++; // kapanış ":::" satırını atla
@@ -647,6 +709,7 @@ export function renderWikiMarkdown(content) {
           key={`video-${blocks.length}`}
           url={(urlLine ?? "").trim()}
           caption={captionLines.join(" ").trim()}
+          transcript={transcriptLines.join("\n").trim() || undefined}
         />
       );
       continue;

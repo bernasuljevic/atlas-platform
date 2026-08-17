@@ -61,8 +61,19 @@ export function extractVideosFromContent(content) {
 
     i++; // ":::video" açılış satırını atla
     const blockLines = [];
+    // ":::transcript" (D grubu takip, 2026-08-17) - markdown.jsx'teki AYNI
+    // "bu bir alt-fence DEĞİL, video bloğunun kendi kapanışına kadar geri
+    // kalan her şeyi transkript sayan tek satırlık bölüm sınırı" mantığı -
+    // BURADA ATLANMASI ŞART, yoksa transkript metni caption'a karışırdı
+    // (galeri kartında "IIk satır ... transkript metni ..." gibi anlamsız,
+    // devasa bir alt yazı görünürdü).
+    let inTranscript = false;
     while (i < lines.length && lines[i].trim() !== ":::") {
-      blockLines.push(lines[i]);
+      if (!inTranscript && lines[i].trim() === ":::transcript") {
+        inTranscript = true;
+      } else if (!inTranscript) {
+        blockLines.push(lines[i]);
+      }
       i++;
     }
     i++; // kapanış ":::" satırını atla (varsa)
