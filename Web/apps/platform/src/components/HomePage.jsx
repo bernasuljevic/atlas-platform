@@ -898,7 +898,21 @@ function HomePage({ token }) {
             </section>
           )}
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] xl:items-start">
+          {/* xl:items-start BİLEREK KULLANILMIYOR (2026-08-17 takip, kullanıcı
+              geri bildirimi: "aşağı kaydırdıkça sağ taraf altı boş
+              kalmasın") - grid'in VARSAYILAN align-items:stretch'i sağ
+              sütunun (<aside>, xl:sticky) KENDİ KUTUSUNU sol sütunla AYNI
+              satır yüksekliğine geriyor. items-start VARKEN sağ sütunun
+              kutusu SADECE kendi içeriği kadar (daha kısa) oluyordu -
+              sticky'nin "yapışacak" alanı erken tükeniyordu, sol sütun
+              (Favoriler/Pinlenenler/Tartışmalar) daha uzun olduğunda sağ
+              taraf sayfanın geri kalanında GERÇEKTEN kayboluyordu (boş
+              zemin görünüyordu). Stretch ile <aside>'ın kutusu sol sütunla
+              AYNI yüksekliğe geriliyor - içeriği (üstte, gerilmemiş) hâlâ
+              kompakt duruyor ama artık sticky'nin TÜM satır boyunca
+              "yapışacak" alanı var, sağ taraf sol sütun ne kadar uzarsa
+              uzasın görünür kalmaya devam ediyor. */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
             {/* SOL/GENİŞ sütun */}
             <div className="flex min-w-0 flex-col gap-6">
               {recentArticles.length > 0 && (
