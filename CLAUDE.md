@@ -1928,6 +1928,84 @@ banner beklendiği gibi doğru çıktı. Test verisi (oluşturulan sayfa + tüm
 **"Eksik-özellik listesi B grubu" artık TAMAMEN BİTTİ (Wiki Version History
 Gün 1-2 + Autosave/Draft Gün 3).**
 
+## Eksik-özellik listesi - C Grubu, Gün 1: Vimeo/Loom embed desteği (2026-08-17)
+
+C grubu ("Video Merkezi/Medya Kütüphanesi") başlamadan önce kapsam kullanıcıyla
+netleştirildi (`AskUserQuestion`) - üç seçenek sunuldu: (a) sadece embed+galeri,
+gerçek dosya depolama YOK (önerilen), (b) yukarıdakine ek gerçek video dosyası
+yükleme (Documents'a benzer yeni bir depolama katmanı), (c) sadece embed,
+galeri YOK. Kullanıcı (a)'yı seçti - video transkript indeksleme zaten D
+grubunda AYRI bir madde olduğu için, C grubunun gerçek dosya depolamaya
+girmesi kapsam karışıklığı yaratırdı.
+
+- [x] **`VideoBlock` (markdown.jsx) Vimeo/Loom tanıyacak şekilde genişletildi** -
+      YouTube-only mimari DEĞİŞTİRİLMEDİ, SADECE genişletildi: sıralama
+      YouTube→Vimeo→Loom→dosya→düz-link (eskisiyle AYNI "önce özel servisler,
+      sonra genel dosya, en sonda düz link" mantığı). `VIMEO_PATTERN`
+      (`vimeo.com/123...` ve zaten embed formatındaki `player.vimeo.com/
+      video/123...` ikisini de yakalıyor) + `LOOM_PATTERN` (`loom.com/share/...`
+      ve `loom.com/embed/...` ikisini de yakalıyor). Backend'e HİÇ dokunulmadı -
+      bu tamamen bir render-katmanı genişlemesi.
+      **Tanınmayan bir URL hâlâ kırık bir gömme DENEMİYOR**, sade bir
+      "Videoyu Aç" linkine düşüyor - eski davranış korundu.
+- [x] Editördeki video düğmesi/slash-command placeholder metni güncellendi
+      ("YouTube/Vimeo/Loom linki ya da video dosyası URL'si") - kullanıcı
+      artık desteklenen üç servisin farkında.
+
+Canlı doğrulandı: YouTube+Vimeo+Loom+tanınmayan-URL içeren 4 blok taşıyan
+gerçek bir sayfa oluşturuldu, render edilen `<iframe>` `src`'leri doğru
+embed URL'lerine (`youtube-nocookie.com/embed/...`, `player.vimeo.com/
+video/...`, `loom.com/embed/...`) dönüştüğü, tanınmayan URL'in düz linke
+düştüğü, alt yazıların (figcaption) doğru göründüğü DOM üzerinden teyit
+edildi. `npm run lint`/`build`/`test` (24/24) yeşil. Test verisi temizlendi.
+
+## Eksik-özellik listesi - C Grubu, Gün 2: Video Merkezi galeri sayfası (2026-08-17)
+
+C grubunun ikinci ve son maddesi. Backend'e YENİ bir endpoint EKLENMEDİ -
+Wiki'nin zaten departman-görünürlüğüne göre filtrelenmiş döndürdüğü sayfa
+listesi (`GetWikiPagesQuery`, `GetWikiPagesQueryHandler`'ın "tüm veriyi çek,
+bellekte filtrele" ZATEN KABUL EDİLMİŞ ölçek varsayımıyla AYNI) istemci
+tarafında taranıp `:::video` blokları çıkarılıyor - görünürlük kuralı VERİYİ
+backend'den ALIRKEN zaten uygulanmış oluyor.
+
+- [x] **`videoExtraction.js` (YENİ, saf fonksiyon)** - `dateUtils.js`/
+      `readingTime.js` ile AYNI desen. `renderWikiMarkdown`'ın `:::video`
+      blok algılama mantığıyla (markdown.jsx) BİREBİR aynı kural (ilk dolu
+      satır URL, kalanı alt yazı) - TAM markdown render'ını tekrar üretmeden
+      sadece video bloklarını buluyor. 8 yeni Vitest testi.
+- [x] **`VideoBlock` (markdown.jsx) `export` edildi** - embed algılama
+      mantığının (YouTube/Vimeo/Loom/dosya/düz-link) TEK bir yerde yaşamaya
+      devam etmesi için galeri sayfası bunu DOĞRUDAN tekrar kullanıyor, AYNI
+      mantığı ikinci bir yerde KOPYALAMIYOR (ör. "hangi ikon/etiket" kararı
+      için bile ayrı bir regex seti YAZILMADI - kart placeholder'ı BİLEREK
+      kaynak-agnostik, sade bir Video ikonu kullanıyor).
+- [x] **`VideoCenterPage.jsx` (YENİ sayfa, `/wiki/videos`)** - Favoriler/
+      Pinlenenler'le AYNI gerekçeyle Wiki İÇERİĞİ (top-level DEĞİL, `/wiki`
+      altında nested). "Lazy play" - `VideoCard` tıklanana kadar iframe HİÇ
+      render EDİLMİYOR (bir galeride onlarca YouTube/Vimeo/Loom iframe'ini
+      baştan yüklemek hem yavaş hem gereksiz ağ trafiği olurdu), tıklanınca
+      `VideoBlock` inline render ediliyor + kaynak sayfaya link. `pageSize=100`
+      (backend'in `Math.Clamp` üst sınırı) ile `totalPages` kadar sıralı
+      istek atılıyor - Wiki'nin ana liste sayfasının ZATEN kabul ettiği
+      "büyük ölçekte optimize değil" tradeoff'uyla tutarlı.
+- [x] `HomePage.jsx`'in Hızlı Erişim şeridine "Video Merkezi" düğmesi
+      eklendi (Favoriler/Pinlenenler/Audit Log'un yanına).
+
+**Canlı doğrulandı:** IT departmanında Public bir video sayfası + IK
+departmanında DepartmentOnly bir video sayfası oluşturuldu - IT'li normal
+bir kullanıcı galeride SADECE IT'nin videosunu gördü (IK'nınki hiç
+görünmedi, güvenlik testi), Admin ikisini de gördü (bypass). "Lazy play"
+doğrulandı: sayfa açılışında `<iframe>` sayısı 0, bir karta tıklanınca TAM
+1 iframe doğru embed URL'iyle (`player.vimeo.com/video/...`) render edildi,
+"Kaynak: {sayfa başlığı}" linki doğru göründü. `/wiki/videos` linkinin
+Hızlı Erişim şeridinde doğru çalıştığı teyit edildi. `npm run lint`/`build`/
+`test` (32/32) yeşil. Test verisi (2 sayfa + 1 kullanıcı) temizlendi.
+
+**"Eksik-özellik listesi C grubu" artık TAMAMEN BİTTİ (Vimeo/Loom Gün 1 +
+Video Merkezi galerisi Gün 2).** Sırada D grubu var: link/embed otomatik
+algılama, video transkript indeksleme, Vault paylaşım modeli - henüz hiç
+başlanmadı.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

@@ -83,7 +83,7 @@ const SLASH_ITEMS = [
     icon: Video,
     before: ":::video\n",
     after: "\n:::",
-    placeholder: "https://www.youtube.com/watch?v=... veya video dosyası URL'si",
+    placeholder: "YouTube/Vimeo/Loom linki ya da video dosyası URL'si",
   },
   {
     key: "image",
@@ -706,15 +706,15 @@ function WikiEditorPage({ token }) {
             </Button>
             {/* Video - tek bir şablon insert (Callout/Checklist/Ayraç ile AYNI
                 desen, popover YOK) - kullanıcı yer tutucu URL'yi elle
-                değiştiriyor. YouTube/mp4/webm/ogg/mov otomatik algılanıyor
-                (bkz. markdown.jsx'teki VideoBlock), tanınmayan bir URL sade
-                bir "Videoyu Aç" linkine düşüyor. */}
+                değiştiriyor. YouTube/Vimeo/Loom/mp4/webm/ogg/mov otomatik
+                algılanıyor (bkz. markdown.jsx'teki VideoBlock, C grubu Gün 1),
+                tanınmayan bir URL sade bir "Videoyu Aç" linkine düşüyor. */}
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() =>
-                applyToolbarInsert(":::video\n", "\n:::", "https://www.youtube.com/watch?v=... veya video dosyası URL'si")
+                applyToolbarInsert(":::video\n", "\n:::", "YouTube/Vimeo/Loom linki ya da video dosyası URL'si")
               }
             >
               🎬 Video
