@@ -2129,6 +2129,87 @@ alan eklemek hiçbir testi kırmadı, bu DTO'ya referans veren test yoktu).
 **"Görsel Tasarım Yenileme" artık TAMAMEN BİTTİ (Gün 1-2, palet+logo+ana
 sayfa).**
 
+## Ana sayfa takibi: "Son Eklenen Makaleler" carousel'ı + bildirim temizliği bug'ı (2026-08-17)
+
+Görsel Tasarım Yenileme'nin hemen ardından, kullanıcı referans mockup'ıyla
+canlı siteyi karşılaştırırken iki ayrı iş ortaya çıktı - biri planlı bir
+UX isteği, öbürü kullanıcının fark ettiği gerçek bir veri temizliği
+sorunundan doğan bağımsız bir bug avı.
+
+- [x] **"Son Eklenen Makaleler" nokta-sayfalamalı carousel'a çevrildi**
+      (`design/homepage-recent-articles-followup` branch'i, `master`'dan) -
+      mockup'taki kart ızgarasının altındaki `• • •` işaretlerinin gerçek
+      karşılığı. `AskUserQuestion` ile netleştirildi: kullanıcı "sayfa
+      içinde genişleme" DEĞİL, gerçek bir carousel/kaydırmalı görünüm istedi.
+      Backend'e `GetWikiDashboardQuery`'ye `ItemsPerSection`'dan AYRI bir
+      `RecentlyAddedCount` parametresi eklendi (`GET /api/wiki/dashboard?
+      recentlyAddedCount=13`) - SADECE "Son Eklenen Makaleler" havuzunu
+      büyütüyor, `recentlyUpdated`/`departmentSpecific`'i şişirmiyor
+      (`departmentSpecific`'in listesi frontend'de zaten hiç render
+      edilmiyor). `RecentArticlesCarousel` (HomePage.jsx) - Öne Çıkan Makale
+      + 3 sayfa x 4 kart (2x2 grid), nokta düğmelerine tıklamak SADECE
+      component state'ini değiştiriyor, navigasyon YOK - "Tümünü Gör" linki
+      (başka sayfaya gider) AYRICA duruyor. Canlı doğrulandı (gerçek
+      backend'e karşı, `javascript_tool` ile): 3 nokta doğru render edildi,
+      her tıklama URL değiştirmeden farklı 4 kart getirdi.
+
+- [x] **Bulunan gerçek bug - yetim bildirim kayıtları:** Kullanıcı ana
+      sayfadaki Bildirimler panelinde silinmiş sayfalara ait "hayalet"
+      kayıtlar fark etti. Kök sebep: `WikiPageDeletedEvent` yayınlanınca AI
+      kendi embedding'lerini temizliyordu (bkz. AI Semantik Arama bölümü)
+      ama **Notifications modülü bu event'i hiç dinlemiyordu** -
+      `WikiPageCreatedEventHandler`'ın yazdığı kalıcı `NotificationEntry`
+      kaydı, sayfa silinince sonsuza kadar "yetim" olarak tabloda kalıyordu.
+      Düzeltme: AI'ın `WikiPageDeletedEventHandler`'ıyla BİREBİR aynı desen -
+      yeni `WikiPageDeletedEventHandler` (Notifications.Infrastructure) +
+      `INotificationRepository.DeleteAllForResourceAsync` (Ders #22'deki
+      "InMemory `ExecuteDelete`'i desteklemiyor" güvenli deseniyle -
+      `ToListAsync`+`RemoveRange`). Aynı assembly'de yaşadığı için (AI/
+      Documents'taki gibi ikinci bir MediatR assembly kaydı GEREKMEDİ,
+      `WikiPageCreatedEventHandler` zaten Infrastructure'ı tarıyordu).
+      Canlı doğrulandı (gerçek create+delete + Outbox'ın 5sn'lik turu
+      beklenerek): sayfa oluşunca bildirim oluştu, silinince bildirim de
+      silindi.
+      **Test sırasında bulunan, düzeltilmeyen (bilinçli) ikincil bir
+      gözlem:** `dotnet test tests/Atlas.IntegrationTests` çalıştırılınca 2
+      yeni yetim bildirim daha oluştu - testler kendi WikiPage'lerini
+      İZOLE bir InMemory `WikiDbContext`'te oluşturup siliyor (bkz.
+      `AtlasApiFactory`), ama Notifications GERÇEK SQL Server'a yazıyor
+      (Vault/AI/Documents ile AYNI "bilerek InMemory'e çevrilmeyen" grup) -
+      testin `finally` bloğundaki DELETE, `WikiPageDeletedEvent`'i InMemory
+      Outbox'a enqueue ediyor ama test host'u OutboxProcessor'ın bir
+      SONRAKİ 5sn'lik turunu beklemeden kapanabiliyor, bu da bildirim
+      temizliğinin o test çalıştırması için hiç tetiklenmemesine yol
+      açabiliyor. Bu, AI'ın embedding'leri için ZATEN bilinen/kabul edilmiş
+      bir sınıf soruna BENZER (bkz. "Integration testler artık kendi
+      ürettikleri AI verisini temizliyor") - düşük hacimli (test başına en
+      fazla birkaç satır), kendi kendine büyümeyen bir sızıntı, teorik bir
+      "sağlamlaştırma" (ör. test teardown'a bir flush/wait eklemek) DENENMEDİ
+      çünkü Ders #16'nın sonundaki notla AYNI gerekçe: kanıtlanmamış bir
+      kırılganlığı "düzeltmeye" çalışmak yeni bir regresyon riski taşır.
+      Gerekirse (hacim gerçekten büyürse) AI'ın test-verisi-takip deseni
+      (try/finally ile oluşturulan ID'leri izleyip temizleme) buraya da
+      uygulanabilir - şimdilik YAGNI.
+
+- [x] **Veri temizliği (kullanıcı isteğiyle, canlı DB üzerinde, önce SELECT
+      ile doğrulanarak - Ders #14):** `notifications.NotificationEntries`'de
+      birikmiş 11 yetim kayıt (haftalar süren test/doğrulama oturumlarından)
+      + yukarıdaki düzeltmeyi test ederken oluşan 2 yeni yetim kayıt
+      silindi. AI embedding'leri/Favoriler/Pinler/Belgeler/Vault tabloları
+      da kontrol edildi - hepsi zaten temizdi (yetim veri yok). Ayrıca
+      `auth.Users`'ta haftalar/ayların birikimi ~20 otomatik-test deseniyle
+      (tarih/random suffix'li e-posta) oluşturulmuş hesap silindi -
+      `wiki.WikiPages.CreatedByUserId` FK'siyle (Ders'in tek istisnai FK'ı)
+      korunan 4 hesap (gerçek içerik yazmış test kullanıcıları:
+      `browser-test-1`/`ik-calisan-yeni`/`test-login`/`test-shadcn`) VE 5
+      gerçek/örnek kullanıcı (`admin`/`admin2`/`ahmet`/`esra`/`mehmet`)
+      BİLEREK silinmeden bırakıldı - önce bir `SELECT ... WHERE Email NOT
+      IN (...)` ile silinecek tam liste gösterilip kullanıcı onayı alındı.
+
+`dotnet build`/`dotnet test Atlas.sln --filter "Category!=Integration"`
+(regresyon yok) + `dotnet test tests/Atlas.IntegrationTests` (24/24) +
+`npm run lint`/`build`/`test` (32/32) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
