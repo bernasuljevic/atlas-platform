@@ -383,7 +383,11 @@ const VIMEO_PATTERN = /vimeo\.com\/(?:video\/)?(\d+)/;
 const LOOM_PATTERN = /loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/;
 const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
 
-function VideoBlock({ url, caption }) {
+// export EDİLDİ (C grubu Gün 2, Video Merkezi galerisi) - embed algılama
+// mantığının (YouTube/Vimeo/Loom/dosya/düz-link) TEK bir yerde yaşamaya
+// devam etmesi için VideoCenterPage.jsx bunu DOĞRUDAN tekrar kullanıyor,
+// aynı mantığı ikinci bir yerde KOPYALAMIYOR.
+export function VideoBlock({ url, caption }) {
   const youtubeMatch = url.match(YOUTUBE_PATTERN);
   const vimeoMatch = !youtubeMatch && url.match(VIMEO_PATTERN);
   const loomMatch = !youtubeMatch && !vimeoMatch && url.match(LOOM_PATTERN);

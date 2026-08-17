@@ -13,6 +13,7 @@ import WikiEditorPage from "./components/WikiEditorPage";
 import WikiFolderBrowsePage from "./components/WikiFolderBrowsePage";
 import WikiFavoritesPage from "./components/WikiFavoritesPage";
 import WikiPinnedPage from "./components/WikiPinnedPage";
+import VideoCenterPage from "./components/VideoCenterPage";
 import AuditLogPage from "./components/AuditLogPage";
 import VaultPage from "./components/VaultPage";
 import VaultEntryFormPage from "./components/VaultEntryFormPage";
@@ -94,6 +95,14 @@ function WikiPinnedRoute() {
   return <WikiPinnedPage token={token} />;
 }
 
+// Favoriler/Pinlenenler ile AYNI gerekçeyle Wiki İÇERİĞİ (var olan wiki
+// sayfalarının içindeki video bloklarının bir görünümü, bağımsız bir kaynak
+// değil) - top-level DEĞİL, /wiki altında nested.
+function VideoCenterRoute() {
+  const { token } = useAuth();
+  return <VideoCenterPage token={token} />;
+}
+
 function AuditLogRoute() {
   const { token } = useAuth();
   return <AuditLogPage token={token} />;
@@ -165,6 +174,7 @@ function App() {
               <Route path="browse/:departmentName/:folderId" element={<WikiFolderBrowseRoute />} />
               <Route path="favorites" element={<WikiFavoritesRoute />} />
               <Route path="pinned" element={<WikiPinnedRoute />} />
+              <Route path="videos" element={<VideoCenterRoute />} />
               <Route path=":id" element={<WikiArticleRoute />} />
               <Route path=":id/edit" element={<WikiEditorRoute />} />
             </Route>

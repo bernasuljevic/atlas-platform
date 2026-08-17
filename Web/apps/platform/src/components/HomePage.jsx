@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Star,
   Users,
+  Video,
 } from "lucide-react";
 import { getNotifications, getWikiDashboard } from "../api";
 import { getUserInfoFromToken } from "../jwt";
@@ -395,6 +396,9 @@ function HomePage({ token }) {
         <QuickActionButton icon={<Clock size={14} />} label="Son Güncellenenler" href="#son-guncellemeler" />
         <QuickActionButton icon={<Star size={14} />} label="Favoriler" to="/wiki/favorites" />
         <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" to="/wiki/pinned" />
+        {/* Video Merkezi (C grubu, Gün 2) - wiki sayfalarındaki ":::video"
+            bloklarının galeri görünümü. */}
+        <QuickActionButton icon={<Video size={14} />} label="Video Merkezi" to="/wiki/videos" />
         {isAdmin && <QuickActionButton icon={<ShieldCheck size={14} />} label="Audit Log" to="/audit-log" />}
       </div>
 
