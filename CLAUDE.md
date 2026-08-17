@@ -2146,6 +2146,51 @@ verileri (1 kayıt + 2 kullanıcı) temizlendi.
 **Gün 3 (frontend) VE Gün 4 (Vault.Application.Tests projesi) henüz
 BAŞLANMADI.**
 
+## Eksik-özellik listesi - D Grubu, Gün 3: Vault paylaşım modeli - frontend (2026-08-17)
+
+- [x] **3 yeni `api.js` fonksiyonu** - `shareVaultEntry`/`getVaultEntryShares`/
+      `removeVaultEntryShare`, `deletePasswordEntry`'deki AYNI 401→refresh→
+      tekrar dene deseni. Backend'in dört korumasının (kendi kendine paylaşma/
+      olmayan e-posta/tekrar paylaşma reddi) net `detail` mesajları OLDUĞU
+      GİBİ kullanıcıya gösteriliyor.
+- [x] **`VaultEntryFormPage.jsx`'e "Paylaşılanlar" paneli** - SADECE
+      owner-or-Admin görüyor (`canManage`), e-postayla paylaşma formu + liste
+      (her satırda e-posta/tarih + "kaldır" düğmesi).
+- [x] **`VaultPage.jsx`'te GERÇEK bir gap bulunup düzeltildi (canlı teste
+      geçmeden ÖNCE, kod incelemesi sırasında yakalandı):** Liste artık
+      SADECE benim kayıtlarımı DEĞİL, benimle PAYLAŞILANLARI da gösteriyor
+      (backend Gün 2'de genişledi) - ama satıra tıklama hâlâ KOŞULSUZ
+      `/vault/{id}/edit`'e gidiyordu. Paylaşılan (owner-or-Admin OLMAYAN) bir
+      kullanıcı bu şekilde düzenleme formuna girip "Kaydet"e basınca 403
+      alırdı - backend zaten doğru reddediyordu ama kötü bir UX olurdu. İki
+      katmanlı düzeltme: (1) `VaultPage.jsx`'te satır tıklaması artık SADECE
+      `canEdit` (owner-or-Admin) true ise çalışıyor, (2) `VaultEntryFormPage.jsx`'e
+      AYRICA (savunma amaçlı - doğrudan URL ile gelinmesi hâlâ mümkün) bir
+      `canManage` kontrolü eklendi: owner-or-Admin değilse form alanları
+      disabled, "Kaydet" pasif, üstte "Bu kayıt seninle paylaşıldı..."
+      bilgilendirmesi çıkıyor - `handleLoadCurrentPassword` (reveal) BİLEREK
+      bu kısıtlamaya DAHİL DEĞİL, paylaşılan kullanıcı parolayı görebilmeli.
+- [x] **Liste görünümünde "Paylaşıldı" rozeti** - SADECE normal kullanıcı
+      için (Admin'in listesindeki HER kayıt zaten bypass sayesinde görünüyor,
+      "Paylaşıldı" orada yanıltıcı olurdu) - `!isAdmin && entry.createdByUserId
+      !== userId` kesin bir işaret (normal bir kullanıcı için listede olup
+      sahibi kendisi OLMAYAN bir kayıt, TEK yol paylaşımdır).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, iki test kullanıcısıyla):**
+A, B'yi UI üzerinden paylaştı (toast + liste güncellendi); B `/vault`'a
+girince kayıt "Paylaşıldı" rozetiyle göründü, satıra tıklamak düzenleme
+sayfasına GÖTÜRMEDİ (URL değişmedi, doğrulandı), "Göster" ile parolayı
+başarıyla açabildi; A paylaşımı panelden kaldırınca liste tekrar boş
+duruma döndü. **Test sırasında (ürün kodunda DEĞİL, kendi test script'imde)
+bir sorun yaşandı:** `computer` aracının ilk birkaç `left_click`/`type`
+denemesi e-posta input'una GERÇEKTE ulaşmamıştı (`document.activeElement`
+BODY kalmıştı) - native input setter + `dispatchEvent`/JS `.click()`
+kullanılarak yeniden denenince doğru çalıştığı kanıtlandı, aynı session'da
+daha önce de görülen bir ortam/araç kısıtlamasıydı. `npm run lint`/`build`/
+`test` (36/36) yeşil. Test verileri (1 kayıt + 2 kullanıcı) temizlendi.
+
+**Gün 4 (Vault.Application.Tests projesi) henüz BAŞLANMADI.**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
