@@ -119,6 +119,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Shared.Text.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Documents.Application.Tests", "tests\Atlas.Modules.Documents.Application.Tests\Atlas.Modules.Documents.Application.Tests.csproj", "{45C879BA-EF8E-4D71-9462-D07B375C674C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Atlas.Modules.Vault.Application.Tests", "tests\Atlas.Modules.Vault.Application.Tests\Atlas.Modules.Vault.Application.Tests.csproj", "{E0943262-35D9-42F1-8CA6-50C900113603}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -693,6 +695,18 @@ Global
 		{45C879BA-EF8E-4D71-9462-D07B375C674C}.Release|x64.Build.0 = Release|Any CPU
 		{45C879BA-EF8E-4D71-9462-D07B375C674C}.Release|x86.ActiveCfg = Release|Any CPU
 		{45C879BA-EF8E-4D71-9462-D07B375C674C}.Release|x86.Build.0 = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|x64.Build.0 = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Debug|x86.Build.0 = Debug|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|x64.ActiveCfg = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|x64.Build.0 = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|x86.ActiveCfg = Release|Any CPU
+		{E0943262-35D9-42F1-8CA6-50C900113603}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -743,5 +757,6 @@ Global
 		{5E65F559-F1B4-4378-ACE6-5F659F938104} = {C8E42992-5E42-0C2B-DBFE-AA848D06431C}
 		{C36A3BCC-D188-4C46-B515-CC3A1A1C1120} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{45C879BA-EF8E-4D71-9462-D07B375C674C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{E0943262-35D9-42F1-8CA6-50C900113603} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
