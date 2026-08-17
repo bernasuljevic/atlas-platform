@@ -9,6 +9,43 @@
 // bu fonksiyonla tarıyor.
 const VIDEO_BLOCK_OPEN_PATTERN = /^:::video$/;
 
+// Embed algılama desenleri (D grubu, Gün 1, 2026-08-17) - ÖNCEDEN
+// markdown.jsx'in içinde, SADECE VideoBlock'un kullandığı yerel sabitlerdi.
+// Buraya (React'siz, saf bir modüle) TAŞINDI ki HEM VideoBlock (render
+// zamanında embed URL'sini üretmek için) HEM WikiEditorPage'in yapıştırma
+// (paste) algılayıcısı (kullanıcı düz bir video linki yapıştırınca otomatik
+// ":::video:::" bloğuna çevirmek için) AYNI kaynaktan beslensin - iki ayrı
+// yerde iki ayrı regex seti YAŞAMASIN (biri güncellenip diğeri unutulursa
+// sessizce birbirinden sapardı).
+export const YOUTUBE_PATTERN = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+// Vimeo video ID'si sayısal - hem "vimeo.com/123456789" hem
+// "player.vimeo.com/video/123456789" (zaten embed formatındaki bir URL'nin
+// yapıştırılması) aynı desenle yakalanıyor.
+export const VIMEO_PATTERN = /vimeo\.com\/(?:video\/)?(\d+)/;
+// Loom paylaşım ID'si alfasayısal (32 karakter hex) - hem "loom.com/share/..."
+// (kullanıcının kopyaladığı normal paylaşım linki) hem "loom.com/embed/..."
+// aynı desenle yakalanıyor.
+export const LOOM_PATTERN = /loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/;
+export const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
+
+// Bir metnin İÇİNDE tanınan bir video kaynağına ait desen olup olmadığını
+// söylüyor - KISMİ eşleşme (desenlerin kendisi ^...$ ile ÇAPALANMIŞ değil,
+// bkz. VideoBlock'un `url.match(...)` kullanımı - orada da ID'yi metnin
+// HERHANGİ bir yerinden çıkarabilmek gerekiyor). "Yapıştırılan metnin
+// TAMAMI SADECE bir video linki mi" ayrımı BİLEREK burada YAPILMIYOR -
+// bu, çağıranın (WikiEditorPage'in yapıştırma algılayıcısı) sorumluluğu;
+// orada trimmed metinde BOŞLUK KARAKTERİ olup olmadığı da ayrıca kontrol
+// ediliyor (bkz. o dosyadaki yorum).
+export function isRecognizedVideoUrl(text) {
+  if (!text) return false;
+  return (
+    YOUTUBE_PATTERN.test(text) ||
+    VIMEO_PATTERN.test(text) ||
+    LOOM_PATTERN.test(text) ||
+    VIDEO_FILE_PATTERN.test(text)
+  );
+}
+
 export function extractVideosFromContent(content) {
   if (!content) return [];
 

@@ -13,14 +13,19 @@ public interface IPasswordEntryRepository
 {
     Task<PasswordEntry?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    // ownerUserId BİLEREK nullable - null verilince TÜM kayıtlar dönüyor
+    // viewerUserId BİLEREK nullable - null verilince TÜM kayıtlar dönüyor
     // (SADECE Admin bu şekilde çağırıyor, bkz. GetPasswordEntriesQueryHandler),
-    // bir Guid verilince filtre SQL WHERE'de uygulanıyor (bellekte filtrelemek
+    // bir Guid verilince filtre SQL'de uygulanıyor (bellekte filtrelemek
     // yerine) - normal bir kullanıcı sorgusu, başkalarının şifrelenmiş
     // parolalarını hiç RAM'e çekmeden en baştan hariç tutuyor. Wiki'nin
     // "tüm veriyi çek, bellekte filtrele" deseninin BİLİNÇLİ TERSİ - Vault'un
     // hassasiyeti bunu gerektiriyor.
-    Task<IReadOnlyList<PasswordEntry>> GetAllAsync(Guid? ownerUserId, CancellationToken cancellationToken);
+    //
+    // Vault paylaşım modeli (D grubu, Gün 1, 2026-08-17) - dönen küme artık
+    // SADECE "CreatedByUserId == viewerUserId" DEĞİL, "OWNER OLDUĞUM VEYA
+    // BENİMLE PAYLAŞILAN" (bkz. EfPasswordEntryRepository'nin implementasyonu) -
+    // parametre adı bu yüzden "ownerUserId"den "viewerUserId"ye değişti.
+    Task<IReadOnlyList<PasswordEntry>> GetAllAsync(Guid? viewerUserId, CancellationToken cancellationToken);
 
     Task AddAsync(PasswordEntry entry, CancellationToken cancellationToken);
     Task UpdateAsync(PasswordEntry entry, CancellationToken cancellationToken);

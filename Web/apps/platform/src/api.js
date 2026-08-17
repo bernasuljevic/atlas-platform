@@ -1017,6 +1017,82 @@ export async function revealPasswordEntry(accessToken, id) {
   return body.password;
 }
 
+// Vault paylaşım modeli (D grubu, Gün 3, 2026-08-17) - deletePasswordEntry'deki
+// AYNI 401 -> refresh -> tekrar dene deseni. Backend'in dört koruması (kendi
+// kendine paylaşma/olmayan e-posta/tekrar paylaşma reddi) hepsi 400 + net bir
+// `detail` mesajıyla dönüyor - onu OLDUĞU GİBİ kullanıcıya gösteriyoruz.
+export async function shareVaultEntry(accessToken, id, email) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}/shares`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email }),
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu kaydı paylaşma yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? "Kayıt paylaşılamadı");
+  }
+}
+
+export async function getVaultEntryShares(accessToken, id) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}/shares`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (response.status === 404) {
+    throw new Error("Paylaşım listesi görüntülenemedi.");
+  }
+  if (!response.ok) {
+    throw new Error("Paylaşım listesi yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function removeVaultEntryShare(accessToken, id, sharedWithUserId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/vault/entries/${id}/shares/${sharedWithUserId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu paylaşımı kaldırma yetkin yok.");
+    }
+    throw new Error("Paylaşım kaldırılamadı");
+  }
+}
+
 export async function deleteComment(accessToken, commentId) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/comments/${commentId}`, {

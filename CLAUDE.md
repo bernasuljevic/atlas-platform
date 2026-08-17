@@ -2006,6 +2006,226 @@ Video Merkezi galerisi Gün 2).** Sırada D grubu var: link/embed otomatik
 algılama, video transkript indeksleme, Vault paylaşım modeli - henüz hiç
 başlanmadı.
 
+## Eksik-özellik listesi - D Grubu, Gün 1: Link/embed otomatik algılama (2026-08-17)
+
+D grubunda üç ayrı, birbiriyle ilgisiz madde var (C grubunun aksine) - hangi
+maddeyle başlanacağı `AskUserQuestion` ile netleştirildi, kullanıcı "Link/embed
+otomatik algılama"yı seçti. **Video transkript indeksleme henüz BAŞLANMADI**
+- YouTube/Vimeo/Loom'un resmi, basit bir "transkripti bana ver" API'si yok
+(YouTube'un altyazı verisine erişim ya kırılgan/gayrı-resmi bir "timedtext"
+endpoint'i scrape etmeyi ya da Google'ın kendi API key gerektiren, kotalı Data
+API'sini gerektiriyor) - bu, gerçek embedding sağlayıcısının API key'ini
+beklediği durumla AYNI sınıf bir engel, kullanıcıya açıkça belirtildi.
+
+- [x] **Regex desenleri `markdown.jsx`'ten `videoExtraction.js`'e TAŞINDI**
+      (`YOUTUBE_PATTERN`/`VIMEO_PATTERN`/`LOOM_PATTERN`/`VIDEO_FILE_PATTERN`,
+      hepsi `export`) - HEM `VideoBlock` (render zamanı embed URL'si için)
+      HEM yeni yapıştırma algılayıcısı AYNI kaynaktan besleniyor, iki ayrı
+      kopya YAŞAMASIN diye (biri güncellenip diğeri unutulursa sessizce
+      birbirinden sapardı). Yeni `isRecognizedVideoUrl(text)` - KISMİ
+      eşleşme arıyor (dört desenin HİÇBİRİ `^...$` ile çapalanmamış), "SADECE
+      bu mu" ayrımı BİLEREK burada YAPILMIYOR - bu, çağıranın sorumluluğu
+      (bkz. altta). 4 yeni Vitest testi.
+- [x] **`WikiEditorPage.jsx`'e yapıştırma (paste) algılayıcısı** - kullanıcı
+      araç çubuğundaki "🎬 Video" düğmesini/"/video" komutunu hiç bilmese bile,
+      düz bir YouTube/Vimeo/Loom/video-dosyası linkini yapıştırdığında
+      otomatik olarak `:::video:::` bloğuna dönüşüyor (Medium/Notion'daki
+      "bir link yapıştır, otomatik gömülsün" alışkanlığıyla tutarlı).
+      BİLEREK DAR bir tetikleyici - üç koşulun HEPSİ gerekiyor:
+      (1) trim'lenmiş yapıştırılan metin HİÇ boşluk karakteri taşımıyor VE
+      tanınan bir video deseniyle eşleşiyor (`isRecognizedVideoUrl`'ün kısmi
+      eşleşme araması nedeniyle "SADECE bu mu" ayrımı BURADA, boşluk
+      kontrolüyle sağlanıyor - bir URL'nin içinde boşluk OLAMAZ), (2) o anda
+      aktif bir metin seçimi YOK (Video düğmesiyle eklenmiş bir bloğun
+      İÇİNDEKİ yer tutucu URL'yi değiştirmek için yapıştırma yapılıyorsa
+      dokunulmuyor - aksi halde bloğun içine ikinci bir sarmalayıcı ekleyip
+      bozardı), (3) imlecin bulunduğu satır TAMAMEN BOŞ (`[buraya tıkla](`
+      yazıp link hedefini yapıştıran bir kullanıcının markdown link
+      sözdizimi yarım kalmasın). Başarılı dönüşümde kısa bir `toast()` ile
+      bilgilendiriliyor.
+      **Kod incelemesi sırasında kendi tasarımımda bulunan gerçek bir hata
+      (canlı teste geçmeden önce yakalandı):** ilk yazımda sadece
+      `trimmed.includes("\n")` kontrol ediliyordu, boşluk KARAKTERİ (satır
+      İÇİ boşluk) kontrol edilmiyordu - "bak şu videoya: https://youtu.be/xyz
+      diyorum" gibi TEK satırlık ama İÇİNDE link geçen bir cümle yanlışlıkla
+      "SADECE bir video linki" sayılıp TÜM cümle `:::video:::` bloğunun URL
+      alanına yazılırdı (geçersiz bir embed URL'si üretirdi). `/\s/.test(...)`
+      kontrolüyle düzeltildi.
+
+Canlı doğrulandı (tarayıcıda gerçek/simüle paste event'leriyle, backend
+gerektirmeden - sadece client-side davranış): boş bir satıra bare bir
+YouTube linki yapıştırılınca DOĞRU şekilde `:::video\n{url}\n:::`'ye
+dönüştü; cümle içindeki bir link (`preventDefault` ÇAĞRILMADI, native
+yapıştırma davranışı korundu) VE aktif seçim varken yapıştırma (placeholder
+değiştirme senaryosu) VE satır ortasında yapıştırma (`[buraya tıkla](`
+sonrası) - ÜÇÜ de doğru şekilde dönüştürülMEDİ. `npm run lint`/`build`/
+`test` (36/36) yeşil.
+
+**D grubunun geri kalanı (video transkript indeksleme, Vault paylaşım
+modeli) henüz BAŞLANMADI.**
+
+## Eksik-özellik listesi - D Grubu, Gün 2: Vault paylaşım modeli - backend (2026-08-17)
+
+D grubunun ikinci maddesi (video transkript indeksleme, YouTube/Vimeo/Loom'un
+basit bir transkript API'si olmadığı için hâlâ bloklanmış durumda, bkz. Gün 1).
+
+**Mimari kararlar (koda geçmeden önce):**
+- **Departman bazlı DEĞİL, kullanıcı bazlı paylaşım.** `PasswordEntry.cs`'in
+  kendi yorumunda "Vault'ta departman kavramı yok" diye bilinçli bir
+  sınırlama zaten var - departman paylaşımı eklemek bu kararla ÇELİŞİRDİ,
+  üstelik bir şifre kasası için "belirli kişiyle paylaş" (least-privilege)
+  departman-geneli paylaşımdan daha güvenli/doğru bir model.
+- **Paylaşım SADECE görüntüleme+reveal yetkisi veriyor, düzenleme/silme
+  DEĞİL** - alıcı kaydı görüp parolasını açabiliyor ama sahibi (ya da Admin)
+  dışında kimse düzenleyip silemiyor. Update/DeletePasswordEntryCommandHandler'a
+  HİÇ DOKUNULMADI.
+- **Yeni cross-module sözleşme: `IUserLookupService` (Shared.Contracts)** -
+  Vault, bir e-postayı kullanıcı ID'sine çevirebilmek için Auth'a ihtiyaç
+  duyuyor ama Domain/Application/Infrastructure'ına referans veremez.
+  `ICurrentUserAccessor`/`IWikiVisibilityChecker` ile AYNI desen - dar bir
+  `UserSummary(Id, Email, FullName)` DTO'su, gerçek implementasyon
+  (`AuthUserLookupService`) Auth.Infrastructure'da, var olan `IUserRepository.
+  GetByEmailAsync`'i SARMALIYOR (ikinci bir veri erişim yolu icat edilmedi).
+- **Paylaşım/paylaşımı kaldırma audit'leniyor** ("PasswordEntry.Shared"/
+  "PasswordEntry.ShareRevoked") - Reveal'la AYNI gerekçe, "kim buna
+  erişebilir" değişikliği gerçek bir güvenlik olayı.
+
+- [x] **`PasswordEntryShare` (YENİ entity, Vault.Domain)** - `WikiPageVersion`/
+      `DocumentVersion`'daki AYNI desen: `PasswordEntry`'ye FK İLE BAĞLI
+      DEĞİL, temizlik Handler orkestrasyonuna bırakılıyor.
+      `(PasswordEntryId, SharedWithUserId)` composite unique index - aynı
+      kayıt aynı kullanıcıyla iki kez paylaşılamaz. Migration
+      (`AddPasswordEntryShares`) uygulandı.
+- [x] **`IPasswordEntryRepository.GetAllAsync` genişledi** - artık SADECE
+      "sahip olduğum" DEĞİL, "sahip olduğum VEYA benimle paylaşılan"
+      kayıtları döndürüyor (`EfPasswordEntryRepository`'de iki ayrı sorgu -
+      Vault'un "kişisel kasa, küçük ölçek" varsayımında bir JOIN'e gerek
+      yok, okunabilirlik tercih edildi).
+- [x] **`GetPasswordEntryByIdQueryHandler`/`RevealPasswordEntryCommandHandler`
+      genişledi** - owner-or-Admin'in yanına ÜÇÜNCÜ bir yol: paylaşılan
+      kullanıcı da görüntüleyebiliyor/reveal edebiliyor
+      (`IPasswordEntryShareRepository.IsSharedWithAsync`, gereksiz DB
+      round-trip'inden kaçınmak için SADECE owner/Admin değilse sorgulanıyor).
+- [x] **`DeletePasswordEntryCommandHandler` genişledi** - kayıt silinince
+      `IPasswordEntryShareRepository.DeleteAllForEntryAsync` ile TÜM
+      paylaşımları da temizliyor (WikiPageVersion'ın "yetim veri bırakma"
+      gerekçesiyle AYNI). **Ders #22'nin AYNI dersi tekrar uygulandı:**
+      `ExecuteDeleteAsync` yerine `ToListAsync+RemoveRange` - Vault'un test
+      host'unda şu an gerçek SQL Server kullanılsa da (InMemory'ye
+      çevrilmiyor), küçük bir işlem için ekstra bir sağlayıcı-bağımlılığı
+      riski almanın gereği yok.
+- [x] **`SharePasswordEntryCommand`/`RemovePasswordEntryShareCommand`/
+      `GetPasswordEntrySharesQuery`** - owner-or-Admin (paylaşımı yönetmek de
+      bir düzenleme eylemi, paylaşılan kullanıcı KENDİSİ yeniden paylaşamıyor).
+      Share Handler'ı dört koruma uyguluyor: kendi kendine paylaşma
+      reddediliyor, olmayan bir e-posta reddediliyor, aynı kullanıcıyla
+      TEKRAR paylaşma reddediliyor (hepsi net 400 mesajıyla). Shares sorgusu
+      `GetWikiPageVersionsQuery`'deki AYNI "varlığı gizle" deseninde - SADECE
+      sahibi/Admin kiminle paylaşıldığını görebiliyor.
+- [x] **3 yeni endpoint:** `POST/GET /api/vault/entries/{id}/shares`,
+      `DELETE /api/vault/entries/{id}/shares/{sharedWithUserId}`.
+
+**Canlı doğrulandı (curl + sqlcmd ile uçtan uca, iki test kullanıcısıyla):**
+paylaşılmadan ÖNCE B, kayda erişemedi (404) ve reveal edemedi (403); A'nın
+kendi kendine paylaşma/var olmayan e-posta/tekrar paylaşma denemeleri hepsi
+net 400 mesajıyla reddedildi; paylaşım sonrası B kaydı görebildi (200),
+parolayı doğru şekilde açabildi (200, gerçek parola döndü), listesinde
+kayıt göründü - AMA düzenleme (403) ve silme (403) denemeleri reddedildi;
+A paylaşım listesini görebildi, B GÖREMEDİ (404); paylaşım kaldırılınca B
+tekrar erişimini kaybetti (404); Admin owner/paylaşım OLMADAN da hem kaydı
+hem paylaşım listesini görebildi (bypass); kayıt silinince
+`vault.PasswordEntryShares`'te 0 yetim satır kaldığı doğrulandı; audit
+log'da `PasswordEntry.Created`→`Shared`→`Revealed`→`ShareRevoked` sırasıyla,
+doğru kullanıcı/detaylarla kayıtlı olduğu görüldü. `dotnet test
+tests/Atlas.IntegrationTests` (24/24) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` yeşil (regresyon yok - Vault'un henüz hiç
+Application-katmanı unit test projesi yoktu, bu yüzden Handler imza
+değişiklikleri hiçbir testi kırmadı; Gün 4'te bu boşluk kapatılacak). Test
+verileri (1 kayıt + 2 kullanıcı) temizlendi.
+
+**Gün 3 (frontend) VE Gün 4 (Vault.Application.Tests projesi) henüz
+BAŞLANMADI.**
+
+## Eksik-özellik listesi - D Grubu, Gün 3: Vault paylaşım modeli - frontend (2026-08-17)
+
+- [x] **3 yeni `api.js` fonksiyonu** - `shareVaultEntry`/`getVaultEntryShares`/
+      `removeVaultEntryShare`, `deletePasswordEntry`'deki AYNI 401→refresh→
+      tekrar dene deseni. Backend'in dört korumasının (kendi kendine paylaşma/
+      olmayan e-posta/tekrar paylaşma reddi) net `detail` mesajları OLDUĞU
+      GİBİ kullanıcıya gösteriliyor.
+- [x] **`VaultEntryFormPage.jsx`'e "Paylaşılanlar" paneli** - SADECE
+      owner-or-Admin görüyor (`canManage`), e-postayla paylaşma formu + liste
+      (her satırda e-posta/tarih + "kaldır" düğmesi).
+- [x] **`VaultPage.jsx`'te GERÇEK bir gap bulunup düzeltildi (canlı teste
+      geçmeden ÖNCE, kod incelemesi sırasında yakalandı):** Liste artık
+      SADECE benim kayıtlarımı DEĞİL, benimle PAYLAŞILANLARI da gösteriyor
+      (backend Gün 2'de genişledi) - ama satıra tıklama hâlâ KOŞULSUZ
+      `/vault/{id}/edit`'e gidiyordu. Paylaşılan (owner-or-Admin OLMAYAN) bir
+      kullanıcı bu şekilde düzenleme formuna girip "Kaydet"e basınca 403
+      alırdı - backend zaten doğru reddediyordu ama kötü bir UX olurdu. İki
+      katmanlı düzeltme: (1) `VaultPage.jsx`'te satır tıklaması artık SADECE
+      `canEdit` (owner-or-Admin) true ise çalışıyor, (2) `VaultEntryFormPage.jsx`'e
+      AYRICA (savunma amaçlı - doğrudan URL ile gelinmesi hâlâ mümkün) bir
+      `canManage` kontrolü eklendi: owner-or-Admin değilse form alanları
+      disabled, "Kaydet" pasif, üstte "Bu kayıt seninle paylaşıldı..."
+      bilgilendirmesi çıkıyor - `handleLoadCurrentPassword` (reveal) BİLEREK
+      bu kısıtlamaya DAHİL DEĞİL, paylaşılan kullanıcı parolayı görebilmeli.
+- [x] **Liste görünümünde "Paylaşıldı" rozeti** - SADECE normal kullanıcı
+      için (Admin'in listesindeki HER kayıt zaten bypass sayesinde görünüyor,
+      "Paylaşıldı" orada yanıltıcı olurdu) - `!isAdmin && entry.createdByUserId
+      !== userId` kesin bir işaret (normal bir kullanıcı için listede olup
+      sahibi kendisi OLMAYAN bir kayıt, TEK yol paylaşımdır).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, iki test kullanıcısıyla):**
+A, B'yi UI üzerinden paylaştı (toast + liste güncellendi); B `/vault`'a
+girince kayıt "Paylaşıldı" rozetiyle göründü, satıra tıklamak düzenleme
+sayfasına GÖTÜRMEDİ (URL değişmedi, doğrulandı), "Göster" ile parolayı
+başarıyla açabildi; A paylaşımı panelden kaldırınca liste tekrar boş
+duruma döndü. **Test sırasında (ürün kodunda DEĞİL, kendi test script'imde)
+bir sorun yaşandı:** `computer` aracının ilk birkaç `left_click`/`type`
+denemesi e-posta input'una GERÇEKTE ulaşmamıştı (`document.activeElement`
+BODY kalmıştı) - native input setter + `dispatchEvent`/JS `.click()`
+kullanılarak yeniden denenince doğru çalıştığı kanıtlandı, aynı session'da
+daha önce de görülen bir ortam/araç kısıtlamasıydı. `npm run lint`/`build`/
+`test` (36/36) yeşil. Test verileri (1 kayıt + 2 kullanıcı) temizlendi.
+
+## Eksik-özellik listesi - D Grubu, Gün 4: Vault paylaşım modeli - Application testleri (2026-08-17)
+
+D grubunun Vault paylaşım maddesinin son adımı - Documents.Application.Tests'in
+(Test & CI Sertleştirme paketi, Gün 3) AYNI deseni: mocking kütüphanesi yok,
+elle yazılmış fake'ler + gerçek Handler'ların doğrudan çağrılması (MediatR
+pipeline'ı - AuditBehavior dahil - devre dışı, sadece iş mantığı test ediliyor).
+
+- [x] **Yeni `Atlas.Modules.Vault.Application.Tests` projesi** - 4 fake
+      (`FakePasswordEntryRepository`/`FakePasswordEntryShareRepository`/
+      `FakePasswordEncryptor`/`FakeUserLookupService`), `FakeCurrentUserAccessor`
+      `Atlas.Shared.Testing`'ten paylaşılıyor (Ders'teki "üç kural" eşiğini
+      zaten aşmış, yeniden yazılmadı). `FakePasswordEncryptor` gerçek bir
+      şifreleme algoritması TEST ETMİYOR (o Infrastructure'ın işi) - basit,
+      tersinir bir sabit önek deseni, sadece Handler'ın Encrypt/Decrypt'i doğru
+      sırada çağırdığını doğrulamaya yetiyor.
+- [x] **30 test, paylaşım modelinin (Gün 1-3) eklediği TÜM dallar dahil:**
+      `SharePasswordEntryCommandHandler` (kayıt yok/owner-or-Admin değil/hedef
+      kullanıcı yok/kendi kendine paylaşım/zaten paylaşılmış/başarılı paylaşım
+      + audit/Admin bypass), `RemovePasswordEntryShareCommandHandler` (AYNI
+      korumalar + başarılı kaldırma), `GetPasswordEntrySharesQueryHandler`
+      (kayıt yok → null, **paylaşılan kullanıcının KENDİSİ bile bu listeyi
+      göremiyor** → null - sadece sahibi/Admin), `GetPasswordEntryByIdQueryHandler`
+      (owner-or-Admin'in ÜÇÜNCÜ istisnası olan "paylaşılan kullanıcı da
+      görebiliyor" dalı + ilgisiz kullanıcıya null - 404, 403 DEĞİL, varlık
+      gizleniyor), `RevealPasswordEntryCommandHandler` (paylaşılan kullanıcının
+      parolayı GERÇEKTEN açabildiği - paylaşımın asıl amacı - + ilgisiz
+      kullanıcıya 403), `DeletePasswordEntryCommandHandler` (silme sırasında
+      TÜM paylaşım satırlarının da temizlendiği - `DeleteAllForEntryAsync`'in
+      doğru entryId'yle çağrıldığı - + temel owner-or-Admin korumaları).
+
+`dotnet test Atlas.sln --filter "Category!=Integration"` yeşil - regresyon yok.
+
+**"Eksik-özellik listesi D grubu"nun Vault paylaşım modeli maddesi artık
+TAMAMEN BİTTİ (Gün 1-4, backend+frontend+test).** D grubunun geri kalanı
+(video transkript indeksleme) hâlâ gerçek bir engelle bloklanmış durumda -
+aşağıya bkz.
+
 ## Görsel Tasarım Yenileme - Teal/Cyan + Turuncu Palet (2026-08-17)
 
 Eksik-özellik listesinden (D grubu) BAĞIMSIZ, kullanıcının bir referans

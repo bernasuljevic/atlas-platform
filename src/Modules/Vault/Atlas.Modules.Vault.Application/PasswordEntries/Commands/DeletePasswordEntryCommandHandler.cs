@@ -7,11 +7,15 @@ namespace Atlas.Modules.Vault.Application.PasswordEntries.Commands;
 public class DeletePasswordEntryCommandHandler : IRequestHandler<DeletePasswordEntryCommand>
 {
     private readonly IPasswordEntryRepository _repository;
+    private readonly IPasswordEntryShareRepository _shareRepository;
     private readonly ICurrentUserAccessor _currentUser;
 
-    public DeletePasswordEntryCommandHandler(IPasswordEntryRepository repository, ICurrentUserAccessor currentUser)
+    public DeletePasswordEntryCommandHandler(
+        IPasswordEntryRepository repository, IPasswordEntryShareRepository shareRepository,
+        ICurrentUserAccessor currentUser)
     {
         _repository = repository;
+        _shareRepository = shareRepository;
         _currentUser = currentUser;
     }
 
@@ -33,6 +37,11 @@ public class DeletePasswordEntryCommandHandler : IRequestHandler<DeletePasswordE
         // AYNI gerekçe (Ders #14/AuditLogEntry.Details notu): kayıt silindikten
         // sonra Title'a erişecek başka hiçbir yer kalmıyor.
         request.AuditDetails = entry.Title;
+
+        // Vault paylaşım modeli (D grubu, Gün 1) - DeleteWikiPageCommandHandler'ın
+        // versiyon geçmişini temizlemesiyle AYNI gerekçe: kayıt silinince
+        // "yetim" paylaşım satırları kalmasın.
+        await _shareRepository.DeleteAllForEntryAsync(entry.Id, cancellationToken);
 
         await _repository.DeleteAsync(entry, cancellationToken);
     }

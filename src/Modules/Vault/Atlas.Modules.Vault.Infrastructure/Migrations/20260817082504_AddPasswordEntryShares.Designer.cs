@@ -4,6 +4,7 @@ using Atlas.Modules.Vault.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Atlas.Modules.Vault.Infrastructure.Migrations
 {
     [DbContext(typeof(VaultDbContext))]
-    partial class VaultDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817082504_AddPasswordEntryShares")]
+    partial class AddPasswordEntryShares
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

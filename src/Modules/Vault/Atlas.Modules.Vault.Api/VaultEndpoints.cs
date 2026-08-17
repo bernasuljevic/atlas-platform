@@ -18,6 +18,9 @@ public record UpdatePasswordEntryRequest(
     string? Category,
     string? Notes);
 
+// Vault paylaşım modeli (D grubu, Gün 1) - POST'un gövdesi, id route'tan geliyor.
+public record SharePasswordEntryRequest(string Email);
+
 public static class VaultEndpoints
 {
     public static IEndpointRouteBuilder MapVaultEndpoints(this IEndpointRouteBuilder app)
@@ -95,6 +98,34 @@ public static class VaultEndpoints
         .WithName("RevealPasswordEntry")
         .RequireAuthorization()
         .RequireRateLimiting("vault-reveal");
+
+        // Vault paylaşım modeli (D grubu, Gün 1, 2026-08-17) - owner-or-Admin
+        // kuralı Handler'da (SharePasswordEntryCommandHandler), istemciden gelmiyor.
+        group.MapPost("/{id:guid}/shares", async (Guid id, SharePasswordEntryRequest request, IMediator mediator) =>
+        {
+            await mediator.Send(new SharePasswordEntryCommand(id, request.Email));
+            return Results.NoContent();
+        })
+        .WithName("SharePasswordEntry")
+        .RequireAuthorization();
+
+        // GetPasswordEntrySharesQueryHandler'daki AYNI "varlığı gizle" deseni -
+        // null dönerse 404 (SADECE sahibi/Admin kiminle paylaşıldığını görebilir).
+        group.MapGet("/{id:guid}/shares", async (Guid id, IMediator mediator) =>
+        {
+            var shares = await mediator.Send(new GetPasswordEntrySharesQuery(id));
+            return shares is null ? Results.NotFound() : Results.Ok(shares);
+        })
+        .WithName("GetPasswordEntryShares")
+        .RequireAuthorization();
+
+        group.MapDelete("/{id:guid}/shares/{sharedWithUserId:guid}", async (Guid id, Guid sharedWithUserId, IMediator mediator) =>
+        {
+            await mediator.Send(new RemovePasswordEntryShareCommand(id, sharedWithUserId));
+            return Results.NoContent();
+        })
+        .WithName("RemovePasswordEntryShare")
+        .RequireAuthorization();
 
         return app;
     }

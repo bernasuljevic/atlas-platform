@@ -24,6 +24,8 @@ import {
 } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { DEPARTMENTS } from "../departments";
+import { isRecognizedVideoUrl } from "../videoExtraction";
+import { toast } from "sonner";
 import { Button } from "@atlas/ui/button";
 import { Input } from "@atlas/ui/input";
 import { Label } from "@atlas/ui/label";
@@ -361,6 +363,55 @@ function WikiEditorPage({ token }) {
     } else if (isSlashMenuOpen) {
       setIsSlashMenuOpen(false);
     }
+  }
+
+  // Link/embed otomatik algılama (D grubu, Gün 1, 2026-08-17) - kullanıcı
+  // araç çubuğundaki "🎬 Video" düğmesini/"/video" komutunu HİÇ BİLMESE bile,
+  // düz bir YouTube/Vimeo/Loom/video-dosyası linkini yapıştırdığında otomatik
+  // olarak ":::video:::" bloğuna dönüşüyor - Medium/Notion'daki "bir link
+  // yapıştır, otomatik gömülsün" alışkanlığıyla tutarlı.
+  //
+  // BİLEREK DAR bir tetikleyici (yanlış-pozitifi önlemek için üç koşulun
+  // HEPSİ gerekiyor):
+  // 1. Yapıştırılan metin (trim'lendikten sonra) HİÇ boşluk karakteri
+  //    TAŞIMIYOR VE tanınan bir video deseniyle eşleşiyor - bir URL'nin
+  //    içinde boşluk OLAMAYACAĞI için bu, "bak şu videoya: https://youtu.be/xyz
+  //    diyorum" gibi normal bir cümlenin İÇİNDEKİ bir linkin YANLIŞLIKLA
+  //    gömülmesini yapısal olarak engelliyor (isRecognizedVideoUrl'ün
+  //    kendisi KISMİ eşleşme arar, "sadece bu mu" ayrımı BURADA yapılıyor).
+  // 2. O anda AKTİF bir metin seçimi YOK - "🎬 Video" düğmesiyle eklenmiş bir
+  //    bloğun İÇİNDEKİ yer tutucu URL'yi (seçili durumda) değiştirmek için
+  //    yapıştırma yapılıyorsa, bu davranışa DOKUNULMUYOR (aksi halde bloğun
+  //    İÇİNE ikinci bir ":::video:::" sarmalayıp bozardı).
+  // 3. İmlecin bulunduğu SATIR TAMAMEN BOŞ - "[buraya tıkla](" yazıp link
+  //    hedefini yapıştırmaya çalışan bir kullanıcının markdown link
+  //    sözdizimi YARIM kalmasın (mid-line bir yapıştırma asla dönüştürülmez).
+  function handleContentPaste(e) {
+    const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
+    const trimmed = clipboardText.trim();
+    // isRecognizedVideoUrl KISMİ eşleşme arıyor (bkz. videoExtraction.js'teki
+    // notu) - "TAMAMI SADECE bir video linki mi" ayrımını BURADA, boşluk
+    // karakteri (satır sonu dahil) kontrolüyle yapıyoruz: bir URL'nin
+    // içinde HİÇBİR boşluk karakteri olamaz, bu yüzden trimmed'de boşluk
+    // varsa bu kesinlikle "bir cümlenin İÇİNDEKİ link" demektir, dönüştürme.
+    if (!trimmed || /\s/.test(trimmed) || !isRecognizedVideoUrl(trimmed)) return;
+
+    const el = e.target;
+    const { selectionStart, selectionEnd, value } = el;
+    if (selectionStart !== selectionEnd) return;
+
+    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+    const lineEndIdx = value.indexOf("\n", selectionStart);
+    const currentLine = value.slice(lineStart, lineEndIdx === -1 ? value.length : lineEndIdx);
+    if (currentLine.trim() !== "") return;
+
+    e.preventDefault();
+    const block = `:::video\n${trimmed}\n:::`;
+    const newValue = value.slice(0, selectionStart) + block + value.slice(selectionEnd);
+    setContent(newValue);
+    const cursorPos = selectionStart + block.length;
+    setTimeout(() => restoreFocusAndCursor(cursorPos), 0);
+    toast("Video linki algılandı", { description: "Otomatik olarak video bloğuna dönüştürüldü." });
   }
 
   // "/" yazarak AÇILDIYSA triggerPos dolu - önce o "/" karakterini kaldırıp
@@ -874,6 +925,7 @@ function WikiEditorPage({ token }) {
             id={CONTENT_TEXTAREA_ID}
             value={content}
             onChange={handleContentChange}
+            onPaste={handleContentPaste}
             disabled={isSaving}
             className="min-h-64 rounded-t-none"
           />

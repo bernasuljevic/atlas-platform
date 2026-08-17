@@ -10,6 +10,7 @@ public class VaultDbContext : DbContext
     }
 
     public DbSet<PasswordEntry> PasswordEntries => Set<PasswordEntry>();
+    public DbSet<PasswordEntryShare> PasswordEntryShares => Set<PasswordEntryShare>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

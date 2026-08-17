@@ -183,14 +183,33 @@ function VaultPage({ token }) {
                 {visibleEntries.map((entry) => {
                   const isVisible = visibleIds.has(entry.id);
                   const isRevealingThis = revealingId === entry.id;
+                  // Vault paylaşım modeli (D grubu, Gün 3) - liste artık
+                  // SADECE benim kayıtlarımı DEĞİL, benimle PAYLAŞILANLARI da
+                  // gösteriyor (bkz. GetPasswordEntriesQueryHandler'daki
+                  // genişleme). Satıra tıklayıp /vault/{id}/edit'e gitmek
+                  // SADECE owner-or-Admin için anlamlı - backend zaten
+                  // paylaşılan bir kullanıcının PUT'unu 403 ile reddediyor,
+                  // ama düzenleme formunu hiç AÇMAMAK daha iyi bir UX
+                  // ("yetkin yok" hatasıyla karşılaşmak yerine).
+                  const canEdit = isAdmin || entry.createdByUserId === userId;
                   return (
                     <TableRow
                       key={entry.id}
-                      onClick={() => navigate(`/vault/${entry.id}/edit`)}
-                      className="cursor-pointer hover:bg-[var(--brand-accent)]/10"
+                      onClick={canEdit ? () => navigate(`/vault/${entry.id}/edit`) : undefined}
+                      className={canEdit ? "cursor-pointer hover:bg-[var(--brand-accent)]/10" : ""}
                     >
                       <TableCell className="max-w-[140px] truncate font-medium" title={entry.title}>
                         {entry.title}
+                        {/* Admin için gösterilmiyor - Admin'in listesindeki
+                            HER kayıt onun bypass'ı sayesinde görünüyor,
+                            "Paylaşıldı" burada yanıltıcı olurdu. Normal bir
+                            kullanıcı için bu kesin bir işaret: bu kayıt
+                            listesinde AMA sahibi o DEĞİL, tek yol paylaşım. */}
+                        {!isAdmin && entry.createdByUserId !== userId && (
+                          <Badge variant="outline" className="ml-1.5 text-[10px] font-normal">
+                            Paylaşıldı
+                          </Badge>
+                        )}
                         {entry.url && (
                           <a
                             href={entry.url}
