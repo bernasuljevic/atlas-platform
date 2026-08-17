@@ -1643,9 +1643,33 @@ gerçek bir Domain/Application/Infrastructure katmanı eklendi.
 oluşturan hiçbir test dosyası bulunmadı - constructor değişikliği güvenliydi).
 Test verisi (2 sayfa + 2 bildirim kaydı) canlı doğrulama sonrası temizlendi.
 
-**Gün 2 (frontend) henüz YAPILMADI:** Medium-vari "Yazmaya başla" kartı +
-sağ sidebar'da bu yeni `GET /api/notifications`'ı kullanan bir bildirim
-paneli + "Son Güncellemeler"in gerçek bir sağ sütuna taşınması.
+**Gün 2 (frontend) TAMAMLANDI (2026-08-15):**
+
+- [x] **`WritePromptCard`** - Medium'un "+ Just start writing" kartının
+      ÇEKİRDEK fikri alındı, dekoratif illüstrasyon/ekstra linkler BİLEREK
+      alınmadı ("Medium'dan özellik alınabilir ama Atlas'ın tasarımı
+      Medium'un kopyası olmamalı" ilkesi) - tek satır, tıklanınca `/wiki/new`.
+- [x] **`NotificationsPanel`** - `DiscussionPanel`'in AYNI "self-contained,
+      kendi verisini kendi çeken" deseni, `GetNotificationsQuery`'yi (Gün 1)
+      kullanıyor. Hiçbir yetkilendirme mantığı İÇERMİYOR - backend zaten
+      filtrelenmiş veriyi döndürüyor, aynı "gerçek yetkilendirme her zaman
+      backend'de" ilkesi.
+- [x] **HomePage'in ana içerik alanı 2 sütuna bölündü** (`xl:grid-cols-[1fr_300px]`)
+      - sol/geniş sütun makale ızgarası (3'ten 2 sütuna indirildi, sidebar'a
+      yer açmak için), sağ/dar sütun (Yazmaya Başla + Bildirimler + Son
+      Güncellemeler + Popüler Kategoriler) `xl:sticky`. `xl` ALTINDA sidebar
+      `hidden` DEĞİL - DOM sırası gereği makalelerin altına doğal olarak
+      akıyor (WikiArticlePage'in TOC/panel'indeki AYNI "dar ekranda gizleme
+      yerine akıt" tercihi).
+
+Canlı doğrulandı: gerçek bir sayfa oluşturulup Bildirimler panelinde doğru
+veriyle (`admin@atlas.local yeni bir sayfa ekledi` + başlık + departman/tarih)
+göründüğü, tıklanınca doğru sayfaya gittiği, "Yazmaya başla" kartının
+`/wiki/new`'e gittiği, grid'in gerçekten iki sütun oluşturduğu (`789.667px
+300px`) DOM üzerinden teyit edildi. `npm run lint`/`npm run build`/
+`npx vitest run` (24/24) yeşil. Test verisi temizlendi.
+
+**"Kalıcı Bildirim Geçmişi" özelliği artık TAMAMEN BİTTİ (Gün 1-2).**
 
 ## Sırada ne var
 
