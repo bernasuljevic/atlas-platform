@@ -33,6 +33,18 @@ import SlashCommandMenu from "./SlashCommandMenu";
 
 const CONTENT_TEXTAREA_ID = "wiki-editor-content";
 const LINK_SEARCH_DEBOUNCE_MS = 250;
+// Autosave/Draft (Eksik-özellik listesi B grubu, Gün 3, 2026-08-17) - BİLEREK
+// backend'e YAZMIYOR (yeni bir Draft entity/endpoint İCAT EDİLMEDİ). Amacı
+// SADECE tarayıcı-yerel bir kazayı (yanlışlıkla sekmeyi kapatmak, "Vazgeç"e
+// basmak, tarayıcı çökmesi) telafi etmek - theme/Okuma Ayarları'yla AYNI
+// localStorage deseni. WikiPageVersion'a (Gün 1-2, GERÇEK kaydedilmiş
+// geçmiş) KARIŞTIRILMADI - "taslak karalama" ile "kaydedilmiş sürüm" farklı
+// kavramlar, ikisini aynı tabloya koymak geçmişi anlamsız taslak satırlarıyla
+// kirletirdi.
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+function draftStorageKey(pageId) {
+  return pageId ? `wiki-draft-edit-${pageId}` : "wiki-draft-new";
+}
 
 // Tablo düğmesi seçili metni SARMALAMIYOR (bir tabloyu seçili metnin içine
 // "sarmak" anlamsız olurdu) - sabit bir şablon ekliyor, kullanıcı hücreleri
@@ -151,6 +163,10 @@ function WikiEditorPage({ token }) {
   const [headingLevel, setHeadingLevel] = useState(2);
   const [calloutType, setCalloutType] = useState("info");
   const [imageAlign, setImageAlign] = useState("left");
+  // Eksik-özellik listesi Gün 2 (2026-08-17, "Resize") - varsayılan "medium",
+  // markdown.jsx'teki AlignedImageBlock'un size prop'unun varsayılanıyla
+  // AYNI (eski, boyut eki OLMADAN yazılmış içerikle tutarlı kalması için).
+  const [imageSize, setImageSize] = useState("medium");
   // Slash-command menüsü - triggerPos bir state DEĞİL bir ref, çünkü
   // handleSlashSelect içinde SENKRON olarak (bir sonraki render'ı beklemeden)
   // okunması gerekiyor - "/" karakterinin textarea'daki TAM konumu.
@@ -166,6 +182,16 @@ function WikiEditorPage({ token }) {
   const linkSearchDebounceRef = useRef(null);
 
   const [existingDepartment, setExistingDepartment] = useState(null);
+
+  // Autosave/Draft state - pendingDraft doluyken kullanıcı henüz "Geri
+  // Yükle"/"Yok say" demedi, bu yüzden otomatik kaydetme BİLEREK duruyor
+  // (draftCheckDoneRef, bkz. aşağıdaki iki effect) - aksi halde fetch'ten
+  // gelen (ya da red-link'ten prefill edilen) İLK state değişikliği,
+  // kullanıcının henüz GÖRMEDİĞİ bir taslağın üzerine sessizce yazardı.
+  const [pendingDraft, setPendingDraft] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const draftCheckDoneRef = useRef(false);
+  const autosaveDebounceRef = useRef(null);
 
   // Düzenleme modunda departman sabit (var olan sayfanın departmanı) - Admin
   // dahil kimse değiştiremiyor. Oluşturma modunda: Admin seçebiliyor, normal
@@ -198,6 +224,90 @@ function WikiEditorPage({ token }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode, pageId, token]);
+
+  // Taslak kontrolü - SADECE bir kez, gerçek (fetch edilmiş ya da red-link'ten
+  // prefill edilmiş) başlangıç state'i oturduktan SONRA çalışıyor. Var olan
+  // bir taslak, o anki state'ten HERHANGİ bir alanda farklıysa kullanıcıya
+  // sorulmadan uygulanmıyor - "Geri Yükle"/"Yok say" banner'ı çıkıyor (bkz.
+  // handleRestoreDraft/handleDiscardDraft). Aynıysa (ör. daha önce zaten
+  // kaydedilmiş bir sayfanın taslağı, hiç değişmemiş) sessizce atlanıyor.
+  useEffect(() => {
+    if (isLoadingExisting) return;
+
+    const key = draftStorageKey(isEditMode ? pageId : null);
+    const raw = localStorage.getItem(key);
+
+    if (!raw) {
+      draftCheckDoneRef.current = true;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      const differs =
+        parsed.title !== title ||
+        parsed.content !== content ||
+        parsed.tags !== tags ||
+        parsed.visibility !== visibility ||
+        parsed.folderId !== folderId;
+
+      if (differs) {
+        setPendingDraft(parsed);
+      } else {
+        draftCheckDoneRef.current = true;
+      }
+    } catch {
+      // Bozuk/eski formatlı bir taslak - kurtarmaya çalışmak yerine temizle.
+      localStorage.removeItem(key);
+      draftCheckDoneRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoadingExisting]);
+
+  // Otomatik kaydetme - draftCheckDoneRef true OLMADAN (yani kullanıcı henüz
+  // var olan bir taslağı görüp karar vermeden) hiçbir şey yazmıyor. Debounce
+  // deseni linkSearchDebounceRef ile AYNI - her tuş vuruşunda zamanlayıcı
+  // sıfırlanıyor, sadece AUTOSAVE_DEBOUNCE_MS'lik bir sessizlikten sonra
+  // gerçekten localStorage'a yazıyor.
+  useEffect(() => {
+    if (!draftCheckDoneRef.current) return;
+
+    clearTimeout(autosaveDebounceRef.current);
+    autosaveDebounceRef.current = setTimeout(() => {
+      const draft = {
+        title,
+        content,
+        tags,
+        visibility,
+        folderId,
+        department: !isEditMode ? department : undefined,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(draftStorageKey(isEditMode ? pageId : null), JSON.stringify(draft));
+      setDraftSavedAt(draft.savedAt);
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(autosaveDebounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, tags, visibility, folderId, department]);
+
+  function handleRestoreDraft() {
+    if (!pendingDraft) return;
+    setTitle(pendingDraft.title ?? "");
+    setContent(pendingDraft.content ?? "");
+    setTags(pendingDraft.tags ?? "");
+    setVisibility(pendingDraft.visibility ?? "Public");
+    setFolderId(pendingDraft.folderId ?? null);
+    if (!isEditMode && isAdmin && pendingDraft.department) setDepartment(pendingDraft.department);
+    setPendingDraft(null);
+    draftCheckDoneRef.current = true;
+  }
+
+  function handleDiscardDraft() {
+    localStorage.removeItem(draftStorageKey(isEditMode ? pageId : null));
+    setPendingDraft(null);
+    draftCheckDoneRef.current = true;
+  }
 
   async function reloadTree(dept) {
     if (!dept) return;
@@ -425,6 +535,9 @@ function WikiEditorPage({ token }) {
     try {
       if (isEditMode) {
         await updateWikiPage(token, pageId, { title, content, visibility, folderId, tags });
+        // Gerçek kayıt başarılı oldu - artık bu içeriğin "kaydedilmemiş"
+        // hiçbir hâli yok, taslak anlamsız hale geldi.
+        localStorage.removeItem(draftStorageKey(pageId));
         navigate(`/wiki/${pageId}`);
       } else {
         const created = await createWikiPage(token, {
@@ -435,6 +548,7 @@ function WikiEditorPage({ token }) {
           folderId,
           tags,
         });
+        localStorage.removeItem(draftStorageKey(null));
         navigate(`/wiki/${created.id}`);
       }
     } catch (err) {
@@ -455,6 +569,26 @@ function WikiEditorPage({ token }) {
       <h1 className="mb-6 text-2xl font-medium" style={{ color: "var(--text-h)" }}>
         {isEditMode ? "Sayfayı Düzenle" : "Yeni Sayfa"}
       </h1>
+
+      {pendingDraft && (
+        <div
+          className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: "var(--brand-accent-border)", background: "var(--brand-accent-bg)" }}
+        >
+          <span style={{ color: "var(--text)" }}>
+            Kaydedilmemiş bir taslak bulundu ({new Date(pendingDraft.savedAt).toLocaleString("tr-TR")} tarihli) - geri
+            yüklemek ister misin?
+          </span>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" onClick={handleRestoreDraft}>
+              Geri Yükle
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={handleDiscardDraft}>
+              Yok say
+            </Button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
@@ -587,7 +721,10 @@ function WikiEditorPage({ token }) {
             </Button>
             {/* Hizalı resim - metnin ImageBlock'un aksine (her zaman ortada,
                 sabit boyutta) metnin YANINA konup metnin etrafından dolanması
-                gereken durumlar için (bkz. markdown.jsx'teki AlignedImageBlock). */}
+                gereken durumlar için (bkz. markdown.jsx'teki AlignedImageBlock).
+                İkinci select (boyut) - "Resize" (2026-08-17): serbest piksel
+                sürükleme yerine üç sabit boyut, bkz. markdown.jsx'teki
+                IMAGE_ALIGN_SIZE_CLASSES'daki gerekçe. */}
             <select
               value={imageAlign}
               onChange={(e) => setImageAlign(e.target.value)}
@@ -598,11 +735,23 @@ function WikiEditorPage({ token }) {
               <option value="center">Orta</option>
               <option value="right">Sağ</option>
             </select>
+            <select
+              value={imageSize}
+              onChange={(e) => setImageSize(e.target.value)}
+              className="rounded border px-1.5 py-1 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }}
+            >
+              <option value="small">Küçük</option>
+              <option value="medium">Orta</option>
+              <option value="large">Büyük</option>
+            </select>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => applyToolbarInsert(`:::image-${imageAlign}\n![`, "](https://...)\n:::", "Açıklama")}
+              onClick={() =>
+                applyToolbarInsert(`:::image-${imageAlign}-${imageSize}\n![`, "](https://...)\n:::", "Açıklama")
+              }
             >
               🖼️ Hizalı Resim
             </Button>
@@ -843,6 +992,14 @@ function WikiEditorPage({ token }) {
           >
             Vazgeç
           </Button>
+          {/* "Vazgeç"e basılsa bile taslak BİLEREK SİLİNMİYOR (bkz. handleSave'deki
+              temizleme, SADECE gerçek kayıt sonrası) - yanlışlıkla "Vazgeç"e
+              basan bir kullanıcı bir sonraki girişinde taslağını hâlâ bulabilsin. */}
+          {draftSavedAt && (
+            <span className="self-center text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+              Taslak kaydedildi · {new Date(draftSavedAt).toLocaleTimeString("tr-TR")}
+            </span>
+          )}
         </div>
       </form>
     </div>

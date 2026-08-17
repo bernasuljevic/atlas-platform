@@ -353,6 +353,86 @@ export async function updateWikiPage(accessToken, pageId, page) {
   }
 }
 
+// Version History (2026-08-17) - getDocumentVersions'la AYNI desen: SADECE
+// eski (arşivlenmiş) versiyonları döndürür, güncel hâl zaten getWikiPageById'de.
+export async function getWikiPageVersions(accessToken, pageId) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}/versions`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (response.status === 404) {
+    throw new Error("Versiyon geçmişi görüntülenemedi.");
+  }
+  if (!response.ok) {
+    throw new Error("Versiyon geçmişi yüklenemedi");
+  }
+
+  return response.json();
+}
+
+export async function getWikiPageVersionByNumber(accessToken, pageId, versionNumber) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}/versions/${versionNumber}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (response.status === 404) {
+    throw new Error("Bu versiyon bulunamadı.");
+  }
+  if (!response.ok) {
+    throw new Error("Versiyon yüklenemedi");
+  }
+
+  return response.json();
+}
+
+// updateWikiPage'deki AYNI 401 -> refresh -> tekrar dene deseni. Restore
+// backend'de bir düzenleme eylemi sayıldığı için (owner-or-Admin) 403 mesajı
+// da updateWikiPage'inkiyle TUTARLI.
+export async function restoreWikiPageVersion(accessToken, pageId, versionNumber) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/wiki/pages/${pageId}/versions/${versionNumber}/restore`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Bu sayfayı geri döndürme yetkin yok.");
+    }
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? "Versiyona geri dönülemedi");
+  }
+}
+
 export async function createWikiPage(accessToken, page) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pages`, {

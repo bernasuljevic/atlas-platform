@@ -11,4 +11,5 @@ public record WikiPageDto(
     Guid? FolderId,
     DateTime? UpdatedAtUtc,
     string? CreatedByEmail,
-    string? Tags);
+    string? Tags,
+    int CurrentVersionNumber);

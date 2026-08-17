@@ -13,9 +13,11 @@ public class UpdateWikiPageCommandHandlerTests
         FakeWikiFolderRepository? folderRepository = null,
         FakeUnitOfWork? unitOfWork = null,
         Guid? viewerUserId = null,
-        bool viewerIsAdmin = false)
+        bool viewerIsAdmin = false,
+        FakeWikiPageVersionRepository? versionRepository = null)
         => new(
             pageRepository,
+            versionRepository ?? new FakeWikiPageVersionRepository(),
             folderRepository ?? new FakeWikiFolderRepository(),
             new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId),
             unitOfWork ?? new FakeUnitOfWork());

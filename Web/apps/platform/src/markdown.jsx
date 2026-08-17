@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { AlertTriangle, Check, CheckCircle2, Copy, FileText, Info, PlayCircle, XCircle } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, FileText, Info, Maximize2, PlayCircle, X, XCircle } from "lucide-react";
 
 // Kasıtlı olarak KÜÇÜK, ELLE YAZILMIŞ bir render katmanı - dışarıdan bir
 // markdown kütüphanesi (react-markdown/marked) EKLENMEDİ, çünkü sadece
@@ -275,10 +275,51 @@ function CodeBlock({ code }) {
   );
 }
 
+// Eksik-özellik listesi (2026-08-17): fullscreen/lightbox. Tam Ekran Okuma
+// Modu'nun (WikiArticlePage.jsx) AYNI `fixed inset-0 z-50` deseni - tutarlı
+// bir "bu uygulamada tam ekran overlay böyle görünür" dili. ImageBlock VE
+// AlignedImageBlock'un İKİSİ de kendi yerel `isOpen` state'ini tutuyor (paylaşılan
+// bir Context/global state İCAT EDİLMEDİ - her görsel zaten bağımsız, aynı
+// anda en fazla BİR tanesi açık olabilir, yerel state bunun için yeterli).
+function ImageLightbox({ src, alt, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{ background: "rgba(0,0,0,0.9)" }}
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Kapat"
+        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-full"
+        style={{ background: "rgba(255,255,255,0.1)", color: "#fff" }}
+      >
+        <X size={18} />
+      </button>
+      <img
+        src={src}
+        alt={alt || "Görsel"}
+        className="max-h-[90vh] max-w-[90vw] rounded object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
 // Görselin gerçek "blok" hâli - kendi satırında tek başına duran bir
 // "![alt](url)" için (bkz. STANDALONE_IMAGE_PATTERN). CodeBlock/tablo gibi
 // diğer blok elemanlarla AYNI seviyede, doğrudan blocks[]'a itiliyor.
+//
+// Boyut BİLEREK sabit kalıyor (2026-08-07 kullanıcı geri bildirimi: "boyutu
+// darda olan kadar kalsın" - aşağıdaki max-w-[800px] notuna bkz.) - bu basit
+// sözdizimine ("![alt](url)") bir boyut seçeneği EKLENMEDİ. Boyut kontrolü
+// isteyen kullanıcı zaten AlignedImageBlock'un (":::image-center-{boyut}")
+// "gelişmiş" sözdizimini kullanabiliyor - iki ayrı ihtiyaç seviyesi, basit
+// olan basit kalıyor.
 function ImageBlock({ src, alt }) {
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
   return (
     // Kullanıcı geri bildirimi (2026-08-07, DOKUZUNCU geçiş - "görsel
     // hiçbirinde değişmesin, boyutu darda olan kadar kalsın") - ÖNCEKİ
@@ -292,17 +333,30 @@ function ImageBlock({ src, alt }) {
     // bir sütunda (mobil, "Dar" vb.) kendi genişliğine SIĞMAK için küçülüyor
     // (w-full + max-w birlikte - taşma yok, ama büyümüyor da).
     <figure className="my-4 mx-auto w-full max-w-[800px]">
-      <img
-        src={src}
-        alt={alt || "Görsel"}
-        className="mx-auto max-h-[560px] w-full rounded-lg border object-contain shadow-sm"
-        style={{ borderColor: "var(--border)" }}
-      />
+      <button
+        type="button"
+        onClick={() => setIsLightboxOpen(true)}
+        className="group relative block w-full cursor-zoom-in"
+        aria-label="Görseli büyüt"
+      >
+        <img
+          src={src}
+          alt={alt || "Görsel"}
+          className="mx-auto max-h-[560px] w-full rounded-lg border object-contain shadow-sm"
+          style={{ borderColor: "var(--border)" }}
+        />
+        {/* Büyütme ikonu SADECE hover'da görünüyor - "sade" hedefine göre,
+            görselin kendisini her zaman bir ikonla kirletmemek için. */}
+        <span className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full opacity-0 transition group-hover:opacity-100" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
+          <Maximize2 size={13} />
+        </span>
+      </button>
       {alt && (
         <figcaption className="mt-1.5 text-center text-[13px] italic opacity-75" style={{ color: "var(--text)" }}>
           {alt}
         </figcaption>
       )}
+      {isLightboxOpen && <ImageLightbox src={src} alt={alt} onClose={() => setIsLightboxOpen(false)} />}
     </figure>
   );
 }
@@ -366,26 +420,62 @@ function VideoBlock({ url, caption }) {
 // sonucu verir (float yok, ortalı) - üç seçeneği tutarlı tek bir sözdiziminde
 // (":::image-<yön>") sunmak, kullanıcının editördeki tek bir select'ten
 // hepsine erişebilmesi için.
-const IMAGE_ALIGN_CLASSES = {
-  left: "float-left mr-4 mb-2 max-w-[320px]",
-  right: "float-right ml-4 mb-2 max-w-[320px]",
-  center: "mx-auto max-w-[800px]",
+// Eksik-özellik listesi (2026-08-17): "Resize". Serbest piksel sürükleme
+// BİLEREK EKLENMEDİ (bir <textarea> tabanlı düz-metin editöründe fare ile
+// sürükleyip tam piksel değerini markdown'a yazmak - hem mouse-tracking hem
+// "editördeki taslak" ile "yayınlanan görünüm" arasında pixel-perfect bir
+// önizleme gerektirirdi, bu editörün mimarisiyle - bkz. dosyanın en
+// başındaki not, "genel amaçlı bir markdown motoruna gerek yok" - UYUŞMAZDI).
+// Bunun yerine WikiVisibilityRules/HEADING_SIZES'taki AYNI felsefe: sabit,
+// isimlendirilmiş ÜÇ boyut. "left"/"right" (float) İÇİN daha dar bir aralık
+// (metnin etrafından dolanması gerektiği için çok büyürse okumayı bozar),
+// "center" için ImageBlock'un kendi 800px üst sınırına kadar.
+const IMAGE_ALIGN_SIZE_CLASSES = {
+  left: {
+    small: "float-left mr-4 mb-2 max-w-[200px]",
+    medium: "float-left mr-4 mb-2 max-w-[320px]",
+    large: "float-left mr-4 mb-2 max-w-[440px]",
+  },
+  right: {
+    small: "float-right ml-4 mb-2 max-w-[200px]",
+    medium: "float-right ml-4 mb-2 max-w-[320px]",
+    large: "float-right ml-4 mb-2 max-w-[440px]",
+  },
+  center: {
+    small: "mx-auto max-w-[480px]",
+    medium: "mx-auto max-w-[800px]",
+    large: "mx-auto w-full max-w-[1100px]",
+  },
 };
 
-function AlignedImageBlock({ src, alt, align }) {
+function AlignedImageBlock({ src, alt, align, size }) {
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const sizeClasses = IMAGE_ALIGN_SIZE_CLASSES[align] ?? IMAGE_ALIGN_SIZE_CLASSES.center;
+
   return (
-    <figure className={`my-2 ${IMAGE_ALIGN_CLASSES[align] ?? IMAGE_ALIGN_CLASSES.center}`}>
-      <img
-        src={src}
-        alt={alt || "Görsel"}
-        className="w-full rounded-lg border object-contain shadow-sm"
-        style={{ borderColor: "var(--border)" }}
-      />
+    <figure className={`my-2 ${sizeClasses[size] ?? sizeClasses.medium}`}>
+      <button
+        type="button"
+        onClick={() => setIsLightboxOpen(true)}
+        className="group relative block w-full cursor-zoom-in"
+        aria-label="Görseli büyüt"
+      >
+        <img
+          src={src}
+          alt={alt || "Görsel"}
+          className="w-full rounded-lg border object-contain shadow-sm"
+          style={{ borderColor: "var(--border)" }}
+        />
+        <span className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full opacity-0 transition group-hover:opacity-100" style={{ background: "rgba(0,0,0,0.55)", color: "#fff" }}>
+          <Maximize2 size={13} />
+        </span>
+      </button>
       {alt && (
         <figcaption className="mt-1.5 text-center text-[12px] italic opacity-75" style={{ color: "var(--text)" }}>
           {alt}
         </figcaption>
       )}
+      {isLightboxOpen && <ImageLightbox src={src} alt={alt} onClose={() => setIsLightboxOpen(false)} />}
     </figure>
   );
 }
@@ -529,13 +619,18 @@ export function renderWikiMarkdown(content) {
       continue;
     }
 
-    // Hizalı resim - ":::image-left|center|right" ... ":::" - içindeki ilk
-    // satır "![alt](url)" olmalı (STANDALONE_IMAGE_PATTERN'in AYNISI), kalan
-    // satırlar (varsa) alt yazı olarak alt metnin YERİNE geçiyor.
-    const imageAlignMatch = line.trim().match(/^:::image-(left|center|right)$/);
+    // Hizalı resim - ":::image-left|center|right" (isteğe bağlı "-small|
+    // medium|large" boyut eki, bkz. IMAGE_ALIGN_SIZE_CLASSES) ... ":::" -
+    // içindeki ilk satır "![alt](url)" olmalı (STANDALONE_IMAGE_PATTERN'in
+    // AYNISI), kalan satırlar (varsa) alt yazı olarak alt metnin YERİNE
+    // geçiyor. Boyut eki OPSİYONEL - eski içerikte (":::image-left", boyut
+    // eklenmeden önce yazılmış) hâlâ eşleşiyor, `size` grubu `undefined`
+    // kalıp aşağıda "medium"a düşüyor - GERİYE DÖNÜK UYUMLULUK BOZULMADI.
+    const imageAlignMatch = line.trim().match(/^:::image-(left|center|right)(?:-(small|medium|large))?$/);
     if (imageAlignMatch) {
       flushParagraph();
       const align = imageAlignMatch[1];
+      const size = imageAlignMatch[2] ?? "medium";
       i++;
       const innerLines = [];
       while (i < lines.length && lines[i].trim() !== ":::") {
@@ -551,7 +646,9 @@ export function renderWikiMarkdown(content) {
       if (imgMatch) {
         const [, alt, src] = imgMatch;
         const caption = captionLines.join(" ").trim() || alt;
-        blocks.push(<AlignedImageBlock key={`img-align-${blocks.length}`} src={src} alt={caption} align={align} />);
+        blocks.push(
+          <AlignedImageBlock key={`img-align-${blocks.length}`} src={src} alt={caption} align={align} size={size} />
+        );
       }
       continue;
     }

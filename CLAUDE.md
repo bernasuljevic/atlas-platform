@@ -353,6 +353,34 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     onu doğrulayan testler görünmez şekilde kırılmıştı. "Testler mevcut, o
     zaman güvenlik ağı sağlam" varsayımı, o testlerin GERÇEKTEN çalıştırıldığı
     (ve CI'ın onları atlamadığı) doğrulanmadan yapılmamalı.
+22. **EF Core'un `ExecuteDeleteAsync`/`ExecuteUpdateAsync`'i InMemory
+    sağlayıcısında ÇALIŞMIYOR - gerçek SQL Server'a karşı yerelde test etmek
+    bunu YAKALAYAMAZ:** Wiki Version History'nin `EfWikiPageVersionRepository.
+    DeleteAllForWikiPageAsync`'i ilk yazıldığında `ExecuteDeleteAsync`
+    kullanıyordu - yerelde (gerçek `.\SQLEXPRESS`'e karşı) hem curl/sqlcmd hem
+    tarayıcı testinde SORUNSUZ çalıştı, hiçbir hata vermedi. PR #19'un CI'ında
+    (2026-08-17) `OutboxIntegrationTests.SayfaSilininceOlusanOutboxMesaji_
+    DogruEventTipindeYaziliyor` `DELETE /api/wiki/pages/{id}`'de 500 alıp
+    kırıldı - kök sebep: integration test host'u (`AtlasApiFactory.cs`)
+    `WikiDbContext`'i (Auth/Wiki/Audit/Documents gibi) EF Core InMemory
+    sağlayıcısına çeviriyor (SADECE Vault/AI gerçek veritabanına bağlı kalıyor,
+    bkz. yukarıdaki "InMemory'ye çevrilme" notları) - InMemory sağlayıcısı
+    `ExecuteDelete`/`ExecuteUpdate`'i DESTEKLEMİYOR, `InvalidOperationException`
+    fırlatıyor. Düzeltme: `ExecuteDeleteAsync` yerine `ToListAsync()` +
+    `RemoveRange()` (AddAsync'teki AYNI "stage et, çağıranın `SaveChangesAsync`'i
+    beklesin" deseni) - hem InMemory'de HEM gerçek SQL Server'da çalışıyor,
+    ÜSTELİK asıl istenen atomikliği de sağlıyor (`ExecuteDeleteAsync` zaten
+    HEMEN/AYRI çalışıyordu, `DeleteWikiPageCommandHandler`'ın sonundaki TEK
+    `SaveChangesAsync`'in dışında kalıyordu - bu da ayrı, gizli bir
+    atomiklik kusuruydu, sadece CI'ın InMemory sağlayıcısı sayesinde daha
+    erken yakalandı). Genel ders: **gerçek bir veritabanına karşı yerel test
+    "yeterince gerçek" değildir** - bu proje kasıtlı olarak bazı modüllerde
+    InMemory (hız için) bazılarında gerçek DB (Vault/AI, davranış doğruluğu
+    için) kullanıyor; EF Core'un bulk `Execute*` API'leri gibi provider'a özgü
+    davranış farklılıkları SADECE CI'ın (ya da InMemory'nin) kullandığı
+    provider'a karşı ortaya çıkabilir - "yerelde sorunsuz çalıştı" tek başına
+    yeterli bir doğrulama değil, mümkünse HER İKİ sağlayıcıya karşı da (ya da
+    en azından CI'ınkine karşı) test edilmeli.
 
 ## Şu ana kadar tamamlananlar
 
@@ -1670,6 +1698,235 @@ göründüğü, tıklanınca doğru sayfaya gittiği, "Yazmaya başla" kartını
 `npx vitest run` (24/24) yeşil. Test verisi temizlendi.
 
 **"Kalıcı Bildirim Geçmişi" özelliği artık TAMAMEN BİTTİ (Gün 1-2).**
+
+## Eksik-özellik listesi - Gün 2: Görsel resize + fullscreen/lightbox (2026-08-17)
+
+Gün 1'deki (okuma ilerleme çubuğu + arama derin linki) devamı - listenin
+"A) Hızlı, düşük risk, sadece frontend" grubundaki son madde.
+
+- [x] **Resize - serbest piksel sürükleme BİLİNÇLİ OLARAK EKLENMEDİ.**
+      Bir `<textarea>` tabanlı düz-metin editöründe fare ile sürükleyip tam
+      piksel değerini markdown'a yazmak, hem mouse-tracking hem "editördeki
+      taslak = yayınlanan görünüm" pixel-perfect bir önizleme gerektirirdi -
+      bu editörün "gerçek bir contenteditable/blok editörü yok" mimarisiyle
+      uyuşmazdı. Bunun yerine `HEADING_SIZES`/`WikiVisibilityRules`'daki AYNI
+      felsefe: üç sabit, isimlendirilmiş boyut (Küçük/Orta/Büyük).
+      `:::image-{sol|orta|sağ}` sözdizimine isteğe bağlı bir `-{small|medium|
+      large}` eki eklendi (`IMAGE_ALIGN_SIZE_CLASSES`, markdown.jsx) - eki
+      OLMAYAN eski içerik hâlâ eşleşiyor, `medium`'a düşüyor (GERİYE DÖNÜK
+      UYUMLULUK bozulmadı, migration/veri dönüşümü gerekmedi). Editöre
+      ikinci bir `<select>` (boyut) eklendi, mevcut hizalama select'inin
+      yanına.
+- [x] **Fullscreen/lightbox** - Tam Ekran Okuma Modu'nun (WikiArticlePage.jsx)
+      AYNI `fixed inset-0 z-50` deseni, tutarlı bir "bu uygulamada tam ekran
+      overlay böyle görünür" dili. `ImageBlock` VE `AlignedImageBlock`'un
+      İKİSİ de kendi yerel `isOpen` state'ini tutuyor - paylaşılan bir
+      Context/global state İCAT EDİLMEDİ (aynı anda en fazla bir görsel
+      açık olabilir, yerel state yeterli). Büyütme ikonu SADECE hover'da
+      görünüyor ("sade" hedefine göre, görseli her zaman bir ikonla
+      kirletmemek için).
+
+Canlı doğrulandı: `:::image-left-large` + `:::image-center-small` içeren
+gerçek bir sayfa oluşturuldu, render edilen `<figure>`'ların computed
+`max-width`/`float` değerleri (440px float-left, 480px ortalı) doğru
+eşleşti; bir görsele tıklanınca lightbox doğru `src` ile açıldı, kapatma
+düğmesiyle kapandığı doğrulandı; editördeki boyut `<select>`'i test edilip
+doğru sözdiziminin (`:::image-right-small\n![Açıklama](https://...)\n:::`)
+üretildiği teyit edildi. `npm run lint`/`npm run build`/`npx vitest run`
+(24/24) yeşil. Test verisi temizlendi.
+
+**Eksik-özellik listesinin "A" grubu (hızlı, düşük risk, sadece frontend)
+artık TAMAMEN BİTTİ** - okuma ilerleme çubuğu, arama derin linki, görsel
+resize/lightbox. Sırada "B) Orta, mevcut desenleri tekrar kullanıyor" grubu
+var: Wiki sayfaları için Version History + Autosave/Draft göstergesi.
+
+## Eksik-özellik listesi - B Grubu, Gün 1: Wiki Version History backend (2026-08-17)
+
+"B) Orta, mevcut desenleri tekrar kullanıyor" grubunun ilk maddesi. Yeni bir
+tasarım İCAT EDİLMEDİ - Documents modülünün P6'daki `DocumentVersion`/
+`UploadNewDocumentVersionCommandHandler` deseni ("önce mevcut hâli
+snapshot'la, SONRA üzerine yaz") BİREBİR Wiki'ye taşındı.
+
+- [x] **`WikiPage.CurrentVersionNumber`** - Domain'de yeni bir alan, `Update()`
+      her çağrıldığında artıyor. `WikiPage.cs`'in KENDİSİ hiçbir zaman eski
+      bir versiyonu tutmuyor - HER ZAMAN en güncel hâli taşıyor, geçmiş
+      SADECE ayrı bir tabloda yaşıyor (bkz. altta).
+- [x] **`WikiPageVersion` (Domain, YENİ entity)** - `DocumentVersion`'ın
+      birebir karşılığı: `WikiPage`'e FK İLE BAĞLI DEĞİL (bu projede FK'ler
+      sadece Wiki'nin cross-module ham-SQL migration'ındaki istisnai durumda
+      var - temizlik DB cascade'ine değil Handler'ın orkestrasyonuna
+      bırakılıyor). `EditedByUserId`/`EditedByEmail` BİLİNÇLİ bir
+      sadeleştirme - içeriği İLK YAZAN değil, o versiyonu DEĞİŞTİREN kişi
+      (orijinal yazar zaten `WikiPage.CreatedByUserId`'de duruyor).
+      `(WikiPageId, VersionNumber)` composite unique index. Migration
+      (`AddWikiPageVersions`) uygulandı - **dikkat edilen bir detay:**
+      `CurrentVersionNumber` kolonunun migration'daki `defaultValue`'su `0`
+      DEĞİL `1` olarak ayarlandı, çünkü Domain'deki in-memory varsayılan da
+      `1` - migration'dan ÖNCE var olan (hiç düzenlenmemiş) sayfalar da
+      "1. versiyon"da sayılmalı, `0` olsaydı bu sayfalar için tutarsız/yanlış
+      bir başlangıç değeri olurdu.
+- [x] **`UpdateWikiPageCommandHandler`** artık `page.Update(...)` çağrısından
+      HEMEN ÖNCE mevcut (o ana kadar güncel olan) hâli bir
+      `WikiPageVersion.CreateSnapshot(...)`'a alıp kaydediyor -
+      `UploadNewDocumentVersionCommandHandler`'daki "önce snapshot, SONRA
+      ReplaceFile" sırasıyla AYNI. **`DeleteWikiPageCommandHandler`** artık
+      sayfa silinince `IWikiPageVersionRepository.DeleteAllForWikiPageAsync`
+      ile geçmişteki TÜM versiyonları da temizliyor (`DeleteDocumentCommandHandler`'ın
+      "versiyon dosyalarını da diskten temizle" gerekçesiyle AYNI - burada
+      disk yok, sadece DB satırı, ama "yetim" veri bırakmama ilkesi aynı).
+      Bu Outbox ÜZERİNDEN DEĞİL, Handler içinde doğrudan yapılıyor - versiyon
+      geçmişi tamamen Wiki modülünün kendi iç verisi, başka bir modül
+      dinlemiyor.
+- [x] **`GetWikiPageVersionsQuery`/`GetWikiPageVersionByNumberQuery`** -
+      `GetWikiPageByIdQueryHandler`'daki AYNI "varlığı gizle" deseni (null
+      dönerse 404) + AYNI `page.IsVisibleTo(viewerDepartment, viewerIsAdmin)`
+      görünürlük kuralı - Id'yi bilmek geçmişi görebilmek anlamına gelmiyor.
+      Versiyon listesi SADECE ESKİ (arşivlenmiş) versiyonları döndürüyor -
+      güncel hâl zaten `GET /api/wiki/pages/{id}`'in kendisinde.
+- [x] **`RestoreWikiPageVersionCommand`** - owner-or-Admin (Update/Delete ile
+      AYNI yetki deseni, throw-based 403/400 - Restore da bir düzenleme
+      eylemi). Handler ÖNCE geri dönülmeden HEMEN ÖNCEki hâli YENİ bir
+      snapshot olarak arşive ekliyor, SONRA hedef versiyonun içeriğini
+      `page.Update(...)`'e veriyor - "geri dönmek" hiçbir hâli sessizce
+      kaybetmiyor, kendisi de versiyonlanabilir bir eylem. `IAuditableCommand`
+      ile audit'leniyor ("WikiPage.VersionRestored").
+- [x] **3 yeni endpoint:** `GET /api/wiki/pages/{id}/versions`,
+      `GET /api/wiki/pages/{id}/versions/{versionNumber}`,
+      `POST /api/wiki/pages/{id}/versions/{versionNumber}/restore`.
+
+**Canlı doğrulandı (curl + sqlcmd ile uçtan uca):** bir sayfa oluşturulup iki
+kez güncellendi (v1→v2→v3), versiyon listesi doğru sırayla (`[2, 1]` - v3
+güncel olduğu için listede YOK) döndü, eski versiyonların içeriği/etiketleri
+doğru okundu. v1'e restore edilince: sayfa v1'in içeriğine döndü,
+`CurrentVersionNumber` 4'e çıktı (3 DEĞİL - restore da bir versiyon
+ilerletir), restore edilmeden HEMEN ÖNCEki hâl (v3) otomatik olarak yeni bir
+snapshot'a (versiyon 3) dönüştü - versiyon listesi artık `[3, 2, 1]`. Audit
+log'da `WikiPage.VersionRestored` doğru `Details` ("Versiyon Testi v1 (v1
+sürümüne geri döndürüldü)") ile kayıtlı. Güvenlik testleri: aynı departmandan
+sahibi-olmayan bir kullanıcı versiyonları GÖREBİLDİ ama restore denemesi 403
+aldı; başka departmandan (IK) bir kullanıcı `GET .../versions` VE
+`GET .../versions/{n}` için 404 aldı (varlık gizlendi) - restore denemesi ise
+403 döndü (Update/Delete'in ZATEN taşıdığı, mutasyon komutlarının throw-based
+olup "varlığı gizle"mediği kuralla TUTARLI, yeni bir açık DEĞİL). Sayfa
+silinince 4 versiyon satırının TAMAMININ da temizlendiği doğrulandı. 13 yeni
+unit test (`RestoreWikiPageVersionCommandHandlerTests`,
+`GetWikiPageVersionsQueryHandlerTests`, `GetWikiPageVersionByNumberQueryHandlerTests`)
++ `dotnet test Atlas.sln --filter "Category!=Integration"` yeşil (regresyon
+yok - `UpdateWikiPageCommandHandlerTests`/`DeleteWikiPageCommandHandlerTests`'in
+`CreateHandler` yardımcıları yeni `IWikiPageVersionRepository` parametresini
+alacak şekilde güncellendi). Test verisi (1 sayfa + 3 kullanıcı) temizlendi.
+
+## Eksik-özellik listesi - B Grubu, Gün 2: Wiki Version History frontend (2026-08-17)
+
+`DocumentDetailPage.jsx`'teki versiyon geçmişi listesinin (P6) fikrini
+taşıdı, ama Documents'ın "İndir" düğmesi yerine burada "Önizle + geri dön"
+var - Wiki'nin içeriği (markdown) İNDİRİLECEK bir dosya değil, DOĞRUDAN
+görüntülenebilir.
+
+- [x] **Yeni "Geçmiş" sekmesi** - `WikiArticlePage.jsx`'in var olan "Madde"/
+      "Tartışma" sekme desenine ÜÇÜNCÜ bir sekme olarak eklendi (yeni bir
+      Dialog/route İCAT EDİLMEDİ, `activeTab` state'i zaten vardı).
+- [x] **`WikiVersionHistoryPanel.jsx` (YENİ, kendi kendine yeten bileşen)** -
+      `DiscussionPanel.jsx`'le AYNI desen (kendi state'ini, kendi veri
+      çekmesini yönetiyor, parent'a sadece `onRestored` callback'iyle haber
+      veriyor). Bir versiyon satırına tıklanınca İÇİNDE genişleyip
+      `renderWikiMarkdown` ile SALT-OKUNUR bir önizleme gösteriyor - AYRI bir
+      Dialog/route AÇILMADI (bu projede içerik görüntüleme Dialog'dan tam
+      sayfaya kaydı, bkz. WikiPageTable'ın eski detay dialogunun kaldırılma
+      gerekçesi - satır-içi genişleme bu felsefeyle daha tutarlı). "Bu
+      sürüme geri dön" düğmesi SADECE `canRestore` (owner-or-Admin, parent'tan
+      geliyor) true ise gösteriliyor - backend zaten 403 ile reddediyor, bu
+      sadece UI'da gereksiz bir düğme göstermemek için.
+- [x] **3 yeni `api.js` fonksiyonu** - `getWikiPageVersions`/
+      `getWikiPageVersionByNumber`/`restoreWikiPageVersion`, `updateWikiPage`
+      ile AYNI 401→refresh→tekrar dene deseni.
+- [x] **Restore sonrası state güncellemesi** - `DocumentDetailPage`'in "yeni
+      versiyon yüklendi" akışındaki AYNI gerekçeyle iyimser (optimistic) bir
+      güncelleme YAPILMADI - `handleVersionRestored`, sayfayı sunucudan
+      YENİDEN çekip `page` state'ini tazeliyor, "Madde" sekmesi bir sonraki
+      bakışta gerçek (restore edilmiş) içeriği gösteriyor.
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, admin girişiyle):** var
+olan bir sayfa ("Blok Editörü Test Sayfası") düzenlenip bir versiyon
+oluşturuldu, "Geçmiş" sekmesinde doğru göründü; satıra tıklanınca
+ESKİ (düzenlemeden önceki) içerik doğru render edildi; "Bu sürüme geri dön"
+tıklanınca - **ortamın `window.confirm()`'ü CDP üzerinden otomatik
+reddettiği fark edildi** (bu ortamın bilinen bir sınırlaması, bu projenin
+`handleDelete` gibi diğer `window.confirm()` kullanan akışlarıyla AYNI
+davranış) - `window.confirm` geçici olarak `true` döndürecek şekilde
+override edilip TEKRAR denendi: restore doğru çalıştı, "Madde" sekmesi
+ANINDA (sayfa yenilemeden) eski içeriği gösterdi, "Geçmiş" sekmesi
+pre-restore hâli otomatik olarak yeni bir versiyon (2) olarak arşivledi.
+Test sırasında oluşan versiyon satırları + `CurrentVersionNumber` sqlcmd ile
+temizlenip sayfa test-öncesi hâline döndürüldü. `npm run lint`/`npm run
+build`/`npm run test` (24/24) yeşil - yeni kod hiçbir yeni uyarı/hata
+eklemedi.
+
+**"Eksik-özellik listesi B grubu"nun ilk maddesi (Wiki Version History) artık
+TAMAMEN BİTTİ (Gün 1-2, backend+frontend).** Sırada grubun ikinci maddesi:
+Autosave/Draft göstergesi.
+
+## Eksik-özellik listesi - B Grubu, Gün 3: Autosave/Draft göstergesi (2026-08-17)
+
+B grubunun ikinci ve son maddesi - "mevcut desenleri tekrar kullanıyor"
+temasına rağmen bu sefer YENİ bir mimari karar gerekiyordu: taslak nereye
+yazılacak?
+
+**Mimari karar - backend'e HİÇ dokunulmadı, tamamen `localStorage`:**
+Gün 1-2'de bitirdiğimiz `WikiPageVersion` GERÇEK, kaydedilmiş bir geçmiş
+tutuyor - Autosave'in amacı bunun TAMAMEN FARKLISI: sadece tarayıcı-yerel bir
+kazayı (yanlışlıkla sekme kapatma, "Vazgeç"e basma, tarayıcı çökmesi) telafi
+etmek. Bu, theme/Okuma Ayarları/TOC-panel durumu gibi projenin ZATEN
+`localStorage`'da tuttuğu "cihaza özel, senkron gerekmeyen" veri kategorisiyle
+BİREBİR aynı. Bir backend `Draft` entity'si (yeni tablo/endpoint/sahiplik
+kuralı/temizlik mantığı) hem gereksiz karmaşıklık olurdu hem de gerçek
+versiyon geçmişiyle kavramsal olarak karışırdı - "taslak karalama" ile
+"kaydedilmiş sürüm" aynı tabloda YAŞAMAMALI.
+
+- [x] **`WikiEditorPage.jsx`'e autosave** - `AUTOSAVE_DEBOUNCE_MS` (1500ms)
+      sonra title/content/tags/visibility/folderId/department (SADECE
+      oluşturma modunda) `localStorage`'a yazılıyor. Anahtar şeması:
+      düzenleme modunda `wiki-draft-edit-{pageId}` (sayfalar birbirini
+      EZMESİN), oluşturma modunda TEK bir `wiki-draft-new` (theme/reading
+      settings'teki AYNI "tek global anahtar" basitliği - aynı anda birden
+      fazla "yeni sayfa" taslağı YAGNI).
+- [x] **Taslak kurtarma banner'ı** - sayfa açılışında (fetch tamamlandıktan/
+      red-link prefill'inden HEMEN SONRA) var olan bir taslak, o anki state'ten
+      HERHANGİ bir alanda farklıysa "Kaydedilmemiş bir taslak bulundu... geri
+      yüklemek ister misin?" banner'ı çıkıyor - "Geri Yükle" / "Yok say".
+      **Kritik sıralama detayı:** `draftCheckDoneRef` (bir state DEĞİL, bir ref)
+      kullanıcı bu karara VARANA kadar otomatik kaydetmeyi BLOKLUYOR - aksi
+      halde fetch'ten gelen İLK state değişikliği, kullanıcının henüz
+      GÖRMEDİĞİ bir taslağın üzerine sessizce yazardı (canlı test edilerek
+      doğrulanan bir tasarım kararı, kod yazılırken baştan düşünüldü).
+- [x] **"Vazgeç" taslağı SİLMİYOR** - sadece gerçek bir kayıt (`handleSave`
+      başarılı olunca) taslağı temizliyor. Yanlışlıkla "Vazgeç"e basan bir
+      kullanıcı, sayfaya geri döndüğünde taslağını hâlâ bulabiliyor - bu,
+      autosave'in "kazaya karşı güvenlik ağı" olma amacıyla tutarlı (kazara
+      Vazgeç de bir kaza sayılıyor).
+- [x] **Durum göstergesi** - Kaydet/Vazgeç düğmelerinin yanında "Taslak
+      kaydedildi · HH:MM:SS" (sade, tek satır metin - yeni bir UI elementi
+      İCAT EDİLMEDİ).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle):** hem oluşturma hem
+düzenleme modunda - yazıp 2sn beklenince taslak `localStorage`'a doğru
+içerikle yazıldı, gösterge göründü; kaydetmeden başka bir sayfaya gidip geri
+dönülünce banner doğru çıktı; "Geri Yükle" tıklanınca alanlar taslaktan
+doğru dolduruldu; "Yok say" tıklanınca hem banner kapandı hem `localStorage`
+temizlendi VE alanlar mevcut (fetch edilmiş/boş) hâlinde kaldı; gerçek bir
+"Yayınla"/"Kaydet" sonrası taslağın `localStorage`'dan silindiği doğrulandı.
+**Test sırasında kendi test script'imde bulunan bir hata (ürün kodunda
+değil):** ilk düzenleme-modu testinde textarea'ya `computer` aracıyla
+yazdırılan ek metin GERÇEKTE textarea'ya ulaşmamıştı (muhtemelen stale bir
+element referansı) - banner'ın "görünmediği" ilk gözlem BU YÜZDENDİ, ürün
+kodunda bir eksiklik değildi; native input setter + `dispatchEvent`
+kullanılarak yeniden denenince (içeriğin gerçekten değiştiği doğrulanarak)
+banner beklendiği gibi doğru çıktı. Test verisi (oluşturulan sayfa + tüm
+`wiki-draft-*` anahtarları) temizlendi. `npm run lint`/`build`/`test`
+(24/24) yeşil - yeni kod hiçbir yeni uyarı/hata eklemedi.
+
+**"Eksik-özellik listesi B grubu" artık TAMAMEN BİTTİ (Wiki Version History
+Gün 1-2 + Autosave/Draft Gün 3).**
 
 ## Sırada ne var
 

@@ -15,6 +15,7 @@ public class WikiDbContext : DbContext
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<UserPageFavorite> UserPageFavorites => Set<UserPageFavorite>();
     public DbSet<UserPagePin> UserPagePins => Set<UserPagePin>();
+    public DbSet<WikiPageVersion> WikiPageVersions => Set<WikiPageVersion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

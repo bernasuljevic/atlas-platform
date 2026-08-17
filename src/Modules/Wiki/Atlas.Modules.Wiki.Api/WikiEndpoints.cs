@@ -90,6 +90,35 @@ public static class WikiEndpoints
         .WithName("UpdateWikiPage")
         .RequireAuthorization();
 
+        // Version History (2026-08-17) - GetWikiPageById ile AYNI "varlığı
+        // gizle" deseni (açık endpoint, görünürlük filtresi otomatik). SADECE
+        // ESKİ versiyonları döndürür (güncel versiyon zaten GET /pages/{id}'in
+        // currentVersionNumber alanında) - Documents'ın versiyon listesiyle
+        // AYNI ayrım.
+        group.MapGet("/pages/{id:guid}/versions", async (Guid id, IMediator mediator) =>
+        {
+            var versions = await mediator.Send(new GetWikiPageVersionsQuery(id));
+            return versions is null ? Results.NotFound() : Results.Ok(versions);
+        })
+        .WithName("GetWikiPageVersions");
+
+        group.MapGet("/pages/{id:guid}/versions/{versionNumber:int}", async (Guid id, int versionNumber, IMediator mediator) =>
+        {
+            var version = await mediator.Send(new GetWikiPageVersionByNumberQuery(id, versionNumber));
+            return version is null ? Results.NotFound() : Results.Ok(version);
+        })
+        .WithName("GetWikiPageVersionByNumber");
+
+        // Yetki kuralı istemciden gelmiyor - UpdateWikiPage ile AYNI owner-or-Admin
+        // kararı Handler'da (bkz. RestoreWikiPageVersionCommandHandler).
+        group.MapPost("/pages/{id:guid}/versions/{versionNumber:int}/restore", async (Guid id, int versionNumber, IMediator mediator) =>
+        {
+            await mediator.Send(new RestoreWikiPageVersionCommand(id, versionNumber));
+            return Results.NoContent();
+        })
+        .WithName("RestoreWikiPageVersion")
+        .RequireAuthorization();
+
         // GetWikiPages ile AYNI desen - açık endpoint, departmanı istemci seçer
         // ("hangi ağacı gösteriyorum") ama SONUÇTA neyin göründüğü Handler'ın
         // JWT'den okuduğu gerçek departmana/Admin rolüne göre belirlenir.
