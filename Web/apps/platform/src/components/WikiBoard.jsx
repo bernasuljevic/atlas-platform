@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { getWikiPages } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import WikiSearch from "./WikiSearch";
@@ -23,6 +23,15 @@ function WikiBoard({ token }) {
   // JWT'yi sadece UI kararları için okuyoruz (buton/alan göster-gizle) - gerçek
   // yetkilendirme her zaman backend'de. Token değişirse (refresh sonrası) yeniden hesaplanır.
   const { userId, isAdmin } = useMemo(() => getUserInfoFromToken(token), [token]);
+
+  // Görsel Tasarım Yenileme Gün 2 (2026-08-17) - ana sayfadaki Hero arama
+  // kutusu buraya "?q=..." ile yönlendiriyor. WikiSearch'ün initialQuery
+  // prop'u/kendi useEffect'i ZATEN vardı (yorumunda "üst bardaki arama
+  // kutusundan buraya yönlendirildiğinde" diye açıkça yazıyordu) ama hiçbir
+  // yer bu URL parametresini OKUMUYORDU - gerçek bir bağlanmamış uç
+  // (dangling wiring) idi, burada tamamlanıyor.
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
 
   const [pages, setPages] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
@@ -66,7 +75,7 @@ function WikiBoard({ token }) {
         </Link>
       </div>
 
-      <WikiSearch token={token} />
+      <WikiSearch token={token} initialQuery={initialQuery} />
 
       {error && <p style={{ color: "red" }} className="mb-3 text-sm">{error}</p>}
 

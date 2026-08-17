@@ -36,4 +36,18 @@ public class EfNotificationRepository : INotificationRepository
             .Take(take)
             .ToListAsync(ct);
     }
+
+    // ExecuteDeleteAsync BILEREK kullanilmiyor - Ders #22 (EF Core InMemory
+    // saglayicisi bulk Execute* API'lerini desteklemiyor). Bu DbContext su an
+    // integration testlerde InMemory'e cevrilmiyor ama Wiki/Vault'un ayni
+    // temizlik metotlarindaki AYNI guvenli deseni (ToListAsync + RemoveRange)
+    // burada da tutarlilik icin koruyoruz.
+    public async Task DeleteAllForResourceAsync(Guid resourceId, CancellationToken ct = default)
+    {
+        var entries = await _dbContext.NotificationEntries
+            .Where(n => n.ResourceId == resourceId)
+            .ToListAsync(ct);
+        _dbContext.NotificationEntries.RemoveRange(entries);
+        await _dbContext.SaveChangesAsync(ct);
+    }
 }

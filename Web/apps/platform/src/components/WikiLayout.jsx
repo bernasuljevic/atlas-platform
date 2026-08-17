@@ -14,6 +14,7 @@ import {
 import { getWikiSearchSuggestions } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import WikiFolderTree from "./WikiFolderTree";
+import AtlasLogo from "./AtlasLogo";
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -115,7 +116,11 @@ function WikiLayout({ token, onLogout }) {
         </button>
 
         <Link to="/wiki" className="flex items-center gap-2 font-semibold" style={{ color: "var(--text-h)" }}>
-          <img src="/logo.png" alt="Atlas Wiki" className="h-7 w-7 rounded-full object-cover" />
+          {/* Teal/turuncu redesign (2026-08-17) - eski logo.png (statik PNG,
+              yeşil blob) yerine CSS değişkenlerini okuyan bir SVG marka
+              işareti (bkz. AtlasLogo.jsx'teki not) - açık/koyu temada
+              otomatik doğru renklere geçiyor. */}
+          <AtlasLogo size={28} className="shrink-0" />
           <span className="hidden sm:inline">Atlas Wiki</span>
         </Link>
 

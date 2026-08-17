@@ -133,9 +133,13 @@ export async function getDocumentSearchSuggestions(accessToken, queryText) {
   return response.json();
 }
 
-export async function getWikiDashboard(accessToken) {
+// recentlyAddedCount opsiyonel - "Son Eklenen Makaleler" carousel'ının
+// (2026-08-17) birden fazla sayfasını doldurmak için HomePage varsayılandan
+// (backend'in kendi varsayılanı 5) fazlasını istiyor.
+export async function getWikiDashboard(accessToken, recentlyAddedCount) {
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-  const response = await fetch(`${API_URL}/api/wiki/dashboard`, { headers });
+  const query = recentlyAddedCount ? `?recentlyAddedCount=${recentlyAddedCount}` : "";
+  const response = await fetch(`${API_URL}/api/wiki/dashboard${query}`, { headers });
 
   if (!response.ok) {
     throw new Error("Ana sayfa yüklenemedi");

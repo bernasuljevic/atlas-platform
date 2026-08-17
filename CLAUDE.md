@@ -2226,6 +2226,210 @@ TAMAMEN BİTTİ (Gün 1-4, backend+frontend+test).** D grubunun geri kalanı
 (video transkript indeksleme) hâlâ gerçek bir engelle bloklanmış durumda -
 aşağıya bkz.
 
+## Görsel Tasarım Yenileme - Teal/Cyan + Turuncu Palet (2026-08-17)
+
+Eksik-özellik listesinden (D grubu) BAĞIMSIZ, kullanıcının bir referans
+mockup ekran görüntüsü (koyu tema, teal/cyan + turuncu gradient vurgulu bir
+Atlas Wiki ana sayfa tasarımı) paylaşıp "aynı olsun" demesiyle açıldı. Ayrı
+bir branch'te (`design/teal-cyan-homepage-redesign`, `master`'dan) - D
+grubunun devam eden branch'leriyle (`feature/video-link-autodetect`,
+`feature/vault-sharing`) İLGİSİZ, o yüzden karışmasınlar diye bilerek ayrı
+tutuldu. 2 güne bölündü - Gün 1 (bu bölüm) palet+logo, Gün 2 ana sayfanın
+kendisi (hero/öne çıkan makale/belgeler widget'ı/video widget'ı/istatistik
+grafiği/footer).
+
+**Gün 1 - Renk paleti + logo:**
+
+- [x] **`index.css` TAMAMEN yeniden renklendirildi** - eski yeşil+krem+kahve
+      paleti (aylar süren WCAG-doğrulama emeğiyle kurulmuştu) yerine teal/cyan
+      (ANA etkileşim rengi, eski yeşille AYNI ROL - link/buton/rozet/focus
+      ring) + turuncu (YENİ, SADECE ikincil/gradient bir vurgu - `--accent-warm`,
+      `--brand-accent`'in yerine GEÇMİYOR). **Eski paletin WCAG emeği BOŞA
+      GİTMEDİ** - AYNI yöntem (tahminle değil, gerçek kontrast oranı
+      hesaplanıp doğrulanarak, bkz. scratchpad'teki `contrast.js`) burada da
+      uygulandı: koyu modda `--brand-accent` (#0d828f) beyazla 4.56:1, sayfa
+      zeminiyle 4.06:1 - eski #1d8660 düzeltmesinin (4.53/4.01) BİREBİR AYNI
+      "iki ucu da mümkün olduğunca yükseğe çek" dengesiyle seçildi. Açık mod
+      için de aynı titizlik (#0c7c92: beyazla 4.87:1, zeminle 4.54:1).
+      `--accent-warm` turuncusu da AYNI şekilde doğrulandı (koyu #c2570f
+      beyazla 4.50:1, açık #ad4a0d beyazla 5.58:1). Yeni `--gradient-hero`
+      token'ı (teal→turuncu) Gün 2'nin hero bölümü için hazırlandı.
+- [x] **`AtlasLogo.jsx` (YENİ, SVG bileşen)** - eski `logo.png` (statik PNG,
+      yeşil blob) yeni paletle renk UYUMSUZLUĞUNA düştüğü için (CSS
+      değişkenleriyle yeniden renklendirilemiyordu) yerine geçti. Header'da
+      ZATEN `h-7 w-7 rounded-full`'a kırpıldığı için (yazı okunaklı
+      değildi) TAM "ATLAS WIKI" yazısını piksel piksel yeniden çizmek yerine
+      basit bir marka işareti (organik blob + "A" harfi, `var(--brand-accent)`→
+      `var(--accent-warm)` gradient'i) tercih edildi - SVG olduğu için CSS
+      custom property'lerini DOĞRUDAN okuyor, açık/koyu temada otomatik
+      doğru renklere geçiyor (favicon.png - ayrı bir dosya - bu değişikliğin
+      kapsamı DIŞINDA bırakıldı, istenirse ayrı ele alınır).
+
+**Canlı doğrulandı (gerçek tarayıcıda, CSS custom property'lerin GERÇEKTEN
+render edilen değerlerini okuyarak - sadece dosyanın "doğru yazıldığını"
+değil):** koyu modda `body`'nin `background-color`'ı `rgb(10, 20, 32)`
+(`--page-bg`) ile birebir eşleşti, logo SVG'sinin gradient durak renkleri
+`rgb(13, 130, 143)`→`rgb(194, 87, 15)` (tam beklenen teal→turuncu) çıktı,
+aktif sekme alt çizgisi doğru teal rengi taşıdı; tema değiştirilip açık
+moda geçilince TÜM değerler (body bg, brand-accent, accent-warm, text/text-h)
+doğru açık-mod karşılıklarına döndüğü teyit edildi. `npm run lint`/`build`/
+`test` (32/32 - bu branch `master`'dan, D grubunun henüz merge edilmemiş
+`isRecognizedVideoUrl` testlerini İÇERMİYOR, beklenen) yeşil.
+
+**Gün 2 - Ana sayfanın kendisi:**
+
+Kullanıcının referans mockup'ındaki TÜM bölümler eklendi - hiçbiri dekoratif/
+sahte veri DEĞİL, hepsi zaten var olan backend endpoint'lerinden (ya da
+küçük, güvenli bir backend genişlemesinden) besleniyor:
+
+- [x] **`HeroSection`** - `--gradient-hero` (Gün 1) zeminli karşılama alanı +
+      GERÇEK, çalışan bir arama kutusu. Submit olunca `/wiki/pages?q=...`'a
+      yönlendiriyor. **Bu sırada bulunan gerçek bir "bağlanmamış uç" (dangling
+      wiring) düzeltildi:** `WikiSearch.jsx`'in `initialQuery` prop'u + kendi
+      useEffect'i ZATEN vardı (yorumunda "üst bardaki arama kutusundan
+      yönlendirildiğinde" diye açıkça yazıyordu) ama HİÇBİR yer bu URL
+      parametresini okumuyordu - `WikiBoard.jsx`'e `useSearchParams` eklenip
+      tamamlandı. Hero'ya İKİNCİ bir arama mekanizması İCAT EDİLMEDİ, var
+      olan akış TAMAMLANDI.
+- [x] **`FeaturedArticleCard`** ("Öne Çıkan Makale") - en yeni sayfa büyük bir
+      kart olarak tekrar vurgulanıyor. Ayrı bir "editör seçimi" alanı İCAT
+      EDİLMEDİ (backend'de yok, eklemek YAGNI olurdu).
+- [x] **"Son Eklenen Makaleler" 9'dan 4'e indirildi** (kullanıcı isteği: "ilk
+      sayfada örnek olarak 3-5 tane olsun") - Öne Çıkan Makale ZATEN en
+      yeniyi gösterdiği için, bu bölüm SIRADAKİ 4'ü gösteriyor (aynı sayfa
+      iki kez görünmüyor). "Tümünü Gör" zaten vardı.
+- [x] **`SimplePageListPanel`** (Favorilere Eklenenler + Pinlenenler, "ayrı
+      bölüm" olarak) - var olan `getFavoritePages`/`getPinnedPages`'i
+      kullanan tek, esnek bir bileşen - dört ayrı liste bileşeni YAZILMADI.
+- [x] **`DocumentsWidget`** ("Belgeler") - Documents modülünden gerçek veri,
+      format-özel ikonlar `documentIcons.js`'ten (DocumentDetailPage'in
+      ZATEN kullandığı harita - ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
+- [x] **`RecentVideosWidget`** ("Videolar/Eğitimler") - `VideoCenterPage`'in
+      (Eksik-özellik listesi C grubu) AYNI `extractVideosFromContent`'ini
+      tekrar kullanıyor, ikinci bir video-algılama YAZILMADI. VideoCenterPage'in
+      AKSİNE TÜM sayfalar değil, son ~20 sayfalık bir dilim taranıyor (ana
+      sayfa widget'ı için yeterli, tam galeri zaten `/wiki/videos`'ta).
+- [x] **`DiscussionsWidget`** ("Tartışmalar") - platform GENELİNE ait yorumlar
+      (`getComments(token)`, `pageId=null` - "Anasayfa Tartışması" sekmesiyle
+      AYNI veri kaynağı). "Tartışmaya Katıl" ayrı bir sayfaya DEĞİL, var olan
+      "Tartışma" sekmesine geçiyor - ikinci bir tartışma sayfası İCAT
+      EDİLMEDİ.
+- [x] **"Kategoriler" restyle edildi** - var olan `popularTags` verisi artık
+      küçük bir ikon-rozet ızgarası (2 sütun) olarak gösteriliyor.
+- [x] **`DepartmentDonutChart`** ("İstatistikler") - **backend'e küçük, güvenli
+      bir alan eklendi:** `WikiDashboardDto.DepartmentBreakdown`
+      (`GetWikiDashboardQueryHandler`'ın ZATEN bellekte tuttuğu
+      `visiblePages`'ten türetiliyor, `PopularTags`'le AYNI desen, yeni bir
+      sorgu/endpoint YOK) - donut grafiği SAHTE/rastgele veri GÖSTERMEDİ,
+      gerçek departman dağılımını gösteriyor. Harici bir grafik kütüphanesi
+      EKLENMEDİ - CSS `conic-gradient` + `color-mix()` ile saf bir donut
+      (brand-accent'in azalan opaklık tonları, Gün 1'deki "kategorik çoklu
+      renk yerine sade kalma" kararıyla tutarlı).
+- [x] **`HomeFooter`** - SADECE gerçek linkler (mockup'taki "SSS"/"Destek
+      Talebi"/sahte sosyal medya ikonları gibi karşılığı OLMAYAN dekoratif
+      linkler BİLEREK EKLENMEDİ - projenin baştan beri sürdürdüğü "dekoratif/
+      çalışmayan bir şey gösterme" ilkesi).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, hem koyu hem açık modda):**
+TÜM bölümler doğru veriyle render edildi (Favoriler/Pinlenenler/Belgeler
+gerçek kayıtlar gösterdi, İstatistikler donut'u gerçek departman dağılımını
+- IT %78, Engineering %11, IK %11 - doğru çizdi). Hero arama kutusu uçtan uca
+test edildi: "sunucu bakım" yazılıp gönderilince `/wiki/pages?q=sunucu%20bak%C4%B1m`'a
+yönlendirdi VE WikiSearch otomatik çalışıp GERÇEK, alakalı sonuçlar
+("Sunucu Bakım ve İzleme Rehberi") döndürdü. Videolar/Tartışmalar widget'ları
+başlangıçta veri olmadığı için (doğru şekilde) hiç görünmüyordu - birer test
+kaydı (video sayfası + platform-geneli yorum) eklenip widget'ların GERÇEKTEN
+çalıştığı kanıtlandı, sonra temizlendi. Hero gradient'i ve donut grafiğinin
+`conic-gradient`/`color-mix()`'i hem koyu hem açık modda doğru renklere
+(gerçek render edilen CSS değerleri okunarak) geçtiği teyit edildi.
+`npm run lint`/`build`/`test` (32/32) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` yeşil (regresyon yok - `WikiDashboardDto`'ya yeni
+alan eklemek hiçbir testi kırmadı, bu DTO'ya referans veren test yoktu).
+
+**"Görsel Tasarım Yenileme" artık TAMAMEN BİTTİ (Gün 1-2, palet+logo+ana
+sayfa).**
+
+## Ana sayfa takibi: "Son Eklenen Makaleler" carousel'ı + bildirim temizliği bug'ı (2026-08-17)
+
+Görsel Tasarım Yenileme'nin hemen ardından, kullanıcı referans mockup'ıyla
+canlı siteyi karşılaştırırken iki ayrı iş ortaya çıktı - biri planlı bir
+UX isteği, öbürü kullanıcının fark ettiği gerçek bir veri temizliği
+sorunundan doğan bağımsız bir bug avı.
+
+- [x] **"Son Eklenen Makaleler" nokta-sayfalamalı carousel'a çevrildi**
+      (`design/homepage-recent-articles-followup` branch'i, `master`'dan) -
+      mockup'taki kart ızgarasının altındaki `• • •` işaretlerinin gerçek
+      karşılığı. `AskUserQuestion` ile netleştirildi: kullanıcı "sayfa
+      içinde genişleme" DEĞİL, gerçek bir carousel/kaydırmalı görünüm istedi.
+      Backend'e `GetWikiDashboardQuery`'ye `ItemsPerSection`'dan AYRI bir
+      `RecentlyAddedCount` parametresi eklendi (`GET /api/wiki/dashboard?
+      recentlyAddedCount=13`) - SADECE "Son Eklenen Makaleler" havuzunu
+      büyütüyor, `recentlyUpdated`/`departmentSpecific`'i şişirmiyor
+      (`departmentSpecific`'in listesi frontend'de zaten hiç render
+      edilmiyor). `RecentArticlesCarousel` (HomePage.jsx) - Öne Çıkan Makale
+      + 3 sayfa x 4 kart (2x2 grid), nokta düğmelerine tıklamak SADECE
+      component state'ini değiştiriyor, navigasyon YOK - "Tümünü Gör" linki
+      (başka sayfaya gider) AYRICA duruyor. Canlı doğrulandı (gerçek
+      backend'e karşı, `javascript_tool` ile): 3 nokta doğru render edildi,
+      her tıklama URL değiştirmeden farklı 4 kart getirdi.
+
+- [x] **Bulunan gerçek bug - yetim bildirim kayıtları:** Kullanıcı ana
+      sayfadaki Bildirimler panelinde silinmiş sayfalara ait "hayalet"
+      kayıtlar fark etti. Kök sebep: `WikiPageDeletedEvent` yayınlanınca AI
+      kendi embedding'lerini temizliyordu (bkz. AI Semantik Arama bölümü)
+      ama **Notifications modülü bu event'i hiç dinlemiyordu** -
+      `WikiPageCreatedEventHandler`'ın yazdığı kalıcı `NotificationEntry`
+      kaydı, sayfa silinince sonsuza kadar "yetim" olarak tabloda kalıyordu.
+      Düzeltme: AI'ın `WikiPageDeletedEventHandler`'ıyla BİREBİR aynı desen -
+      yeni `WikiPageDeletedEventHandler` (Notifications.Infrastructure) +
+      `INotificationRepository.DeleteAllForResourceAsync` (Ders #22'deki
+      "InMemory `ExecuteDelete`'i desteklemiyor" güvenli deseniyle -
+      `ToListAsync`+`RemoveRange`). Aynı assembly'de yaşadığı için (AI/
+      Documents'taki gibi ikinci bir MediatR assembly kaydı GEREKMEDİ,
+      `WikiPageCreatedEventHandler` zaten Infrastructure'ı tarıyordu).
+      Canlı doğrulandı (gerçek create+delete + Outbox'ın 5sn'lik turu
+      beklenerek): sayfa oluşunca bildirim oluştu, silinince bildirim de
+      silindi.
+      **Test sırasında bulunan, düzeltilmeyen (bilinçli) ikincil bir
+      gözlem:** `dotnet test tests/Atlas.IntegrationTests` çalıştırılınca 2
+      yeni yetim bildirim daha oluştu - testler kendi WikiPage'lerini
+      İZOLE bir InMemory `WikiDbContext`'te oluşturup siliyor (bkz.
+      `AtlasApiFactory`), ama Notifications GERÇEK SQL Server'a yazıyor
+      (Vault/AI/Documents ile AYNI "bilerek InMemory'e çevrilmeyen" grup) -
+      testin `finally` bloğundaki DELETE, `WikiPageDeletedEvent`'i InMemory
+      Outbox'a enqueue ediyor ama test host'u OutboxProcessor'ın bir
+      SONRAKİ 5sn'lik turunu beklemeden kapanabiliyor, bu da bildirim
+      temizliğinin o test çalıştırması için hiç tetiklenmemesine yol
+      açabiliyor. Bu, AI'ın embedding'leri için ZATEN bilinen/kabul edilmiş
+      bir sınıf soruna BENZER (bkz. "Integration testler artık kendi
+      ürettikleri AI verisini temizliyor") - düşük hacimli (test başına en
+      fazla birkaç satır), kendi kendine büyümeyen bir sızıntı, teorik bir
+      "sağlamlaştırma" (ör. test teardown'a bir flush/wait eklemek) DENENMEDİ
+      çünkü Ders #16'nın sonundaki notla AYNI gerekçe: kanıtlanmamış bir
+      kırılganlığı "düzeltmeye" çalışmak yeni bir regresyon riski taşır.
+      Gerekirse (hacim gerçekten büyürse) AI'ın test-verisi-takip deseni
+      (try/finally ile oluşturulan ID'leri izleyip temizleme) buraya da
+      uygulanabilir - şimdilik YAGNI.
+
+- [x] **Veri temizliği (kullanıcı isteğiyle, canlı DB üzerinde, önce SELECT
+      ile doğrulanarak - Ders #14):** `notifications.NotificationEntries`'de
+      birikmiş 11 yetim kayıt (haftalar süren test/doğrulama oturumlarından)
+      + yukarıdaki düzeltmeyi test ederken oluşan 2 yeni yetim kayıt
+      silindi. AI embedding'leri/Favoriler/Pinler/Belgeler/Vault tabloları
+      da kontrol edildi - hepsi zaten temizdi (yetim veri yok). Ayrıca
+      `auth.Users`'ta haftalar/ayların birikimi ~20 otomatik-test deseniyle
+      (tarih/random suffix'li e-posta) oluşturulmuş hesap silindi -
+      `wiki.WikiPages.CreatedByUserId` FK'siyle (Ders'in tek istisnai FK'ı)
+      korunan 4 hesap (gerçek içerik yazmış test kullanıcıları:
+      `browser-test-1`/`ik-calisan-yeni`/`test-login`/`test-shadcn`) VE 5
+      gerçek/örnek kullanıcı (`admin`/`admin2`/`ahmet`/`esra`/`mehmet`)
+      BİLEREK silinmeden bırakıldı - önce bir `SELECT ... WHERE Email NOT
+      IN (...)` ile silinecek tam liste gösterilip kullanıcı onayı alındı.
+
+`dotnet build`/`dotnet test Atlas.sln --filter "Category!=Integration"`
+(regresyon yok) + `dotnet test tests/Atlas.IntegrationTests` (24/24) +
+`npm run lint`/`build`/`test` (32/32) yeşil.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

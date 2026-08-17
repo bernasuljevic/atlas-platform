@@ -34,10 +34,12 @@ public static class WikiEndpoints
 
         // GetWikiPages ile AYNI görünürlük deseni - açık endpoint, giriş
         // yapmamış bir ziyaretçi sadece Public sayfaları görür (bkz.
-        // GetWikiDashboardQueryHandler).
-        group.MapGet("/dashboard", async (IMediator mediator) =>
+        // GetWikiDashboardQueryHandler). ?recentlyAddedCount=... opsiyonel -
+        // "Son Eklenen Makaleler" carousel'ının (2026-08-17) birden fazla
+        // "sayfa"sını doldurmak için varsayılandan (5) fazlasını istiyor.
+        group.MapGet("/dashboard", async (IMediator mediator, int recentlyAddedCount = 5) =>
         {
-            var dashboard = await mediator.Send(new GetWikiDashboardQuery());
+            var dashboard = await mediator.Send(new GetWikiDashboardQuery(RecentlyAddedCount: recentlyAddedCount));
             return Results.Ok(dashboard);
         })
         .WithName("GetWikiDashboard");
