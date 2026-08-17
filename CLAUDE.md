@@ -1788,10 +1788,55 @@ yok - `UpdateWikiPageCommandHandlerTests`/`DeleteWikiPageCommandHandlerTests`'in
 `CreateHandler` yardımcıları yeni `IWikiPageVersionRepository` parametresini
 alacak şekilde güncellendi). Test verisi (1 sayfa + 3 kullanıcı) temizlendi.
 
-**Gün 2 (frontend) henüz YAPILMADI:** `WikiArticlePage.jsx`'e versiyon
-geçmişi paneli, eski bir versiyonu salt-okunur görüntüleme, "geri dön"
-eylemi - Documents'ın `DocumentDetailPage.jsx`'teki versiyon geçmişi
-UI'ıyla AYNI desende.
+## Eksik-özellik listesi - B Grubu, Gün 2: Wiki Version History frontend (2026-08-17)
+
+`DocumentDetailPage.jsx`'teki versiyon geçmişi listesinin (P6) fikrini
+taşıdı, ama Documents'ın "İndir" düğmesi yerine burada "Önizle + geri dön"
+var - Wiki'nin içeriği (markdown) İNDİRİLECEK bir dosya değil, DOĞRUDAN
+görüntülenebilir.
+
+- [x] **Yeni "Geçmiş" sekmesi** - `WikiArticlePage.jsx`'in var olan "Madde"/
+      "Tartışma" sekme desenine ÜÇÜNCÜ bir sekme olarak eklendi (yeni bir
+      Dialog/route İCAT EDİLMEDİ, `activeTab` state'i zaten vardı).
+- [x] **`WikiVersionHistoryPanel.jsx` (YENİ, kendi kendine yeten bileşen)** -
+      `DiscussionPanel.jsx`'le AYNI desen (kendi state'ini, kendi veri
+      çekmesini yönetiyor, parent'a sadece `onRestored` callback'iyle haber
+      veriyor). Bir versiyon satırına tıklanınca İÇİNDE genişleyip
+      `renderWikiMarkdown` ile SALT-OKUNUR bir önizleme gösteriyor - AYRI bir
+      Dialog/route AÇILMADI (bu projede içerik görüntüleme Dialog'dan tam
+      sayfaya kaydı, bkz. WikiPageTable'ın eski detay dialogunun kaldırılma
+      gerekçesi - satır-içi genişleme bu felsefeyle daha tutarlı). "Bu
+      sürüme geri dön" düğmesi SADECE `canRestore` (owner-or-Admin, parent'tan
+      geliyor) true ise gösteriliyor - backend zaten 403 ile reddediyor, bu
+      sadece UI'da gereksiz bir düğme göstermemek için.
+- [x] **3 yeni `api.js` fonksiyonu** - `getWikiPageVersions`/
+      `getWikiPageVersionByNumber`/`restoreWikiPageVersion`, `updateWikiPage`
+      ile AYNI 401→refresh→tekrar dene deseni.
+- [x] **Restore sonrası state güncellemesi** - `DocumentDetailPage`'in "yeni
+      versiyon yüklendi" akışındaki AYNI gerekçeyle iyimser (optimistic) bir
+      güncelleme YAPILMADI - `handleVersionRestored`, sayfayı sunucudan
+      YENİDEN çekip `page` state'ini tazeliyor, "Madde" sekmesi bir sonraki
+      bakışta gerçek (restore edilmiş) içeriği gösteriyor.
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, admin girişiyle):** var
+olan bir sayfa ("Blok Editörü Test Sayfası") düzenlenip bir versiyon
+oluşturuldu, "Geçmiş" sekmesinde doğru göründü; satıra tıklanınca
+ESKİ (düzenlemeden önceki) içerik doğru render edildi; "Bu sürüme geri dön"
+tıklanınca - **ortamın `window.confirm()`'ü CDP üzerinden otomatik
+reddettiği fark edildi** (bu ortamın bilinen bir sınırlaması, bu projenin
+`handleDelete` gibi diğer `window.confirm()` kullanan akışlarıyla AYNI
+davranış) - `window.confirm` geçici olarak `true` döndürecek şekilde
+override edilip TEKRAR denendi: restore doğru çalıştı, "Madde" sekmesi
+ANINDA (sayfa yenilemeden) eski içeriği gösterdi, "Geçmiş" sekmesi
+pre-restore hâli otomatik olarak yeni bir versiyon (2) olarak arşivledi.
+Test sırasında oluşan versiyon satırları + `CurrentVersionNumber` sqlcmd ile
+temizlenip sayfa test-öncesi hâline döndürüldü. `npm run lint`/`npm run
+build`/`npm run test` (24/24) yeşil - yeni kod hiçbir yeni uyarı/hata
+eklemedi.
+
+**"Eksik-özellik listesi B grubu"nun ilk maddesi (Wiki Version History) artık
+TAMAMEN BİTTİ (Gün 1-2, backend+frontend).** Sırada grubun ikinci maddesi:
+Autosave/Draft göstergesi.
 
 ## Sırada ne var
 

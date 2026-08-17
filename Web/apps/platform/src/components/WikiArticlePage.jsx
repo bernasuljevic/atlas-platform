@@ -4,6 +4,7 @@ import {
   Building2,
   ChevronRight,
   Folder,
+  History,
   List,
   PanelRightClose,
   PanelRightOpen,
@@ -32,6 +33,7 @@ import { formatUtcTimestamp } from "../dateUtils";
 import { estimateReadingMinutes } from "../readingTime";
 import { renderWikiMarkdown } from "../markdown";
 import DiscussionPanel from "./DiscussionPanel";
+import WikiVersionHistoryPanel from "./WikiVersionHistoryPanel";
 import ReadingSettingsPanel, { FONT_SIZE_PX, LINE_HEIGHT_VALUE, LINE_WIDTH_VALUE } from "./ReadingSettingsPanel";
 import { Button } from "@atlas/ui/button";
 import { Badge } from "@atlas/ui/badge";
@@ -177,6 +179,20 @@ function WikiArticlePage({ token }) {
       cancelled = true;
     };
   }, [token, id]);
+
+  // Version History (Gün 2) - bir versiyona geri dönülünce sayfanın
+  // title/content/visibility/tags'i backend'de değişiyor; iyimser
+  // (optimistic) bir state güncellemesi YAPMIYORUZ, DocumentDetailPage'in
+  // "yeni versiyon yüklendi" akışındaki AYNI gerekçeyle - sunucudan dönen
+  // GERÇEK hâli gösteriyoruz.
+  async function handleVersionRestored() {
+    try {
+      const refreshed = await getWikiPageById(token, id);
+      setPage(refreshed);
+    } catch (err) {
+      toast("Sayfa yeniden yüklenemedi", { description: err.message });
+    }
+  }
 
   useEffect(() => {
     if (!page) return;
@@ -677,6 +693,13 @@ function WikiArticlePage({ token }) {
           >
             Tartışma
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("history")}
+            className={`wiki-tab ${activeTab === "history" ? "active" : ""}`}
+          >
+            <History size={13} /> Geçmiş
+          </button>
         </div>
 
         <div className="flex items-center gap-1">
@@ -736,6 +759,18 @@ function WikiArticlePage({ token }) {
             "{page.title}" Tartışma Sayfası
           </h2>
           <DiscussionPanel token={token} pageId={page.id} />
+        </div>
+      ) : activeTab === "history" ? (
+        <div className="rounded-lg border p-6" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+          <h2 className="mb-4 text-base font-semibold" style={{ color: "var(--text-h)" }}>
+            "{page.title}" Versiyon Geçmişi
+          </h2>
+          <WikiVersionHistoryPanel
+            token={token}
+            pageId={page.id}
+            canRestore={canEdit}
+            onRestored={handleVersionRestored}
+          />
         </div>
       ) : (
         // Kullanıcı spec'i (2026-08-07, ÜÇÜNCÜ geçiş - "9. Önemli: Grid
