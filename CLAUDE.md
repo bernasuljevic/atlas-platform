@@ -2189,7 +2189,42 @@ kullanılarak yeniden denenince doğru çalıştığı kanıtlandı, aynı sessi
 daha önce de görülen bir ortam/araç kısıtlamasıydı. `npm run lint`/`build`/
 `test` (36/36) yeşil. Test verileri (1 kayıt + 2 kullanıcı) temizlendi.
 
-**Gün 4 (Vault.Application.Tests projesi) henüz BAŞLANMADI.**
+## Eksik-özellik listesi - D Grubu, Gün 4: Vault paylaşım modeli - Application testleri (2026-08-17)
+
+D grubunun Vault paylaşım maddesinin son adımı - Documents.Application.Tests'in
+(Test & CI Sertleştirme paketi, Gün 3) AYNI deseni: mocking kütüphanesi yok,
+elle yazılmış fake'ler + gerçek Handler'ların doğrudan çağrılması (MediatR
+pipeline'ı - AuditBehavior dahil - devre dışı, sadece iş mantığı test ediliyor).
+
+- [x] **Yeni `Atlas.Modules.Vault.Application.Tests` projesi** - 4 fake
+      (`FakePasswordEntryRepository`/`FakePasswordEntryShareRepository`/
+      `FakePasswordEncryptor`/`FakeUserLookupService`), `FakeCurrentUserAccessor`
+      `Atlas.Shared.Testing`'ten paylaşılıyor (Ders'teki "üç kural" eşiğini
+      zaten aşmış, yeniden yazılmadı). `FakePasswordEncryptor` gerçek bir
+      şifreleme algoritması TEST ETMİYOR (o Infrastructure'ın işi) - basit,
+      tersinir bir sabit önek deseni, sadece Handler'ın Encrypt/Decrypt'i doğru
+      sırada çağırdığını doğrulamaya yetiyor.
+- [x] **30 test, paylaşım modelinin (Gün 1-3) eklediği TÜM dallar dahil:**
+      `SharePasswordEntryCommandHandler` (kayıt yok/owner-or-Admin değil/hedef
+      kullanıcı yok/kendi kendine paylaşım/zaten paylaşılmış/başarılı paylaşım
+      + audit/Admin bypass), `RemovePasswordEntryShareCommandHandler` (AYNI
+      korumalar + başarılı kaldırma), `GetPasswordEntrySharesQueryHandler`
+      (kayıt yok → null, **paylaşılan kullanıcının KENDİSİ bile bu listeyi
+      göremiyor** → null - sadece sahibi/Admin), `GetPasswordEntryByIdQueryHandler`
+      (owner-or-Admin'in ÜÇÜNCÜ istisnası olan "paylaşılan kullanıcı da
+      görebiliyor" dalı + ilgisiz kullanıcıya null - 404, 403 DEĞİL, varlık
+      gizleniyor), `RevealPasswordEntryCommandHandler` (paylaşılan kullanıcının
+      parolayı GERÇEKTEN açabildiği - paylaşımın asıl amacı - + ilgisiz
+      kullanıcıya 403), `DeletePasswordEntryCommandHandler` (silme sırasında
+      TÜM paylaşım satırlarının da temizlendiği - `DeleteAllForEntryAsync`'in
+      doğru entryId'yle çağrıldığı - + temel owner-or-Admin korumaları).
+
+`dotnet test Atlas.sln --filter "Category!=Integration"` yeşil - regresyon yok.
+
+**"Eksik-özellik listesi D grubu"nun Vault paylaşım modeli maddesi artık
+TAMAMEN BİTTİ (Gün 1-4, backend+frontend+test).** D grubunun geri kalanı
+(video transkript indeksleme) hâlâ gerçek bir engelle bloklanmış durumda -
+aşağıya bkz.
 
 ## Sırada ne var
 
