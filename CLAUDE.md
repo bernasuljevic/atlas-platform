@@ -2494,6 +2494,56 @@ verisi (1 sayfa, embedding'i ve bildirimi dahil) temizlendi.
 otomatik algılama (Gün 1), Vault paylaşım modeli (Gün 2-4), video transkript
 indeksleme (bu bölüm). D grubunun orijinal 3 maddesi de tamamlandı.
 
+## Ana sayfa sağ sütun - CSS hilesi yerine gerçek içerik akışı (2026-08-17, üçüncü tur)
+
+"Son Eklenen Makaleler carousel'ı + bildirim temizliği" bölümündeki sticky
+sidebar düzeltmesi (`xl:sticky` + grid `stretch`) kullanıcı tarafından AÇIKÇA
+reddedildi: "sağ tarafın boş kalan yüksekliğini CSS ile doldurmanı
+istemiyorum, sağ sütunun İÇERİĞİNİN kendisinin de aşağı doğru devam etmesini
+istiyorum." Yani istenen sahte bir yükseklik eşitliği DEĞİL, HER İKİ
+sütunun da kendi GERÇEK içerik akışıyla uzaması - `align-items: stretch`/
+`height: 100%`/`min-height` gibi hiçbir "doldurma" tekniği kullanılmadan.
+
+- [x] **`xl:sticky xl:top-4` KALDIRILDI** (`<aside>`) - sağ sütun artık
+      sayfayla BİRLİKTE normal akışta kayıyor, viewport'a sabitlenmiyor.
+- [x] **`xl:items-start` GERİ KONDU** (grid) - stretch YOK, her sütunun
+      kutusu SADECE kendi gerçek içeriği kadar.
+- [x] **`DepartmentHighlightsPanel` (YENİ)** - backend'in `dashboard.
+      departmentSpecific` alanı (`GetWikiDashboardQueryHandler`'da ZATEN
+      hesaplanıyordu) şimdiye kadar frontend'de HİÇ render EDİLMİYORDU -
+      sadece `departmentSpecificCount` (Hero altındaki MiniStat'ta) kullanılıyordu.
+      Ek bir fetch/endpoint GEREKMEDİ, veri zaten `dashboard` objesinin
+      içindeydi. "[Departman] İçin Öne Çıkanlar" başlığıyla, Panel/
+      CompactRow'un AYNI görsel dilinde (kart/spacing/typography/border/
+      grid - kullanıcının "farklı bir dashboard gibi olmasın" şartı),
+      sağ sütunun EN ALTINA (mevcut panellerin ardından) eklendi.
+      Departmanı olmayan (Admin dahil) kullanıcı için backend zaten boş
+      dizi döndürdüğünden panel doğal olarak hiç görünmüyor.
+- [x] **`DocumentsWidget`/`RecentVideosWidget` öğe sayıları büyütüldü**
+      (5→8, 4→6) - sağ sütun kendi payına biraz daha fazla GERÇEK öğe
+      gösteriyor, yapay bir dolgu değil.
+
+**Canlı doğrulandı (departmanlı geçici bir test kullanıcısıyla - admin'in
+departmanı yok, bu özelliği hiç göremezdi):** `position: static` (sticky
+kalkmış), grid `align-items: flex-start` (stretch yok), sol/sağ sütun
+yükseklikleri artık GERÇEKTEN farklı (741px / 1623px - bu test kullanıcısı
+için sağ daha uzun, çünkü 9 gerçek panel taşıyor) - CSS'le eşitlenmiş SAHTE
+bir denge değil. "IT İçin Öne Çıkanlar" paneli 5 gerçek IT sayfasını doğru
+gösterdi. Admin hesabıyla (departmansız) panel doğru şekilde hiç görünmedi,
+sayfa hatasız render oldu. Test kullanıcısı temizlendi. `npm run lint`/
+`build`/`test` (38/38) yeşil.
+
+**Genel ders:** "sağ sütun boş kalmasın" gibi bir isteğin İKİ farklı,
+birbirinden TAMAMEN AYRI çözümü olabilir - (1) CSS ile mevcut kısa içeriği
+uzun görünecek şekilde GERMEK (hızlı ama yüzeysel, kutunun kendisi uzun
+görünür ama içeriği hâlâ kısa) ve (2) GERÇEKTEN daha fazla içerik EKLEMEK
+(daha yavaş ama istenen sonuç). İlk turda (1)'i seçtim çünkü "boş kalmasın"
+ifadesi teknik olarak İKİSİYLE de tatmin edilebilir görünüyordu - kullanıcı
+AÇIKÇA (2)'yi kastettiğini belirtince (üçüncü mesajda, somut bir ASCII
+diyagramla) düzeltildi. Böyle bir belirsizlik varsa daha erken netleştirmek
+(AskUserQuestion ile "CSS ile mi, gerçek içerikle mi" diye sormak) gelecekte
+tercih edilmeli.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

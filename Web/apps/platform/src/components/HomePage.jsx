@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import {
   ArrowRight,
   Bell,
+  Building2,
   Clock,
   FilePlus2,
   FileText,
@@ -513,6 +514,34 @@ function SimplePageListPanel({ title, icon, fetcher, token, viewAllTo }) {
   );
 }
 
+// [Departman] İçin Öne Çıkanlar (2026-08-17, ikinci tur kullanıcı geri
+// bildirimi - sağ sütunun sticky/CSS-stretch İLE DEĞİL, GERÇEK kendi
+// içeriğiyle uzaması isteniyordu). Backend'in `dashboard.departmentSpecific`
+// alanı (GetWikiDashboardQueryHandler'da ZATEN hesaplanıyordu) şimdiye kadar
+// frontend'de HİÇ render EDİLMİYORDU - sadece Count'u (Hero'nun altındaki
+// MiniStat şeridinde) kullanılıyordu. Ek bir fetch/endpoint GEREKMEDİ, veri
+// zaten `dashboard` objesinin içinde duruyordu. Departmanı olmayan (ya da
+// giriş yapmamış) bir kullanıcı için backend zaten boş dizi döndürüyor
+// (bkz. Handler'daki not), bu yüzden burada AYRICA bir "departman var mı"
+// kontrolüne gerek yok - `pages.length === 0` kontrolü zaten yeterli.
+function DepartmentHighlightsPanel({ pages, department }) {
+  if (!pages || pages.length === 0) return null;
+
+  return (
+    <Panel title={`${department} İçin Öne Çıkanlar`} icon={<Building2 size={13} />}>
+      {pages.slice(0, 5).map((p) => (
+        <CompactRow
+          key={p.id}
+          to={`/wiki/${p.id}`}
+          icon={<Building2 size={15} />}
+          title={p.title}
+          subtitle={formatUtcTimestamp(p.createdAtUtc)}
+        />
+      ))}
+    </Panel>
+  );
+}
+
 // Belgeler (Görsel Tasarım Yenileme Gün 2) - Documents modülünden gerçek
 // veri, format-özel ikonlar (documentIcons.js, DocumentDetailPage'in ZATEN
 // kullandığı AYNI harita - burada ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
@@ -521,7 +550,10 @@ function DocumentsWidget({ token }) {
 
   useEffect(() => {
     let cancelled = false;
-    getDocuments(token, { pageSize: 5 })
+    // 5 -> 8 (2026-08-17, ikinci tur geri bildirim) - sağ sütun artık
+    // sticky/stretch DEĞİL, gerçek içerikle uzuyor; bu panel de kendi
+    // payına biraz daha fazla gerçek öğe gösteriyor.
+    getDocuments(token, { pageSize: 8 })
       .then((result) => {
         if (!cancelled) setDocuments(result.items);
       })
@@ -605,7 +637,8 @@ function RecentVideosWidget({ token }) {
           Yükleniyor...
         </p>
       ) : (
-        videos.slice(0, 4).map((v, idx) => (
+        // 4 -> 6 (2026-08-17, ikinci tur geri bildirim - aynı gerekçe).
+        videos.slice(0, 6).map((v, idx) => (
           <CompactRow
             key={`${v.pageId}-${idx}`}
             to={`/wiki/${v.pageId}`}
@@ -898,21 +931,23 @@ function HomePage({ token }) {
             </section>
           )}
 
-          {/* xl:items-start BİLEREK KULLANILMIYOR (2026-08-17 takip, kullanıcı
-              geri bildirimi: "aşağı kaydırdıkça sağ taraf altı boş
-              kalmasın") - grid'in VARSAYILAN align-items:stretch'i sağ
-              sütunun (<aside>, xl:sticky) KENDİ KUTUSUNU sol sütunla AYNI
-              satır yüksekliğine geriyor. items-start VARKEN sağ sütunun
-              kutusu SADECE kendi içeriği kadar (daha kısa) oluyordu -
-              sticky'nin "yapışacak" alanı erken tükeniyordu, sol sütun
-              (Favoriler/Pinlenenler/Tartışmalar) daha uzun olduğunda sağ
-              taraf sayfanın geri kalanında GERÇEKTEN kayboluyordu (boş
-              zemin görünüyordu). Stretch ile <aside>'ın kutusu sol sütunla
-              AYNI yüksekliğe geriliyor - içeriği (üstte, gerilmemiş) hâlâ
-              kompakt duruyor ama artık sticky'nin TÜM satır boyunca
-              "yapışacak" alanı var, sağ taraf sol sütun ne kadar uzarsa
-              uzasın görünür kalmaya devam ediyor. */}
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+          {/* İKİ SÜTUN, İKİSİ DE DOĞAL UZUNLUKTA (2026-08-17 takip, ikinci
+              tur kullanıcı geri bildirimi) - önceki denemede sağ sütun
+              xl:sticky + grid'in stretch'i ile sol sütunun yüksekliğine
+              CSS'le "gerilmişti" (kutusu uzuyordu ama içeriği hâlâ üstte
+              kompakt duruyordu). Kullanıcı bunu AÇIKÇA reddetti: "sağ
+              tarafın boş kalan yüksekliğini CSS ile doldurmanı istemiyorum,
+              sağ sütunun İÇERİĞİNİN kendisinin de aşağı doğru devam
+              etmesini istiyorum" - yani istenen sahte bir yükseklik eşitliği
+              DEĞİL, HER İKİ sütunun da kendi GERÇEK içerik akışıyla uzaması.
+              Düzeltme: xl:sticky KALDIRILDI (sağ sütun artık sayfayla
+              BİRLİKTE normal akışta kayıyor, viewport'a sabitlenmiyor),
+              xl:items-start GERİ KONDU (grid'in stretch'i YOK - her sütunun
+              kutusu SADECE kendi içeriği kadar, yapay bir eşitleme yok).
+              Sağ sütun artık DAHA UZUN çünkü GERÇEKTEN daha fazla panel
+              taşıyor (bkz. aşağıdaki DepartmentHighlightsPanel + Belgeler/
+              Videolar panellerinin büyütülmüş öğe sayısı). */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] xl:items-start">
             {/* SOL/GENİŞ sütun */}
             <div className="flex min-w-0 flex-col gap-6">
               {recentArticles.length > 0 && (
@@ -953,7 +988,7 @@ function HomePage({ token }) {
             </div>
 
             {/* SAĞ/DAR sütun */}
-            <aside id="son-guncellemeler" className="flex scroll-mt-4 flex-col gap-4 xl:sticky xl:top-4">
+            <aside id="son-guncellemeler" className="flex scroll-mt-4 flex-col gap-4">
               <WritePromptCard />
               <NotificationsPanel token={token} />
 
@@ -987,6 +1022,10 @@ function HomePage({ token }) {
                 <CompactRow to="/wiki/new" icon={<Plus size={15} />} title="Yeni Sayfa Oluştur" />
                 <CompactRow to="/documents/upload" icon={<Upload size={15} />} title="Belge Yükle" />
               </Panel>
+
+              {ownDepartment && (
+                <DepartmentHighlightsPanel pages={dashboard.departmentSpecific} department={ownDepartment} />
+              )}
             </aside>
           </div>
 
