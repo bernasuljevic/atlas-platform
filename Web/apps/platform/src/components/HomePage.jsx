@@ -542,6 +542,176 @@ function DepartmentHighlightsPanel({ pages, department }) {
   );
 }
 
+// Sol sütun - Tartışmalar'dan SONRA gelen beş bölüm (2026-08-17, üçüncü tur
+// kullanıcı geri bildirimi: "sol kolon Tartışmalar'da bitip altında CSS'le
+// doldurulmuş boşluk kalıyor, GERÇEK içerikle uzasın"). Hepsi AYNI Panel/
+// CompactRow deseni - yeni bir "dashboard" İCAT EDİLMEDİ, sadece sağ
+// sütunda ZATEN kullanılan görsel dil sol sütunda da tekrar ediyor.
+
+// (1) Departmanlara Göre Öne Çıkanlar - DepartmentHighlightsPanel'in AKSİNE
+// (o SADECE viewer'ın kendi departmanını gösteriyor) TÜM departmanları
+// kapsıyor - ek bir fetch GEREKMEDİ, zaten çekilmiş olan gridArticles
+// (Son Eklenen Makaleler carousel'ının kullandığı AYNI veri, bkz. HomePage
+// içindeki hesaplama) departman bazında gruplanıp her departmanın en
+// yenisi seçiliyor.
+function DepartmentSpotlightPanel({ articles }) {
+  if (!articles || articles.length === 0) return null;
+
+  const latestByDepartment = new Map();
+  for (const a of articles) {
+    const existing = latestByDepartment.get(a.departmentName);
+    if (!existing || new Date(a.createdAtUtc) > new Date(existing.createdAtUtc)) {
+      latestByDepartment.set(a.departmentName, a);
+    }
+  }
+  const entries = Array.from(latestByDepartment.values()).sort(
+    (a, b) => new Date(b.createdAtUtc) - new Date(a.createdAtUtc)
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <Panel title="Departmanlara Göre Öne Çıkanlar" icon={<Building2 size={13} />}>
+      {entries.map((a) => (
+        <CompactRow
+          key={a.id}
+          to={`/wiki/${a.id}`}
+          icon={<Building2 size={15} />}
+          title={a.title}
+          subtitle={`${a.departmentName} · ${formatUtcTimestamp(a.createdAtUtc)}`}
+        />
+      ))}
+    </Panel>
+  );
+}
+
+// (2) En Aktif Katkıda Bulunanlar - RecentVideosWidget'ın AYNI "kendi
+// verisini kendi çeken, dashboard'a bağımlı olmayan" deseni (getWikiPages
+// ile 50 sayfayı tarayıp CreatedByEmail'e göre sayıyor) - dashboard
+// endpoint'i BÜTÜN yazarları saymaya yetecek kadar veri döndürmüyor,
+// yeni bir backend endpoint'i İCAT ETMEK yerine var olan GET /api/wiki/pages
+// zaten yeterli.
+function TopContributorsPanel({ token }) {
+  const [contributors, setContributors] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getWikiPages(token, 1, 50)
+      .then((result) => {
+        if (cancelled) return;
+        const counts = new Map();
+        for (const page of result.items) {
+          if (!page.createdByEmail) continue;
+          counts.set(page.createdByEmail, (counts.get(page.createdByEmail) ?? 0) + 1);
+        }
+        const sorted = Array.from(counts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([email, count]) => ({ email, count }));
+        setContributors(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setContributors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  if (contributors !== null && contributors.length === 0) return null;
+
+  return (
+    <Panel title="En Aktif Katkıda Bulunanlar" icon={<Users size={13} />}>
+      {contributors === null ? (
+        <p className="px-3.5 py-3 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+          Yükleniyor...
+        </p>
+      ) : (
+        contributors.map((c) => (
+          <div key={c.email} className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+            <span className="truncate" style={{ color: "var(--text-h)" }}>
+              {c.email}
+            </span>
+            <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
+              {c.count} sayfa
+            </Badge>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
+// (3) Son Aktiviteler - sağ sütundaki "Son Güncellenenler" kutusunun
+// (SADECE güncellemeleri, tarih listesi olarak gösteren) AKSİNE - hem
+// OLUŞTURULMA hem GÜNCELLENME olaylarını TEK bir kronolojik akışta,
+// tam CompactRow kartlarıyla birleştiriyor. dashboard.recentlyAdded/
+// recentlyUpdated ZATEN fetch edilmiş veri - ek bir çağrı GEREKMEDİ.
+function ActivityFeedPanel({ added, updated }) {
+  const events = [
+    ...(added ?? []).map((p) => ({ ...p, kind: "created", timestamp: p.createdAtUtc })),
+    ...(updated ?? []).map((p) => ({ ...p, kind: "updated", timestamp: p.updatedAtUtc })),
+  ]
+    .filter((e) => e.timestamp)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 6);
+
+  if (events.length === 0) return null;
+
+  return (
+    <Panel title="Son Aktiviteler" icon={<Clock size={13} />}>
+      {events.map((e, idx) => (
+        <CompactRow
+          key={`${e.id}-${e.kind}-${idx}`}
+          to={`/wiki/${e.id}`}
+          icon={e.kind === "created" ? <FilePlus2 size={15} /> : <Clock size={15} />}
+          title={e.title}
+          subtitle={`${e.kind === "created" ? "Oluşturuldu" : "Güncellendi"} · ${formatUtcTimestamp(e.timestamp)}`}
+        />
+      ))}
+    </Panel>
+  );
+}
+
+// (4) Hızlı Başlangıç Rehberi - BİLEREK statik (veri gerektirmiyor) - yeni
+// bir kullanıcının platformu nasıl kullanacağını anlatan sabit bir adım
+// listesi, Hızlı Erişim panelinin (sağ sütun) AYNI CompactRow-benzeri satır
+// deseninde ama linksiz (her adım bir eylem değil, bir açıklama).
+function GettingStartedPanel() {
+  const steps = [
+    { icon: <Search size={15} />, text: "Arama kutusuyla aradığın bilgiyi anında bul" },
+    { icon: <Plus size={15} />, text: '"Yeni Sayfa Oluştur" ile kendi bilgini paylaş' },
+    { icon: <Star size={15} />, text: "Sık kullandığın sayfaları favorile veya pinle" },
+    { icon: <Upload size={15} />, text: "Belgelerini yükleyip ekip arkadaşlarınla paylaş" },
+  ];
+
+  return (
+    <Panel title="Hızlı Başlangıç Rehberi" icon={<ListChecks size={13} />}>
+      {steps.map((s, idx) => (
+        <div key={idx} className="flex items-center gap-3 px-3.5 py-2.5 text-sm" style={{ color: "var(--text)" }}>
+          <span className="shrink-0" style={{ color: "var(--brand-accent)" }}>
+            {s.icon}
+          </span>
+          {s.text}
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+// (5) Daha Fazla Keşfet - sol sütunun kapanışı, sayfanın diğer büyük
+// alanlarına (Tüm Sayfalar/Video Merkezi/Belgeler) yönlendiren sade bir
+// CTA - ayrı bir "keşfet" sayfası İCAT EDİLMEDİ, var olan üç rotaya
+// yönlendiriyor.
+function ExplorePanel() {
+  return (
+    <Panel title="Daha Fazla Keşfet" icon={<ArrowRight size={13} />}>
+      <CompactRow to="/wiki/pages" icon={<FileText size={15} />} title="Tüm Sayfaları Gör" />
+      <CompactRow to="/wiki/videos" icon={<Video size={15} />} title="Video Merkezi" />
+      <CompactRow to="/documents" icon={<Upload size={15} />} title="Belge Kütüphanesi" />
+    </Panel>
+  );
+}
+
 // Belgeler (Görsel Tasarım Yenileme Gün 2) - Documents modülünden gerçek
 // veri, format-özel ikonlar (documentIcons.js, DocumentDetailPage'in ZATEN
 // kullandığı AYNI harita - burada ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
@@ -985,6 +1155,19 @@ function HomePage({ token }) {
               />
 
               <DiscussionsWidget token={token} onJoinDiscussion={() => setActiveTab("talk")} />
+
+              {/* Tartışmalar'dan SONRA, sol sütunun DEVAMI olarak beş yeni
+                  bölüm (2026-08-17, üçüncü tur kullanıcı geri bildirimi -
+                  "sol kolon Tartışmalar'da bitip altında boşluk kalıyor,
+                  CSS ile DEĞİL gerçek içerikle uzasın"). Hepsi AYNI Panel/
+                  CompactRow görsel dilini kullanıyor (sağ sütunla, Favoriler/
+                  Pinlenenler'le BİREBİR aynı kart/spacing/typography/border) -
+                  farklı bir "yeni dashboard" İCAT EDİLMEDİ. */}
+              <DepartmentSpotlightPanel articles={gridArticles} />
+              <TopContributorsPanel token={token} />
+              <ActivityFeedPanel added={dashboard.recentlyAdded} updated={dashboard.recentlyUpdated} />
+              <GettingStartedPanel />
+              <ExplorePanel />
             </div>
 
             {/* SAĞ/DAR sütun */}
