@@ -195,13 +195,24 @@ function slugify(text, usedSlugs) {
 // AYNI oranda yarıya indirmek yerine (bu onları 7-10px'e, okunamaz hale
 // getirirdi) 11-12px'te bir taban değerde tutuldu, H3'ün ALTINDA kalacak
 // şekilde ağırlık/büyük harfle ayrıştırılıyorlar.
+// UI/UX denetimi (2026-08-12): H2 (15px) gövde metninden (16px) KÜÇÜKTÜ -
+// sadece kalın yazı tipi hiyerarşiyi taşıyordu, bu Wikipedia'nın kendi
+// tipografisiyle (H2 gövdeden gözle görülür büyük) karşılaştırınca ters bir
+// hiyerarşi yaratıyordu. Beşinci geçişteki ("başlıklar çok büyük, küçült")
+// kullanıcı talebinin ARKASINDAKİ asıl amaç korunuyor (başlıklar artık
+// 42/30/24 gibi devasa değil) - ama H1/H2/H3 şimdi en azından gövde metninin
+// (16px) ÜZERİNE çıkarıldı, aksi halde bir okuyucu H2'yi "yeni bir bölüm"
+// değil "vurgulu bir cümle" gibi algılayabiliyordu. H4-H6 BİLEREK dokunulmadı -
+// orijinal tasarım kararı onları H3'ün ALTINDA, küçük bir "etiket" tonunda
+// tutmaktı (spec'te hiç geçmemişlerdi), bu denetimin bulgusu SADECE H1-H3'ü
+// kapsıyordu.
 const HEADING_SIZES = {
-  1: "mt-4 mb-1.5 text-[21px] leading-[1.25] font-bold tracking-tight text-[var(--text-h)] border-b pb-1 border-[var(--border)]",
-  2: "mt-3.5 mb-1.5 text-[15px] leading-[1.3] font-bold tracking-tight text-[var(--text-h)]",
-  3: "mt-3 mb-1 text-[12px] leading-[1.3] font-semibold text-[var(--text-h)]",
-  4: "mt-2.5 mb-1 text-[12px] font-medium text-[var(--text-h)]",
-  5: "mt-2 mb-1 text-[11px] font-medium text-[var(--text-h)]",
-  6: "mt-2 mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-h)]",
+  1: "mt-4 mb-1.5 text-[24px] leading-[1.3] font-bold tracking-tight text-[var(--text-h)] border-b pb-1.5 border-[var(--border)]",
+  2: "mt-4 mb-2 text-[19px] leading-[1.3] font-bold tracking-tight text-[var(--text-h)]",
+  3: "mt-3.5 mb-1.5 text-[17px] leading-[1.3] font-semibold text-[var(--text-h)]",
+  4: "mt-2.5 mb-1 text-[14px] font-medium text-[var(--text-h)]",
+  5: "mt-2 mb-1 text-[13px] font-medium text-[var(--text-h)]",
+  6: "mt-2 mb-0.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--text-h)]",
 };
 const HEADING_TAGS = { 1: "h1", 2: "h2", 3: "h3", 4: "h4", 5: "h5", 6: "h6" };
 
@@ -453,7 +464,12 @@ export function renderWikiMarkdown(content) {
       const id = slugify(text, usedSlugs);
       const HeadingTag = HEADING_TAGS[level];
 
-      headings.push({ id, text, level });
+      // lineIndex - arama sonucundan tıklanınca "eşleşen chunk hangi
+      // başlığın altında" hesaplayabilmek için (bkz. WikiArticlePage'in
+      // "arama sonucundan derin link" mantığı) - satır bazlı bir konum,
+      // en yakın ÖNCEKİ başlığı bulmak için yeterli, karakter hassasiyeti
+      // gerekmiyor.
+      headings.push({ id, text, level, lineIndex: i });
       blocks.push(
         <HeadingTag key={`h-${blocks.length}`} id={id} className={`scroll-mt-20 ${HEADING_SIZES[level]}`} style={{ color: "var(--text-h)" }}>
           {renderInline(text, `h-${blocks.length}`)}

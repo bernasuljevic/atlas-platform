@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Shared\Atlas.Shared.Kernel\Atlas.Shared.Kernel.csproj" />
+  </ItemGroup>
+
 </Project>

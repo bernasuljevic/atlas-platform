@@ -93,8 +93,16 @@ function WikiLayout({ token, onLogout }) {
 
   return (
     <div className="flex min-h-screen flex-col text-left">
+      {/* "Modernize et" (2026-08-12): header eskiden `position: static` idi -
+          sayfa kaydırılınca tamamen gözden kayboluyordu, arama/tema/bildirim
+          gibi her an erişilebilir olması gereken kontrollere ulaşmak için
+          kullanıcının tepeye geri dönmesi gerekiyordu. Artık sticky - koyu/
+          açık modun ikisinde de opak `var(--bg)` zemini koruyor (yarı-saydam/
+          backdrop-blur BİLEREK eklenmedi, "sade" hedefiyle gereksiz bir
+          gösteriş olurdu), z-20 ile TOC/sağ panel gibi diğer sticky
+          elemanların üzerinde kalıyor. */}
       <header
-        className="flex items-center gap-3 border-b px-4 py-2.5"
+        className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-2.5"
         style={{ borderColor: "var(--border)", background: "var(--bg)" }}
       >
         <button

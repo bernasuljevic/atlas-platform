@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using Atlas.Modules.AI.Application.Abstractions;
 using Atlas.Modules.AI.Application.WikiPages.Commands;
 using Atlas.Modules.AI.Infrastructure;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Atlas.Modules.AI.Api;
 
@@ -26,12 +28,36 @@ public static class AIModule
 
         services.AddHealthChecks().AddDbContextCheck<AiDbContext>("postgresql");
 
-        // GEÇİCİ: Gerçek bir sağlayıcı (Voyage AI, OpenAI vb.) API key'ler gelince
-        // buraya bağlanacak - o zaman değişecek TEK satır burası. FakeEmbeddingService
-        // hiçbir dış kaynağa (DB, HTTP) bağlı olmadığı, tamamen durumsuz (stateless)
-        // olduğu için Singleton güvenli - her istek için yeni bir instance
-        // oluşturmaya gerek yok (CLAUDE.md'deki "Service Lifetime kuralı"yla tutarlı:
-        // dış bir kaynağı sarmalamıyorsa Singleton olabilir).
+        // VoyageAi:ApiKey appsettings.json'da DEĞİL - User Secrets'tan/ortam
+        // değişkeninden geliyor (Jwt:Key'le AYNI gerekçe, bkz. VoyageAiOptions).
+        services.Configure<VoyageAiOptions>(configuration.GetSection("VoyageAi"));
+
+        // HAZIR AMA HENÜZ DEVREDE DEĞİL: VoyageEmbeddingService'in kendisi VE
+        // typed HttpClient kaydı API key gelmeden de yazılıp test edilebiliyordu
+        // (bkz. VoyageEmbeddingServiceTests - sahte bir HttpMessageHandler'la,
+        // gerçek ağ çağrısı hiç yapılmadan). BaseAddress/Authorization header'ı
+        // burada, DI çözümlenirken (yani key User Secrets'a girilince otomatik)
+        // kuruluyor - key boşsa Authorization header'ı hiç eklenmiyor, Voyage
+        // 401 döner (fail-fast, DI çözümlemesi asla patlamaz).
+        services.AddHttpClient<VoyageEmbeddingService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<VoyageAiOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+
+            if (!string.IsNullOrEmpty(options.ApiKey))
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
+        });
+
+        // GEÇİCİ: API key gelince değişecek TEK satır burası -
+        // AddSingleton<IEmbeddingService, FakeEmbeddingService>() ->
+        // AddSingleton<IEmbeddingService, VoyageEmbeddingService>() (yukarıdaki
+        // AddHttpClient<VoyageEmbeddingService> zaten typed client'ı Scoped/
+        // Transient olarak yönetiyor - IEmbeddingService kaydını AddSingleton
+        // DEĞİL AddScoped yapmak gerekecek, çünkü VoyageEmbeddingService artık
+        // HttpClient gibi dış bir kaynağı sarmalıyor; bkz. CLAUDE.md "Service
+        // Lifetime kuralı"). FakeEmbeddingService hiçbir dış kaynağa bağlı
+        // olmadığı için Singleton güvenli.
         services.AddSingleton<IEmbeddingService, FakeEmbeddingService>();
 
         // AiDbContext'i sarmalıyor (dış kaynak) - Auth/Wiki'deki repository'lerle

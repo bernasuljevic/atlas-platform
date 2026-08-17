@@ -22,7 +22,9 @@ public class ReindexWikiPagesCommandHandler : IRequestHandler<ReindexWikiPagesCo
         foreach (var page in pages)
         {
             await _publisher.Publish(
-                new WikiPageCreatedEvent(page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString()),
+                new WikiPageCreatedEvent(
+                    page.Id, page.Title, page.DepartmentName, page.Content, page.Visibility.ToString(),
+                    page.CreatedByEmail, IsReindexReplay: true),
                 cancellationToken);
         }
 

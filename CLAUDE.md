@@ -1330,24 +1330,359 @@ aynı şekilde işleyip Extracting→Ready/Failed geçişini kendisi yapıyor. �
 unit test (`Atlas.Modules.Documents.Application.Tests`, var olan Fake'lerle) +
 tüm solution (`dotnet test Atlas.sln --filter "Category!=Integration"`) yeşil.
 
+## Voyage AI embedding entegrasyonu - key olmadan yapılabilecek TÜM hazırlık (2026-08-12)
+
+Kullanıcı "şirket key'i sonra verecek, o gelmeden ne yapılabilir" diye sordu -
+madde 1'deki (a)-(e) listesinden key'e bağlı OLMAYAN her şey şimdiden yazılıp
+test edildi. **DI kaydı hâlâ `FakeEmbeddingService`'te** - hiçbir davranış
+değişmedi, bu bilerek "kanatta bekleyen, anahtarı çevirmeyi bekleyen" bir
+implementasyon.
+
+- **`VoyageEmbeddingService`** (AI.Infrastructure/Embeddings) - Voyage AI'ın
+  `POST /v1/embeddings` sözleşmesine göre yazıldı (endpoint/alan adları resmi
+  dokümantasyondan doğrulandı, tahmin edilmedi). Batch bölme: Voyage tek
+  istekte en fazla 1000 metin kabul ediyor, `texts.Chunk(1000)` ile bölünüyor
+  (`.NET`'in kendi `Chunk()`'ı yeterliydi, elle bir bölme algoritması
+  YAZILMADI). Toplam token bütçesi (modele göre 120K-1000K) BİLEREK ayrıca
+  hesaplanmıyor - `truncation: true` Voyage'ın aşırı uzun TEK bir metni
+  kendisinin kesmesini sağlıyor, tam bir tokenizer eklemek şimdilik YAGNI.
+  Sıra garantisi (`IEmbeddingService`'in "çıktı[i] = girdi[i]" sözleşmesi)
+  Voyage'ın dönüş sırasına GÜVENMEDEN, her elemanın kendi döndürdüğü `index`
+  alanına göre doğru pozisyona yazılmasıyla sağlanıyor.
+- **Retry:** 429/5xx/network/timeout GEÇİCİ sayılıp üstel geri çekilmeyle
+  (1sn, 2sn) en fazla 3 deneme yapılıyor; 400/401 gibi KALICI hatalar hiç
+  tekrar denenmeden fırlatılıyor (geçersiz bir key'le her çağrının 3 katı
+  gereksiz istek atmaması için). Polly gibi bir kütüphane EKLENMEDİ - tek bir
+  dış çağrı noktası için elle yazılmış bir döngü yeterliydi (gereksiz
+  bağımlılık eklememe ilkesi).
+- **Fail-fast boyut kontrolü:** dönen vektör `EmbeddingDimensions.Standard`
+  (1024) ile eşleşmiyorsa hemen hata fırlatılıyor - Ders #15'teki (sıfır-vektör
+  → NaN → tüm arama isteği çöktü) sınıftan bir hatanın pgvector'a ulaşmadan
+  yakalanması.
+- **`VoyageAiOptions`** - `ApiKey` appsettings.json'da DEĞİL (Jwt:Key'le AYNI
+  gerekçe, Ders #16), `Model`/`BaseUrl` appsettings.json'da (`"VoyageAi"`
+  bölümü, gizli değiller). `AIModule.cs`'e `AddHttpClient<VoyageEmbeddingService>`
+  (typed client, Authorization header'ı DI çözümlenirken Options'tan kuruluyor)
+  + `Configure<VoyageAiOptions>` eklendi - **key BOŞKEN bile** uygulama
+  sorunsuz açılıyor (canlı doğrulandı: `dotnet run`, `/health` → 200), sadece
+  gerçek bir çağrı yapılırsa Voyage 401 döner.
+- **Testler key GEREKTİRMİYOR:** `FakeHttpMessageHandler` (mocking kütüphanesi
+  yok, projenin kendi Fake deseni) ile `HttpClient` gerçek ağa hiç çıkmadan
+  test ediliyor - 6 yeni test (boş girdi, sıra garantisi/ters index, 1000+
+  metnin bölünmesi, 429'da retry, 401'de retry YOK, yanlış boyutta fail-fast).
+  `dotnet test Atlas.sln --filter "Category!=Integration"` yeşil (Documents
+  bulk reindex'ten sonra: 138 test).
+
+**Key geldiğinde yapılacaklar (runbook):**
+1. `dotnet user-secrets set "VoyageAi:ApiKey" "..."` (KENDİ terminalinden -
+   Ders #16, Claude'un çalıştırdığı bir komut kullanıcının kendi shell'ine
+   görünmeyebilir).
+2. `AIModule.cs`'te TEK satır: `AddSingleton<IEmbeddingService, FakeEmbeddingService>()`
+   → `AddScoped<IEmbeddingService, VoyageEmbeddingService>()` (Singleton
+   DEĞİL - artık `HttpClient` gibi dış bir kaynağı sarmalıyor, bkz. "Service
+   Lifetime kuralı").
+3. `Model`/`output_dimension` kararını (appsettings.json'daki `"VoyageAi:Model"`)
+   gerçek key'e karşı doğrula - `EmbeddingDimensions.Standard`in (1024) seçilen
+   modelin gerçek çıktısıyla eştiği canlı test edilmeli.
+4. `POST /api/wiki/reindex` + `POST /api/documents/reindex` (Admin) - var olan
+   TÜM Fake-üretimi embedding'leri gerçek sağlayıcıyla yeniden üret.
+5. Bir arama yapıp sonuçların anlam benzerliğine göre (kelime örtüşmesine göre
+   DEĞİL) sıralandığını canlı doğrula.
+
+## Makale okunabilirliği - "Okuma Süresi" eklendi (2026-08-12)
+
+Şirketten (Rıdvan) gelen eski bir geri bildirim ("Medium gibi birkaç siteyi
+kontrol edip belki ek özellikler ekleyebiliriz") denetlendi. **Önemli
+düzeltme:** İçindekiler (TOC, scroll-spy ile aktif başlık takibi, mobilde
+çekmece), Okuma Ayarları (yazı boyutu/satır genişliği/satır aralığı/tema,
+`ReadingSettingsPanel.jsx`) ve Tam Ekran Okuma Modu **ZATEN VARDI**
+(`WikiArticlePage.jsx`, 2026-08-07 tarihli birden fazla kullanıcı geri
+bildirimi turuyla inşa edilmiş) - bu, CLAUDE.md'nin "Şu ana kadar
+tamamlananlar" listesine hiç girmemiş, GERÇEK bir dokümantasyon boşluğuydu
+(kod var, kayıt yok). Denetimde tek somut EKSİK bulundu: Medium'un "X dakika
+okuma" göstergesinin bir karşılığı yoktu.
+
+`readingTime.js` (yeni, `dateUtils.js` ile AYNI desen - saf fonksiyon + kendi
+Vitest testi) - 200 kelime/dakika varsayımıyla kaba bir tahmin üretiyor,
+kod bloklarını/`:::` blok işaretlerini/link URL'lerini (SADECE link metnini
+sayıyor) kelime sayısına KATMIYOR - aksi halde uzun bir kod örneği ya da uzun
+bir URL süreyi yapay olarak şişirirdi. `WikiArticlePage.jsx`'teki mevcut
+"Bilgi Kutusu"na (Departman/Erişim/Oluşturan/Tarih'in yanına) "Okuma Süresi"
+satırı olarak eklendi - yeni bir UI alanı İCAT EDİLMEDİ, var olan desene
+uyduruldu. Canlı doğrulandı: "Atlas Platformu Geliştirici Kılavuzu" (en uzun
+sayfa) için "~4 dk" gösterdi, doğru sırada (Tarih'ten sonra, Etiketler'den
+önce) render edildi. 7 yeni test (`readingTime.test.js`) + tüm frontend test
+suite'i (24/24) yeşil.
+
+## UI/UX Denetimi ve Uygulanan Düzeltmeler (2026-08-12)
+
+Kullanıcının "yeşil + krem + kahve tonları, sarı yok, sade, kompakt sidebar"
+hedefine göre mevcut frontend'in canlı DOM/CSS incelemesi yapıldı (kod hiç
+değiştirilmeden önce - `getComputedStyle` ile ölçülen gerçek renk/spacing/
+font değerleri, ekran görüntüsü bu ortamda alınamadığı için). **Önemli
+bulgu:** Light mode ZATEN hedefteki krem+yeşil paleti taşıyordu (`--bg:
+#f9f6ef`, `--brand-accent: #1b4d3e`, sarı hiç yok) - asıl kopukluk dark
+mode'daydı. Denetim raporunun tamamı onaylandıktan sonra 5 madde uygulandı:
+
+- [x] **Dark mode paleti ısıtıldı + gerçek bir `--primary` çelişkisi
+      düzeltildi:** Dark mode eskiden soğuk bir slate/grafit paletiydi
+      (`--bg: #1b2025`, mavimsi) - light mode'un krem/kahve karakteriyle hiç
+      akrabalığı yoktu. `--bg`/`--page-bg`/`--border`/`--code-bg`/`--text`/
+      `--text-h` AYNI koyuluk/luminance seviyesi korunarak (WCAG kontrastları
+      bozulmasın diye) mavi-griden sıcak kahve/espresso ailesine çekildi
+      (`--bg: #1e1710`, `--page-bg: #16110b` vb.). **Denetim sırasında bulunan
+      GERÇEK bug:** `index.css`'te İKİ AYRI `.dark` bloğu vardı (biri elle
+      yazılmış, öbürü shadcn init'inden kalma, hiç birleştirilmemiş) -
+      `--primary` üç farklı yerde üç farklı değer taşıyordu (`#34d399`,
+      `#24654f`), CSS kaskad kuralı gereği SONRAKİ blok kazanıyordu, yani
+      ikisinden biri hiç render edilmeyen ölü koddu; ayrıca ikisi de
+      WCAG-doğrulanmış `--brand-accent`'le (`#1d8660`, bkz. eski kontrast
+      düzeltmesi notu) UYUŞMUYORDU. Üçü de tek bir değere (`#1d8660`)
+      birleştirildi - iki `.dark` bloğunun kendisi BİLEREK birleştirilmedi
+      (daha büyük bir mimari temizlik, bu denetimin kapsamı dışında
+      bırakıldı), ama artık hangisinin kazandığının önemi kalmadı.
+- [x] **H1/H2/H3 gövde metninin (16px) üzerine çıkarıldı:** H2 (15px) gövde
+      metninden KÜÇÜKTÜ, sadece kalın yazı tipi hiyerarşiyi taşıyordu -
+      Wikipedia'nın kendi tipografisiyle (H2 gözle görülür büyük) karşılaştırınca
+      ters bir hiyerarşiydi. `HEADING_SIZES` (markdown.jsx): 21/15/12 →
+      24/19/17px. H4-H6 BİLEREK dokunulmadı (orijinal tasarım kararı onları
+      H3'ün altında küçük bir "etiket" tonunda tutmaktı, denetim SADECE
+      H1-H3'ü işaretlemişti).
+- [x] **Ana sayfa hero başlığı büyütüldü, ama ÖLÇÜLÜ:** `text-lg` (15.75px) →
+      `text-xl` (17.5px) - `text-2xl`'e SIÇRANMADI, çünkü bu satır zaten
+      "Karşılama alanı küçültülsün" (2026-08-07 spec'i) kararıyla bilinçli
+      olarak ince tutulmuştu; audit'in "hero zayıf" bulgusuyla o geçmiş
+      kararı ÇELİŞTİRMEDEN tek kademelik bir denge bulundu.
+- [x] **Makale sağ paneli (Bilgi Kutusu + Okuma Ayarları) daraltıldı:**
+      260/280px → 200/240px (`GRID_TEMPLATES`, `WikiArticlePage.jsx`) - panel
+      içeriği (Departman/Erişim/Oluşturan/Tarih/Okuma Süresi/Etiketler) zaten
+      o genişliği doldurmuyordu, içerik sütunu bu daralmadan +40px kazandı.
+      TOC genişliğine (200/220px) BİLEREK dokunulmadı, denetim SADECE sağ
+      paneli "gereksiz geniş" işaretlemişti.
+- [x] **Sarı/amber kontrolü:** `CALLOUT_CONFIG`'de (markdown.jsx) hiç sarı/amber
+      YOK - "warning"/"error" ikisi de düz `"red"` kullanıyor. Doğrulandı,
+      düzeltme gerekmedi (hedef sadece "sarı kullanılmamalı" diyordu).
+
+**Denetimde "bug" olarak işaretlenip SONRADAN YANLIŞ ÇIKAN bir bulgu:**
+İçindekiler'in "genişlet" düğmesinin grid kolonunu büyütmediği düşünülmüştü -
+uygulamaya geçerken TEMİZ bir sayfa yüklemesinde YENİDEN test edildi ve
+DOĞRU çalıştığı görüldü (220px'e genişliyor). Muhtemelen ilk ölçüm sırasında
+bir zamanlama/stale-state sorunu vardı - "düzeltme" YAPILMADI, çünkü
+düzeltilecek gerçek bir sorun yoktu. Genel ders: bir "bug" bulgusunu
+düzeltmeye geçmeden önce TEMİZ bir ortamda yeniden üretmeye çalışmak gerekir -
+burada bu adım atılıp gerçek olmayan bir düzeltmeden kaçınıldı.
+
+Tüm değişiklikler canlı doğrulandı (light+dark mod, `getComputedStyle` ile
+gerçek piksel/hex değerleri okunarak) + `dotnet build` gerekmedi (sadece
+frontend) + `npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
+
+## "Modernize et" turu (2026-08-12, denetim raporunun hemen ardından)
+
+Kullanıcı "siteyi aç ve daha modernize et" dedi - denetim raporunun ("sade
+kal, abartma") sınırları İÇİNDE, iki somut ekleme yapıldı:
+
+- [x] **Sticky header:** `WikiLayout.jsx`'teki `<header>` eskiden
+      `position: static` idi - sayfa kaydırılınca arama/tema/bildirim gibi
+      her an erişilebilir olması gereken kontroller TAMAMEN gözden
+      kayboluyordu. Artık `sticky top-0 z-20`, opak `var(--bg)` zemini
+      koruyor (backdrop-blur/yarı-saydamlık BİLEREK eklenmedi - "sade" hedefine
+      gereksiz bir gösteriş olurdu). Canlı doğrulandı: 800px scroll sonrası
+      `header.getBoundingClientRect().top` hâlâ 0.
+- [x] **Ana sayfa kartlarına hover mikro-etkileşimi:** `ArticleCard`
+      (HomePage.jsx) zaten `hover:shadow-md` taşıyordu - buna küçük bir
+      kaldırma (`hover:-translate-y-0.5`) ve sınır renginin yeşile dönmesi
+      (`hover:border-[var(--brand-accent-border)]`) eklendi. Bunu yapabilmek
+      için sınır rengi inline `style`'dan Tailwind class'ına taşınmak
+      ZORUNDAYDI - inline style, AYNI özellik için `:hover` pseudo-class'ından
+      BAĞIMSIZ olarak her zaman dış CSS kuralını ezer, bu yüzden eskisi gibi
+      `style={{ borderColor: "var(--border)" }}` kalsaydı hover rengi hiç
+      görünmezdi.
+
+**Doğrulama sınırlaması (dürüstçe not edilsin):** Hover mikro-etkileşimini bu
+ortamın otomasyon aracıyla (simüle edilmiş fare hareketi) GÖRSEL olarak
+doğrulayamadım - `element.matches(':hover')` `true` dönmesine rağmen
+`getComputedStyle` değişmedi. Ama bu ortamın kendi sınırlaması olduğu
+doğrulandı: benim EKLEMEDİĞİM, koddan ÖNCEDEN var olan `hover:shadow-md`
+sınıfı da AYNI testte tepki vermedi - yani gerçek bir regresyon değil, CDP
+tabanlı simüle hover'ın bu ortamda `:hover` stil çözümlemesini gerçek fare
+gibi tetiklememesi. CSS kuralının kendisi (`sheet.cssRules` içinde doğru
+selector/specificity ile) doğru derlendiği ayrıca doğrulandı. `npm run lint`/
+`npm run build`/`npx vitest run` (24/24) yeşil, sticky header (layout/scroll
+davranışı gerçekten test edilebilir olduğu için) tam doğrulandı.
+
+## Eksik-özellik listesi - Gün 1: Okuma ilerleme çubuğu + arama derin link (2026-08-12)
+
+19 bölümlük "Atlas İçerik Sistemi" spec'inin tekrar denetlenmesinde bulunan
+10+ eksikten (bkz. o denetimin özeti) en düşük riskli, tamamen frontend olan
+ikisiyle başlandı - CLAUDE.md'nin "büyük özellik birden fazla küçük adıma
+bölünsün" kuralına göre, hepsi tek seferde YAPILMADI.
+
+- [x] **Okuma İlerleme Çubuğu** - `WikiArticlePage.jsx`'te makalenin
+      tepesi/altı viewport'a göre hesaplanan, sticky header'ın (50px) hemen
+      altına sabitlenen ince (2px) bir çubuk. Kısa sayfalarda (tek ekrana
+      sığan) hiç GÖSTERİLMİYOR - "gereksiz UI elementiyle doldurma" spec
+      notuna uyuluyor. Tam ekran okuma modu BİLEREK kapsam dışı (kendi ayrı
+      `overflow-y-auto` scroll konteynerini kullanıyor, window scroll değil -
+      ayrı bir izleme mantığı gerektirirdi).
+- [x] **Arama sonucundan ilgili bölüme derin link** - `WikiSearch.jsx`
+      artık eşleşen chunk metnini `navigate(..., { state: { chunkText } })`
+      ile taşıyor, `WikiArticlePage` chunk'ın ham içerikteki konumunu bulup
+      (`markdown.jsx`'e eklenen `lineIndex` alanı sayesinde) EN YAKIN ÖNCEKİ
+      başlığa kaydırıyor - backend'e YENİ BİR ALAN EKLENMEDİ (chunk<->başlık
+      ilişkisi backend'de hiç saklanmıyor, TextChunker sabit boyutlu pencere
+      kullanıyor, başlık sınırlarını bilmiyor). **Canlı testte bulunan gerçek
+      bir hata:** snippet'i chunk'ın BAŞINDAN almak yanlıştı - bir chunk
+      sıkça bir bölüm SINIRINI ortadan kesiyor (ilk cümlesi ÖNCEKİ bölümün
+      son cümlesi, geri kalanı YENİ bölüm), bu yüzden yanlış (bir önceki)
+      başlığa kaydırıyordu. Düzeltme: snippet chunk'ın ORTASINDAN alınıyor -
+      bir chunk'ın "asıl konusu" neredeyse hep ortasında, sınır-kesme etkisi
+      sadece uçlarda oluyor. Canlı doğrulandı (gerçek bir arama yapılıp
+      tıklanarak): "departman bazlı görünürlük" araması artık doğru şekilde
+      "Departman Bazlı Erişim" başlığını aktif işaretliyor (önceden yanlışlıkla
+      bir önceki başlığı - "CQRS Komutu" - işaretliyordu).
+
+**Doğrulama sınırlaması (dürüstçe not edilsin):** Bu ortamın Browser
+pane'i "compositing" yapmıyor (screenshot da bu yüzden çalışmıyor) - bu
+yüzden `scrollIntoView({behavior:"smooth"})` GERÇEKTEN kaydırmıyor (aynı
+hedefe `behavior:"instant"` ile manuel test edilince ANINDA çalıştığı
+kanıtlandı - kod doğru, gerçek kullanıcılarda sorunsuz çalışacak). Okuma
+ilerleme çubuğunun matematiği de aynı şekilde manuel `scroll` event'i
+tetiklenerek doğrulandı (`window.scrollTo()` bu ortamda gerçek bir `scroll`
+event'i tetiklemiyor - başka bir ortam kısıtlaması, kodun kendisi değil).
+`npm run lint`/`npm run build`/`npx vitest run` (24/24) yeşil.
+
+## Medium-vari "+" düğmesi (2026-08-12, kullanıcının Medium ekran görüntüsü isteği)
+
+Kullanıcı Medium'un editöründeki "+" düğmesini (tıklanınca resim/video/kod/
+embed gibi blok tiplerini gösteren bir satır) örnek gösterip "bizde de olsun"
+dedi. **Yeni bir ekleme mekanizması İCAT EDİLMEDİ** - `WikiEditorPage.jsx`'te
+zaten var olan `SlashCommandMenu`/`SLASH_ITEMS` (satır başında "/" yazınca
+açılan blok menüsü, Faz 2'den beri var) TEK gerçek eksikti: görünür,
+keşfedilebilir bir tetikleyicisi yoktu, sadece "/" kısayolunu BİLENLER
+kullanabiliyordu.
+
+- [x] **Araç çubuğunun İLK öğesi olarak yuvarlak bir "+" düğmesi eklendi**
+      (`handlePlusButtonClick`) - diğer dikdörtgen `Button`'lardan BİLEREK
+      görsel olarak ayrışıyor (yuvarlak, `--brand-accent` renginde) ki
+      Medium'daki gibi "keşfedilebilir, farklı bir şey" hissi versin. Var
+      olan ~15 butonluk uzun araç çubuğuna DOKUNULMADI (kaldırılan/gizlenen
+      hiçbir şey yok) - "+" SADECE aynı blok menüsüne "/" yazmaya gerek
+      kalmadan ek bir yol.
+- [x] **`handleSlashSelect` iki tetikleyiciyi de destekleyecek şekilde
+      dallandırıldı:** "/" ile açıldığında `slashTriggerPosRef.current` dolu
+      oluyor (kaldırılacak bir "/" karakteri var), "+" düğmesiyle açıldığında
+      BİLEREK `null` (kaldırılacak bir tetikleyici karakter yok, doğrudan
+      `applyToolbarInsert` ile mevcut imleç konumuna ekleniyor). **Canlı
+      testte bulunacaktı ama ÖNCEDEN fark edilip önlendi:** `handleSlashSelect`
+      eskiden `triggerPos === null` durumunda SESSİZCE hiçbir şey yapmadan
+      dönüyordu (`if (!el || triggerPos === null) return;`) - "+" düğmesi bu
+      koşulu tetiklediği için, düzeltilmeseydi düğme görünüşte çalışır ama
+      hiçbir şey EKLEMEZDİ.
+
+Canlı doğrulandı: "+" düğmesi menüyü açıyor, bir blok seçilince doğru
+sözdizimi içeriğe ekleniyor ("Kod Bloğu" seçilince `` ```\nkod\n``` `` doğru
+eklendi), menü kapanıyor; AYRICA eski "/" tetiklemesi de (regresyon
+kontrolü) hâlâ birebir aynı şekilde çalışıyor - "/" karakteri doğru
+kaldırılıp yerine blok ekleniyor. `npm run lint`/`npm run build`/
+`npx vitest run` (24/24) yeşil.
+
+## Kalıcı Bildirim Geçmişi - Gün 1/2: Backend (2026-08-15)
+
+Kullanıcı Medium'un sağ sütunundaki "Write" kartını + "Staff Picks" akışını
+örnek gösterip "bildirim için de böyle bir şey ekleyelim" dedi.
+`AskUserQuestion` ile netleştirildi: sadece kozmetik bir "yakında" kartı DEĞİL,
+**gerçek, kalıcı bir bildirim geçmişi** isteniyor. Notifications modülü
+2026-08-15'e kadar TAMAMEN ephemeral'dı (`Class1.cs` placeholder'ları hâlâ
+duruyordu - Domain/Application katmanları hiç kullanılmamıştı) - sadece
+SignalR ile anlık toast, hiçbir yerde saklama yoktu. Bu modüle ilk kez
+gerçek bir Domain/Application/Infrastructure katmanı eklendi.
+
+- [x] **`NotificationEntry` (Notifications.Domain)** - AuditLogEntry'nin AYNI
+      denormalizasyon desenini taşıyor (Title/DepartmentName/Visibility/
+      ActorEmail kopyalanıyor, Auth/Wiki'nin tablolarına referans YOK).
+      **Kritik olan asıl gerekçe süs değil:** DepartmentName/Visibility
+      buradan, `GetNotificationsQueryHandler`'ın Wiki listesi/AI aramasıyla
+      AYNI `IWikiVisibilityChecker`'ı uygulayabilmesi İÇİN var - bu alanlar
+      olmasaydı, DepartmentOnly bir sayfanın oluşturulduğu bilgisi (başlığıyla
+      birlikte) o departmanda OLMAYAN kullanıcılara da sızardı (Ders #10'daki
+      SINIFTAN bir hata, bu sefer BAŞTAN önlendi).
+- [x] **`WikiPageCreatedEvent` genişletildi:** `CreatedByEmail` (Notifications'ın
+      "kim oluşturdu" göstermesi için, "Content" alanının eklenme gerekçesiyle
+      AYNI desen) + `IsReindexReplay = false` (varsayılan). **Bu ikinci alan
+      olmadan bulunacak GERÇEK bir bug BAŞTAN önlendi:** `POST /api/wiki/reindex`
+      var olan TÜM sayfalar için bu event'i yeniden yayınlıyor (embedding
+      sağlayıcısı değişince AI'ın yeniden işlemesi için) - AI'ın handler'ı
+      için sorun değil ama Notifications'ın YENİ kalıcı geçmişi için BÜYÜK
+      bir sorun olurdu: bir reindex çalıştırmak, haftalar önce oluşturulmuş
+      HER sayfa için "az önce oluşturuldu" gibi SAHTE kayıtlar ekleyip
+      geçmişi anlamsızlaştırırdı. `WikiPageCreatedEventHandler`
+      (Notifications.Infrastructure) artık `IsReindexReplay` true ise hem
+      SignalR toast'ını HEM kalıcı kaydı ATLIYOR.
+- [x] **Kalıcı yazma best-effort** - AI'ın embedding-üretim handler'ıyla AYNI
+      gerekçe (try/catch, rethrow YOK, sadece `LogWarning`) - bir DB yazma
+      hatası SignalR toast'ının gönderilmesini ENGELLEMEMELİ.
+- [x] **`GetNotificationsQuery` + `GET /api/notifications?take=10`** (token
+      gerektiriyor - AI arama endpoint'iyle AYNI gerekçe, sonuçlar zaten
+      departmana göre filtreleniyor). `NotificationsDbContext` - Audit/Vault/
+      Documents ile AYNI SQL Server veritabanı (`AtlasPlatform`), kendi
+      `notifications.*` şeması. Migration uygulandı.
+
+**Canlı doğrulandı (üç ayrı senaryo, gerçek kullanıcılarla):**
+1. Public bir sayfa oluşturulunca doğru veriyle (title/departman/actor email)
+   kalıcı kayıt oluştu.
+2. **Güvenlik testi (en kritik olan):** DepartmentOnly bir IK sayfası
+   oluşturuldu - IT departmanındaki (email doğrulanmış) bir test kullanıcısı
+   `GET /api/notifications` çağırınca SADECE Public sayfayı gördü, IK'nın
+   gizli bildirimi listede HİÇ YOKTU. Admin ise ikisini de gördü (bypass).
+3. `POST /api/wiki/reindex` (19 sayfa) tetiklendi - bildirim sayısı reindex
+   ÖNCESİ ve SONRASI birebir aynı (2) kaldı, `IsReindexReplay` doğru
+   çalıştığı kanıtlandı.
+
+`dotnet build Atlas.sln` (0 uyarı/hata) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` (regresyon yok, `WikiPageCreatedEvent`'i doğrudan
+oluşturan hiçbir test dosyası bulunmadı - constructor değişikliği güvenliydi).
+Test verisi (2 sayfa + 2 bildirim kaydı) canlı doğrulama sonrası temizlendi.
+
+**Gün 2 (frontend) TAMAMLANDI (2026-08-15):**
+
+- [x] **`WritePromptCard`** - Medium'un "+ Just start writing" kartının
+      ÇEKİRDEK fikri alındı, dekoratif illüstrasyon/ekstra linkler BİLEREK
+      alınmadı ("Medium'dan özellik alınabilir ama Atlas'ın tasarımı
+      Medium'un kopyası olmamalı" ilkesi) - tek satır, tıklanınca `/wiki/new`.
+- [x] **`NotificationsPanel`** - `DiscussionPanel`'in AYNI "self-contained,
+      kendi verisini kendi çeken" deseni, `GetNotificationsQuery`'yi (Gün 1)
+      kullanıyor. Hiçbir yetkilendirme mantığı İÇERMİYOR - backend zaten
+      filtrelenmiş veriyi döndürüyor, aynı "gerçek yetkilendirme her zaman
+      backend'de" ilkesi.
+- [x] **HomePage'in ana içerik alanı 2 sütuna bölündü** (`xl:grid-cols-[1fr_300px]`)
+      - sol/geniş sütun makale ızgarası (3'ten 2 sütuna indirildi, sidebar'a
+      yer açmak için), sağ/dar sütun (Yazmaya Başla + Bildirimler + Son
+      Güncellemeler + Popüler Kategoriler) `xl:sticky`. `xl` ALTINDA sidebar
+      `hidden` DEĞİL - DOM sırası gereği makalelerin altına doğal olarak
+      akıyor (WikiArticlePage'in TOC/panel'indeki AYNI "dar ekranda gizleme
+      yerine akıt" tercihi).
+
+Canlı doğrulandı: gerçek bir sayfa oluşturulup Bildirimler panelinde doğru
+veriyle (`admin@atlas.local yeni bir sayfa ekledi` + başlık + departman/tarih)
+göründüğü, tıklanınca doğru sayfaya gittiği, "Yazmaya başla" kartının
+`/wiki/new`'e gittiği, grid'in gerçekten iki sütun oluşturduğu (`789.667px
+300px`) DOM üzerinden teyit edildi. `npm run lint`/`npm run build`/
+`npx vitest run` (24/24) yeşil. Test verisi temizlendi.
+
+**"Kalıcı Bildirim Geçmişi" özelliği artık TAMAMEN BİTTİ (Gün 1-2).**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
    `IEmbeddingService`'in DI kaydını değiştirmek yeterli olacak şekilde tasarlandı
-   (bu, API key'ler gelene kadar bloklanmış durumda). **Not (2026-08-12,
-   geçiş öncesi hazırlık denetimi):** "sadece DI kaydını değiştir" cümlesi
-   Application/Domain katmanları için doğru ama TAM resim değil - gerçek geçiş
-   ayrıca şunları gerektirecek: (a) sağlayıcı/model kararı + API key (kod
-   `EmbeddingDimensions.Standard = 1024`'ün yorumunda Voyage AI'a hazırlanmış
-   görünüyor ama kesinleşmedi), (b) projenin İLK dış HTTP entegrasyonu (`IHttpClientFactory`
-   şu an hiç kullanılmıyor) - yeni bir `Infrastructure` sınıfı + hata/timeout
-   yönetimi, (c) `Jwt:Key`'le AYNI gerekçeyle key'in User Secrets'a gitmesi,
-   (d) gerçek API'lerin batch/token limitine göre `EmbedAsync`'in büyük
-   listeleri alt-batch'lere bölmesi (Fake'te sınır yoktu), (e) var olan TÜM
-   embedding'lerin (Fake'in ürettiği, yeni sağlayıcıyla uyumsuz) toplu olarak
-   yeniden üretilmesi - Wiki (`/api/wiki/reindex`) VE Documents
-   (`/api/documents/reindex`, yukarıdaki bölüme bkz. - bu denetimde bulunup
-   AYRICA kapatılan eksik) ikisi de artık hazır. **Not (2026-07-28,
+   (bu, API key'ler gelene kadar bloklanmış durumda). **Güncel durum
+   (2026-08-12):** yukarıdaki "Voyage AI embedding entegrasyonu" bölümüne bkz -
+   key'e bağlı OLMAYAN TÜM hazırlık (gerçek Infrastructure sınıfı, batch/retry/
+   fail-fast mantığı, HttpClient altyapısı, testler, Wiki+Documents bulk
+   reindex) bitti. Kalan tek şey gerçekten key'e bağlı: (a) User Secrets'a
+   key'in girilmesi, (b) DI kaydının tek satır değişmesi, (c) `Model`/boyut
+   kararının gerçek key'e karşı doğrulanması, (d) toplu reindex'in
+   tetiklenmesi - yukarıdaki runbook. **Not (2026-07-28,
    kullanıcı gözlemi):** Arama şu an "başlığa göre eşleşiyormuş" hissi
    verebiliyor - kod tarafında bu YANLIŞ, canlı test edilip kanıtlandı
    (`SearchByMeaningQueryHandler` sadece `ChunkText`/vektöre bakıyor,

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowRight,
+  Bell,
   Clock,
   FilePlus2,
   FileText,
@@ -12,7 +13,7 @@ import {
   Star,
   Users,
 } from "lucide-react";
-import { getWikiDashboard } from "../api";
+import { getNotifications, getWikiDashboard } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
 import { Badge } from "@atlas/ui/badge";
@@ -148,6 +149,93 @@ function RecentUpdatesBox({ updates }) {
   );
 }
 
+// Medium'un sağ sütunundaki "+ Just start writing" kartının karşılığı
+// (kullanıcı isteği, 2026-08-15). BİLEREK Medium'daki dekoratif illüstrasyon/
+// ekstra "yazarlık ipuçları" linkleri YOK - "Medium'dan özellik alınabilir
+// ama Atlas'ın tasarımı Medium'un kopyası olmamalı" ilkesine göre, ÇEKİRDEK
+// fikir (her an görünen, tek tıkla yazmaya başlama girişi) alındı, dekor
+// alınmadı - "sade" hedefiyle tutarlı. Panel'in KENDİSİNİ kullanmıyor (o,
+// başlık çubuğu + divide-y liste deseni için - burası tek, tıklanabilir bir
+// satır, farklı bir görsel dil).
+function WritePromptCard() {
+  return (
+    <Link
+      to="/wiki/new"
+      className="flex items-center gap-2.5 rounded-lg border p-3.5 text-sm transition hover:border-[var(--brand-accent-border)]"
+      style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+    >
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        style={{ background: "var(--brand-accent-bg)", color: "var(--brand-accent)" }}
+      >
+        <Plus size={16} />
+      </span>
+      <span style={{ color: "var(--text)", opacity: 0.75 }}>Yazmaya başla...</span>
+    </Link>
+  );
+}
+
+// Kalıcı bildirim geçmişi (2026-08-15, Gün 2 - backend Gün 1'de eklendi,
+// bkz. GetNotificationsQuery). Panel'in KENDİ fetch'ini yapan, self-contained
+// bir alt bileşeni - DiscussionPanel'in (token alıp kendi verisini kendi
+// çeken) AYNI deseni. Görünürlük filtresi backend'de ZATEN uygulanıyor
+// (IWikiVisibilityChecker) - burası hiçbir departman/rol kontrolü YAPMIYOR,
+// sadece API'nin döndürdüğünü gösteriyor (Wiki listesi/AI aramasıyla AYNI
+// "gerçek yetkilendirme her zaman backend'de" ilkesi).
+function NotificationsPanel({ token }) {
+  const [notifications, setNotifications] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getNotifications(token, 8)
+      .then((result) => {
+        if (!cancelled) setNotifications(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return (
+    <Panel title="Bildirimler" action={<Bell size={13} style={{ color: "var(--text)", opacity: 0.5 }} />}>
+      {error && (
+        <p className="px-3.5 py-3 text-xs" style={{ color: "red" }}>
+          {error}
+        </p>
+      )}
+      {!error && notifications && notifications.length === 0 && (
+        <p className="px-3.5 py-3 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+          Henüz bir bildirim yok.
+        </p>
+      )}
+      {notifications?.map((n) => (
+        <Link
+          key={n.id}
+          to={`/wiki/${n.resourceId}`}
+          className="flex flex-col gap-0.5 px-3.5 py-2.5 text-xs hover:bg-[var(--brand-accent)]/5"
+        >
+          <span style={{ color: "var(--text)", opacity: 0.75 }}>
+            <span className="font-semibold" style={{ color: "var(--text-h)" }}>
+              {n.actorEmail ?? "Biri"}
+            </span>{" "}
+            yeni bir sayfa ekledi
+          </span>
+          <span className="truncate font-medium" style={{ color: "var(--brand-accent)" }}>
+            {n.title}
+          </span>
+          <span style={{ color: "var(--text)", opacity: 0.5 }}>
+            {n.departmentName} · {formatUtcTimestamp(n.createdAtUtc)}
+          </span>
+        </Link>
+      ))}
+    </Panel>
+  );
+}
+
 // "Son Eklenen Makaleler" artık ikili büyük kutular yerine yoğun bir kart
 // ızgarası (kullanıcı spec'i, "2. Ana Sayfa Kartları" - referans admin
 // panelindeki gibi ekranı daha verimli dolduran, birbirine yakın yükseklikte
@@ -158,10 +246,19 @@ function ArticleCard({ article }) {
   const excerpt = article.excerpt.endsWith("…") ? article.excerpt.slice(0, -1) + "…" : article.excerpt;
 
   return (
+    // "Modernize et" (2026-08-12): sınır rengi inline style'dan Tailwind
+      // sınıfına taşındı (border-[var(--border)]) - inline style hover:
+      // sınıfını EZERDİ (inline stil, aynı özellik için HER ZAMAN dış CSS
+      // kuralını kazanır, :hover pseudo-class'ı fark etmeksizin), bu yüzden
+      // hover'da yeşile dönebilmesi için başka türlü mümkün değildi. Küçük
+      // bir kaldırma (-translate-y-0.5) eklendi - mevcut `transition` sınıfı
+      // zaten `transform`ı da kapsıyor, ekstra bir süre/easing tanımlamaya
+      // gerek kalmadı. "Abartısız" hedefine sadık kalmak için sadece 2px'lik
+      // bir hareket - göze çarpan ama rahatsız etmeyen bir mikro-etkileşim.
     <Link
       to={`/wiki/${article.id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-lg border transition hover:shadow-md"
-      style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+      className="group flex h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] transition hover:-translate-y-0.5 hover:border-[var(--brand-accent-border)] hover:shadow-md"
+      style={{ background: "var(--bg)" }}
     >
       {article.coverImageUrl ? (
         <img src={article.coverImageUrl} alt="" className="h-32 w-full object-cover" />
@@ -308,7 +405,13 @@ function HomePage({ token }) {
           ince bir şeride indirildi. */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: "var(--border)" }}>
         <div>
-          <h1 className="text-lg font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+          {/* UI/UX denetimi (2026-08-12): text-lg (15.75px) bir karşılama
+              başlığı için zayıf ölçülmüştü - ama yukarıdaki yorumdaki
+              "Karşılama alanı küçültülsün" kararıyla ÇELİŞMEMEK için text-2xl
+              gibi büyük bir sıçrama YAPILMADI, sadece bir kademe (text-xl,
+              17.5px) - şeridin "ince" karakteri korunuyor, sadece başlık artık
+              MiniStat rakamlarından (text-xs) daha net ayrışıyor. */}
+          <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
             Atlas Wiki'ye hoş geldiniz{fullName ? `, ${fullName}` : ""}!
           </h1>
           <p className="text-xs" style={{ color: "var(--text)", opacity: 0.75 }}>
@@ -343,11 +446,20 @@ function HomePage({ token }) {
           <DiscussionPanel token={token} />
         </div>
       ) : dashboard && (
-        <div className="flex flex-col gap-6">
-          {/* (1) EN ÜSTTE, en dikkat çeken alan - yoğun makale kart ızgarası
-              (spec madde 2 + 6: "en dikkat çeken alan makaleler olmalı"). */}
+        // "Modernize et" (2026-08-15, kullanıcı isteği: "diğerlerinin
+        // yazdıkları da şöyle gözüksün sağ tarafta") - ana içerik artık TEK
+        // sütun DEĞİL, Medium'un kendi yerleşimiyle AYNI fikir: sol/geniş
+        // sütun makaleler, sağ/dar sütun (Yazmaya Başla + Bildirimler + Son
+        // Güncellemeler + Popüler Kategoriler) kalıcı bir "yan şerit".
+        // `xl:` ALTINDA grid tek sütuna düşüyor - sidebar `hidden` DEĞİL,
+        // DOM sırası gereği doğal olarak makalelerin ALTINA akıyor (WikiArticlePage'in
+        // TOC/panel'inde de aynı "dar ekranda gizleme yerine akıt" tercihi var).
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px] xl:items-start">
+          {/* (1) SOL/GENİŞ sütun - en dikkat çeken alan, yoğun makale kart
+              ızgarası (spec madde 2 + 6: "en dikkat çeken alan makaleler
+              olmalı"). */}
           {gridArticles.length > 0 && (
-            <section>
+            <section className="min-w-0">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
                   Son Eklenen Makaleler
@@ -360,7 +472,7 @@ function HomePage({ token }) {
                   Tümünü Gör <ArrowRight size={13} />
                 </Link>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2">
                 {gridArticles.map((a) => (
                   <ArticleCard key={a.id} article={a} />
                 ))}
@@ -368,11 +480,13 @@ function HomePage({ token }) {
             </section>
           )}
 
-          {/* (2) EN ALTTA, ikinci planda - Son Güncellemeler + Popüler
-              Kategoriler (spec madde 6: "istatistik kartları ikinci planda
-              kalmalı"). id="son-guncellemeler" - üstteki Hızlı Erişim
-              şeridindeki "Son Güncellenenler" düğmesi buraya kaydırıyor. */}
-          <div id="son-guncellemeler" className="grid grid-cols-1 gap-5 scroll-mt-4 lg:grid-cols-2">
+          {/* (2) SAĞ/DAR sütun - Yazmaya Başla + Bildirimler + Son
+              Güncellemeler + Popüler Kategoriler. id="son-guncellemeler" -
+              üstteki Hızlı Erişim şeridindeki "Son Güncellenenler" düğmesi
+              hâlâ buraya kaydırıyor. */}
+          <aside id="son-guncellemeler" className="flex scroll-mt-4 flex-col gap-4 xl:sticky xl:top-4">
+            <WritePromptCard />
+            <NotificationsPanel token={token} />
             {recentUpdates.length > 0 && <RecentUpdatesBox updates={recentUpdates} />}
 
             {dashboard.popularTags.length > 0 && (
@@ -382,7 +496,7 @@ function HomePage({ token }) {
                 ))}
               </Panel>
             )}
-          </div>
+          </aside>
         </div>
       )}
     </div>

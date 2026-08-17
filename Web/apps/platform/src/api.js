@@ -734,6 +734,27 @@ export async function getFavoritePages(accessToken) {
   return response.json();
 }
 
+export async function getNotifications(accessToken, take = 10) {
+  const doRequest = (token) =>
+    fetch(`${API_URL}/api/notifications?take=${take}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+  let response = await doRequest(accessToken);
+  if (response.status === 401) {
+    const newAccessToken = await refreshAccessToken();
+    if (newAccessToken) {
+      response = await doRequest(newAccessToken);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error("Bildirimler yüklenemedi");
+  }
+
+  return response.json();
+}
+
 export async function getPinnedPages(accessToken) {
   const doRequest = (token) =>
     fetch(`${API_URL}/api/wiki/pinned`, {
