@@ -151,6 +151,10 @@ function WikiEditorPage({ token }) {
   const [headingLevel, setHeadingLevel] = useState(2);
   const [calloutType, setCalloutType] = useState("info");
   const [imageAlign, setImageAlign] = useState("left");
+  // Eksik-özellik listesi Gün 2 (2026-08-17, "Resize") - varsayılan "medium",
+  // markdown.jsx'teki AlignedImageBlock'un size prop'unun varsayılanıyla
+  // AYNI (eski, boyut eki OLMADAN yazılmış içerikle tutarlı kalması için).
+  const [imageSize, setImageSize] = useState("medium");
   // Slash-command menüsü - triggerPos bir state DEĞİL bir ref, çünkü
   // handleSlashSelect içinde SENKRON olarak (bir sonraki render'ı beklemeden)
   // okunması gerekiyor - "/" karakterinin textarea'daki TAM konumu.
@@ -587,7 +591,10 @@ function WikiEditorPage({ token }) {
             </Button>
             {/* Hizalı resim - metnin ImageBlock'un aksine (her zaman ortada,
                 sabit boyutta) metnin YANINA konup metnin etrafından dolanması
-                gereken durumlar için (bkz. markdown.jsx'teki AlignedImageBlock). */}
+                gereken durumlar için (bkz. markdown.jsx'teki AlignedImageBlock).
+                İkinci select (boyut) - "Resize" (2026-08-17): serbest piksel
+                sürükleme yerine üç sabit boyut, bkz. markdown.jsx'teki
+                IMAGE_ALIGN_SIZE_CLASSES'daki gerekçe. */}
             <select
               value={imageAlign}
               onChange={(e) => setImageAlign(e.target.value)}
@@ -598,11 +605,23 @@ function WikiEditorPage({ token }) {
               <option value="center">Orta</option>
               <option value="right">Sağ</option>
             </select>
+            <select
+              value={imageSize}
+              onChange={(e) => setImageSize(e.target.value)}
+              className="rounded border px-1.5 py-1 text-sm"
+              style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text)" }}
+            >
+              <option value="small">Küçük</option>
+              <option value="medium">Orta</option>
+              <option value="large">Büyük</option>
+            </select>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => applyToolbarInsert(`:::image-${imageAlign}\n![`, "](https://...)\n:::", "Açıklama")}
+              onClick={() =>
+                applyToolbarInsert(`:::image-${imageAlign}-${imageSize}\n![`, "](https://...)\n:::", "Açıklama")
+              }
             >
               🖼️ Hizalı Resim
             </Button>

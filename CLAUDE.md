@@ -1671,6 +1671,47 @@ göründüğü, tıklanınca doğru sayfaya gittiği, "Yazmaya başla" kartını
 
 **"Kalıcı Bildirim Geçmişi" özelliği artık TAMAMEN BİTTİ (Gün 1-2).**
 
+## Eksik-özellik listesi - Gün 2: Görsel resize + fullscreen/lightbox (2026-08-17)
+
+Gün 1'deki (okuma ilerleme çubuğu + arama derin linki) devamı - listenin
+"A) Hızlı, düşük risk, sadece frontend" grubundaki son madde.
+
+- [x] **Resize - serbest piksel sürükleme BİLİNÇLİ OLARAK EKLENMEDİ.**
+      Bir `<textarea>` tabanlı düz-metin editöründe fare ile sürükleyip tam
+      piksel değerini markdown'a yazmak, hem mouse-tracking hem "editördeki
+      taslak = yayınlanan görünüm" pixel-perfect bir önizleme gerektirirdi -
+      bu editörün "gerçek bir contenteditable/blok editörü yok" mimarisiyle
+      uyuşmazdı. Bunun yerine `HEADING_SIZES`/`WikiVisibilityRules`'daki AYNI
+      felsefe: üç sabit, isimlendirilmiş boyut (Küçük/Orta/Büyük).
+      `:::image-{sol|orta|sağ}` sözdizimine isteğe bağlı bir `-{small|medium|
+      large}` eki eklendi (`IMAGE_ALIGN_SIZE_CLASSES`, markdown.jsx) - eki
+      OLMAYAN eski içerik hâlâ eşleşiyor, `medium`'a düşüyor (GERİYE DÖNÜK
+      UYUMLULUK bozulmadı, migration/veri dönüşümü gerekmedi). Editöre
+      ikinci bir `<select>` (boyut) eklendi, mevcut hizalama select'inin
+      yanına.
+- [x] **Fullscreen/lightbox** - Tam Ekran Okuma Modu'nun (WikiArticlePage.jsx)
+      AYNI `fixed inset-0 z-50` deseni, tutarlı bir "bu uygulamada tam ekran
+      overlay böyle görünür" dili. `ImageBlock` VE `AlignedImageBlock`'un
+      İKİSİ de kendi yerel `isOpen` state'ini tutuyor - paylaşılan bir
+      Context/global state İCAT EDİLMEDİ (aynı anda en fazla bir görsel
+      açık olabilir, yerel state yeterli). Büyütme ikonu SADECE hover'da
+      görünüyor ("sade" hedefine göre, görseli her zaman bir ikonla
+      kirletmemek için).
+
+Canlı doğrulandı: `:::image-left-large` + `:::image-center-small` içeren
+gerçek bir sayfa oluşturuldu, render edilen `<figure>`'ların computed
+`max-width`/`float` değerleri (440px float-left, 480px ortalı) doğru
+eşleşti; bir görsele tıklanınca lightbox doğru `src` ile açıldı, kapatma
+düğmesiyle kapandığı doğrulandı; editördeki boyut `<select>`'i test edilip
+doğru sözdiziminin (`:::image-right-small\n![Açıklama](https://...)\n:::`)
+üretildiği teyit edildi. `npm run lint`/`npm run build`/`npx vitest run`
+(24/24) yeşil. Test verisi temizlendi.
+
+**Eksik-özellik listesinin "A" grubu (hızlı, düşük risk, sadece frontend)
+artık TAMAMEN BİTTİ** - okuma ilerleme çubuğu, arama derin linki, görsel
+resize/lightbox. Sırada "B) Orta, mevcut desenleri tekrar kullanıyor" grubu
+var: Wiki sayfaları için Version History + Autosave/Draft göstergesi.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
