@@ -38,6 +38,16 @@ public class WikiPage : Entity<Guid>
     // duruma düşer - geriye dönük kırılma yok.
     public Guid? FolderId { get; private set; }
 
+    // Version History (2026-08-17) - Documents modülündeki Document.
+    // CurrentVersionNumber'la AYNI desen: WikiPage HER ZAMAN en güncel
+    // versiyonun içeriğini taşımaya devam ediyor (ekstra bir JOIN/"en son
+    // versiyonu bul" sorgusu gerekmesin diye), ESKİ versiyonlar ayrı bir
+    // WikiPageVersion satırı olarak arşivleniyor. Var olan sayfalar
+    // (bu alan eklenmeden önce oluşturulmuş) migration sonrası 1'den başlıyor -
+    // "hiç düzenlenmemiş, hâlâ ilk hâli" anlamına geliyor, UpdatedAtUtc'nin
+    // null olmasıyla tutarlı.
+    public int CurrentVersionNumber { get; private set; } = 1;
+
     private WikiPage() { }
 
     private WikiPage(
@@ -110,5 +120,15 @@ public class WikiPage : Entity<Guid>
         FolderId = folderId;
         Tags = NormalizeTags(tags);
         UpdatedAtUtc = DateTime.UtcNow;
+
+        // Handler'ın (UpdateWikiPageCommandHandler) sorumluluğu, Update()
+        // çağrılmadan HEMEN ÖNCE, bu satırın ÜZERİNE yazılacak eski Title/
+        // Content/Visibility/Tags'i bir WikiPageVersion'a snapshot'lamak -
+        // Documents'ın "önce snapshot'la, SONRA ReplaceFile çağır" sırasıyla
+        // AYNI ilke (bkz. UploadNewDocumentVersionCommandHandler). Entity'nin
+        // kendisi snapshot ALMIYOR (Application katmanının repository'ye
+        // ihtiyacı var, Domain'in bundan haberi olmamalı) - sadece kendi
+        // sayacını artırıyor.
+        CurrentVersionNumber++;
     }
 }

@@ -14,9 +14,11 @@ public class DeleteWikiPageCommandHandlerTests
         FakeOutboxWriter? outboxWriter = null,
         FakeUnitOfWork? unitOfWork = null,
         Guid? viewerUserId = null,
-        bool viewerIsAdmin = false)
+        bool viewerIsAdmin = false,
+        FakeWikiPageVersionRepository? versionRepository = null)
         => new(
             repository,
+            versionRepository ?? new FakeWikiPageVersionRepository(),
             new FakeCurrentUserAccessor("IT", viewerIsAdmin, viewerUserId),
             outboxWriter ?? new FakeOutboxWriter(),
             unitOfWork ?? new FakeUnitOfWork());

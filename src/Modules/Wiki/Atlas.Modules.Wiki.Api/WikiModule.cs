@@ -33,6 +33,10 @@ public static class WikiModule
         services.AddScoped<IUserPageFavoriteRepository, EfUserPageFavoriteRepository>();
         services.AddScoped<IUserPagePinRepository, EfUserPagePinRepository>();
 
+        // Version History (2026-08-17) - Documents modülündeki IDocumentVersionRepository
+        // deseninin Wiki karşılığı.
+        services.AddScoped<IWikiPageVersionRepository, EfWikiPageVersionRepository>();
+
         // AI modülü (ve ileride Wiki'nin görünürlük kuralına ihtiyaç duyan başka
         // bir modül) bu arayüz üzerinden Wiki'nin kuralını KOPYALAMADAN kullanabiliyor.
         // Durumsuz (stateless) - Singleton güvenli.

@@ -1712,6 +1712,87 @@ artık TAMAMEN BİTTİ** - okuma ilerleme çubuğu, arama derin linki, görsel
 resize/lightbox. Sırada "B) Orta, mevcut desenleri tekrar kullanıyor" grubu
 var: Wiki sayfaları için Version History + Autosave/Draft göstergesi.
 
+## Eksik-özellik listesi - B Grubu, Gün 1: Wiki Version History backend (2026-08-17)
+
+"B) Orta, mevcut desenleri tekrar kullanıyor" grubunun ilk maddesi. Yeni bir
+tasarım İCAT EDİLMEDİ - Documents modülünün P6'daki `DocumentVersion`/
+`UploadNewDocumentVersionCommandHandler` deseni ("önce mevcut hâli
+snapshot'la, SONRA üzerine yaz") BİREBİR Wiki'ye taşındı.
+
+- [x] **`WikiPage.CurrentVersionNumber`** - Domain'de yeni bir alan, `Update()`
+      her çağrıldığında artıyor. `WikiPage.cs`'in KENDİSİ hiçbir zaman eski
+      bir versiyonu tutmuyor - HER ZAMAN en güncel hâli taşıyor, geçmiş
+      SADECE ayrı bir tabloda yaşıyor (bkz. altta).
+- [x] **`WikiPageVersion` (Domain, YENİ entity)** - `DocumentVersion`'ın
+      birebir karşılığı: `WikiPage`'e FK İLE BAĞLI DEĞİL (bu projede FK'ler
+      sadece Wiki'nin cross-module ham-SQL migration'ındaki istisnai durumda
+      var - temizlik DB cascade'ine değil Handler'ın orkestrasyonuna
+      bırakılıyor). `EditedByUserId`/`EditedByEmail` BİLİNÇLİ bir
+      sadeleştirme - içeriği İLK YAZAN değil, o versiyonu DEĞİŞTİREN kişi
+      (orijinal yazar zaten `WikiPage.CreatedByUserId`'de duruyor).
+      `(WikiPageId, VersionNumber)` composite unique index. Migration
+      (`AddWikiPageVersions`) uygulandı - **dikkat edilen bir detay:**
+      `CurrentVersionNumber` kolonunun migration'daki `defaultValue`'su `0`
+      DEĞİL `1` olarak ayarlandı, çünkü Domain'deki in-memory varsayılan da
+      `1` - migration'dan ÖNCE var olan (hiç düzenlenmemiş) sayfalar da
+      "1. versiyon"da sayılmalı, `0` olsaydı bu sayfalar için tutarsız/yanlış
+      bir başlangıç değeri olurdu.
+- [x] **`UpdateWikiPageCommandHandler`** artık `page.Update(...)` çağrısından
+      HEMEN ÖNCE mevcut (o ana kadar güncel olan) hâli bir
+      `WikiPageVersion.CreateSnapshot(...)`'a alıp kaydediyor -
+      `UploadNewDocumentVersionCommandHandler`'daki "önce snapshot, SONRA
+      ReplaceFile" sırasıyla AYNI. **`DeleteWikiPageCommandHandler`** artık
+      sayfa silinince `IWikiPageVersionRepository.DeleteAllForWikiPageAsync`
+      ile geçmişteki TÜM versiyonları da temizliyor (`DeleteDocumentCommandHandler`'ın
+      "versiyon dosyalarını da diskten temizle" gerekçesiyle AYNI - burada
+      disk yok, sadece DB satırı, ama "yetim" veri bırakmama ilkesi aynı).
+      Bu Outbox ÜZERİNDEN DEĞİL, Handler içinde doğrudan yapılıyor - versiyon
+      geçmişi tamamen Wiki modülünün kendi iç verisi, başka bir modül
+      dinlemiyor.
+- [x] **`GetWikiPageVersionsQuery`/`GetWikiPageVersionByNumberQuery`** -
+      `GetWikiPageByIdQueryHandler`'daki AYNI "varlığı gizle" deseni (null
+      dönerse 404) + AYNI `page.IsVisibleTo(viewerDepartment, viewerIsAdmin)`
+      görünürlük kuralı - Id'yi bilmek geçmişi görebilmek anlamına gelmiyor.
+      Versiyon listesi SADECE ESKİ (arşivlenmiş) versiyonları döndürüyor -
+      güncel hâl zaten `GET /api/wiki/pages/{id}`'in kendisinde.
+- [x] **`RestoreWikiPageVersionCommand`** - owner-or-Admin (Update/Delete ile
+      AYNI yetki deseni, throw-based 403/400 - Restore da bir düzenleme
+      eylemi). Handler ÖNCE geri dönülmeden HEMEN ÖNCEki hâli YENİ bir
+      snapshot olarak arşive ekliyor, SONRA hedef versiyonun içeriğini
+      `page.Update(...)`'e veriyor - "geri dönmek" hiçbir hâli sessizce
+      kaybetmiyor, kendisi de versiyonlanabilir bir eylem. `IAuditableCommand`
+      ile audit'leniyor ("WikiPage.VersionRestored").
+- [x] **3 yeni endpoint:** `GET /api/wiki/pages/{id}/versions`,
+      `GET /api/wiki/pages/{id}/versions/{versionNumber}`,
+      `POST /api/wiki/pages/{id}/versions/{versionNumber}/restore`.
+
+**Canlı doğrulandı (curl + sqlcmd ile uçtan uca):** bir sayfa oluşturulup iki
+kez güncellendi (v1→v2→v3), versiyon listesi doğru sırayla (`[2, 1]` - v3
+güncel olduğu için listede YOK) döndü, eski versiyonların içeriği/etiketleri
+doğru okundu. v1'e restore edilince: sayfa v1'in içeriğine döndü,
+`CurrentVersionNumber` 4'e çıktı (3 DEĞİL - restore da bir versiyon
+ilerletir), restore edilmeden HEMEN ÖNCEki hâl (v3) otomatik olarak yeni bir
+snapshot'a (versiyon 3) dönüştü - versiyon listesi artık `[3, 2, 1]`. Audit
+log'da `WikiPage.VersionRestored` doğru `Details` ("Versiyon Testi v1 (v1
+sürümüne geri döndürüldü)") ile kayıtlı. Güvenlik testleri: aynı departmandan
+sahibi-olmayan bir kullanıcı versiyonları GÖREBİLDİ ama restore denemesi 403
+aldı; başka departmandan (IK) bir kullanıcı `GET .../versions` VE
+`GET .../versions/{n}` için 404 aldı (varlık gizlendi) - restore denemesi ise
+403 döndü (Update/Delete'in ZATEN taşıdığı, mutasyon komutlarının throw-based
+olup "varlığı gizle"mediği kuralla TUTARLI, yeni bir açık DEĞİL). Sayfa
+silinince 4 versiyon satırının TAMAMININ da temizlendiği doğrulandı. 13 yeni
+unit test (`RestoreWikiPageVersionCommandHandlerTests`,
+`GetWikiPageVersionsQueryHandlerTests`, `GetWikiPageVersionByNumberQueryHandlerTests`)
++ `dotnet test Atlas.sln --filter "Category!=Integration"` yeşil (regresyon
+yok - `UpdateWikiPageCommandHandlerTests`/`DeleteWikiPageCommandHandlerTests`'in
+`CreateHandler` yardımcıları yeni `IWikiPageVersionRepository` parametresini
+alacak şekilde güncellendi). Test verisi (1 sayfa + 3 kullanıcı) temizlendi.
+
+**Gün 2 (frontend) henüz YAPILMADI:** `WikiArticlePage.jsx`'e versiyon
+geçmişi paneli, eski bir versiyonu salt-okunur görüntüleme, "geri dön"
+eylemi - Documents'ın `DocumentDetailPage.jsx`'teki versiyon geçmişi
+UI'ıyla AYNI desende.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

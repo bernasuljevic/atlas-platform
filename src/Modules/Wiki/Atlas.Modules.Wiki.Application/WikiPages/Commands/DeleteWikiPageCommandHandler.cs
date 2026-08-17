@@ -7,17 +7,20 @@ namespace Atlas.Modules.Wiki.Application.WikiPages.Commands;
 public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageCommand>
 {
     private readonly IWikiPageRepository _wikiPageRepository;
+    private readonly IWikiPageVersionRepository _wikiPageVersionRepository;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IOutboxWriter _outboxWriter;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteWikiPageCommandHandler(
         IWikiPageRepository wikiPageRepository,
+        IWikiPageVersionRepository wikiPageVersionRepository,
         ICurrentUserAccessor currentUser,
         IOutboxWriter outboxWriter,
         IUnitOfWork unitOfWork)
     {
         _wikiPageRepository = wikiPageRepository;
+        _wikiPageVersionRepository = wikiPageVersionRepository;
         _currentUser = currentUser;
         _outboxWriter = outboxWriter;
         _unitOfWork = unitOfWork;
@@ -44,6 +47,14 @@ public class DeleteWikiPageCommandHandler : IRequestHandler<DeleteWikiPageComman
         // silindikten sonra title'a başka hiçbir yerden erişilemeyeceği için
         // BURADA, silmeden önce yakalanması şart (bkz. IAuditableCommand.AuditDetails).
         request.AuditDetails = page.Title;
+
+        // Version History (2026-08-17): sayfa silinince geçmişteki versiyonlar
+        // da temizlenmezse "yetim" satırlar olarak sonsuza kadar kalırlardı
+        // (Documents'ın DeleteDocumentCommandHandler'daki AYNI temizlik
+        // gerekçesi - orada dosya da vardı, burada sadece DB satırı). Outbox
+        // ÜZERİNDEN DEĞİL, doğrudan burada yapılıyor - versiyon geçmişi
+        // tamamen Wiki modülünün kendi iç verisi, başka bir modül dinlemiyor.
+        await _wikiPageVersionRepository.DeleteAllForWikiPageAsync(page.Id, cancellationToken);
 
         // Outbox Pattern (Gün 2): CreateWikiPageCommandHandler'daki AYNI desen -
         // DeleteAsync artık kalıcı yazmıyor (stage), event doğrudan yayınlanmıyor,

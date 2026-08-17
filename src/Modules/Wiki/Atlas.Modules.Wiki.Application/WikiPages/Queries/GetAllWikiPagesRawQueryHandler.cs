@@ -20,7 +20,7 @@ public class GetAllWikiPagesRawQueryHandler : IRequestHandler<GetAllWikiPagesRaw
             .Select(p => new WikiPageDto(
                 p.Id, p.Title, p.Content, p.DepartmentName,
                 p.Visibility.ToString(), p.CreatedByUserId, p.CreatedAtUtc,
-                p.FolderId, p.UpdatedAtUtc, p.CreatedByEmail, p.Tags))
+                p.FolderId, p.UpdatedAtUtc, p.CreatedByEmail, p.Tags, p.CurrentVersionNumber))
             .ToList();
     }
 }
