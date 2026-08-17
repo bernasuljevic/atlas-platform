@@ -2056,7 +2056,78 @@ doğru açık-mod karşılıklarına döndüğü teyit edildi. `npm run lint`/`b
 `test` (32/32 - bu branch `master`'dan, D grubunun henüz merge edilmemiş
 `isRecognizedVideoUrl` testlerini İÇERMİYOR, beklenen) yeşil.
 
-**Gün 2 (ana sayfanın kendisi) henüz BAŞLANMADI.**
+**Gün 2 - Ana sayfanın kendisi:**
+
+Kullanıcının referans mockup'ındaki TÜM bölümler eklendi - hiçbiri dekoratif/
+sahte veri DEĞİL, hepsi zaten var olan backend endpoint'lerinden (ya da
+küçük, güvenli bir backend genişlemesinden) besleniyor:
+
+- [x] **`HeroSection`** - `--gradient-hero` (Gün 1) zeminli karşılama alanı +
+      GERÇEK, çalışan bir arama kutusu. Submit olunca `/wiki/pages?q=...`'a
+      yönlendiriyor. **Bu sırada bulunan gerçek bir "bağlanmamış uç" (dangling
+      wiring) düzeltildi:** `WikiSearch.jsx`'in `initialQuery` prop'u + kendi
+      useEffect'i ZATEN vardı (yorumunda "üst bardaki arama kutusundan
+      yönlendirildiğinde" diye açıkça yazıyordu) ama HİÇBİR yer bu URL
+      parametresini okumuyordu - `WikiBoard.jsx`'e `useSearchParams` eklenip
+      tamamlandı. Hero'ya İKİNCİ bir arama mekanizması İCAT EDİLMEDİ, var
+      olan akış TAMAMLANDI.
+- [x] **`FeaturedArticleCard`** ("Öne Çıkan Makale") - en yeni sayfa büyük bir
+      kart olarak tekrar vurgulanıyor. Ayrı bir "editör seçimi" alanı İCAT
+      EDİLMEDİ (backend'de yok, eklemek YAGNI olurdu).
+- [x] **"Son Eklenen Makaleler" 9'dan 4'e indirildi** (kullanıcı isteği: "ilk
+      sayfada örnek olarak 3-5 tane olsun") - Öne Çıkan Makale ZATEN en
+      yeniyi gösterdiği için, bu bölüm SIRADAKİ 4'ü gösteriyor (aynı sayfa
+      iki kez görünmüyor). "Tümünü Gör" zaten vardı.
+- [x] **`SimplePageListPanel`** (Favorilere Eklenenler + Pinlenenler, "ayrı
+      bölüm" olarak) - var olan `getFavoritePages`/`getPinnedPages`'i
+      kullanan tek, esnek bir bileşen - dört ayrı liste bileşeni YAZILMADI.
+- [x] **`DocumentsWidget`** ("Belgeler") - Documents modülünden gerçek veri,
+      format-özel ikonlar `documentIcons.js`'ten (DocumentDetailPage'in
+      ZATEN kullandığı harita - ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
+- [x] **`RecentVideosWidget`** ("Videolar/Eğitimler") - `VideoCenterPage`'in
+      (Eksik-özellik listesi C grubu) AYNI `extractVideosFromContent`'ini
+      tekrar kullanıyor, ikinci bir video-algılama YAZILMADI. VideoCenterPage'in
+      AKSİNE TÜM sayfalar değil, son ~20 sayfalık bir dilim taranıyor (ana
+      sayfa widget'ı için yeterli, tam galeri zaten `/wiki/videos`'ta).
+- [x] **`DiscussionsWidget`** ("Tartışmalar") - platform GENELİNE ait yorumlar
+      (`getComments(token)`, `pageId=null` - "Anasayfa Tartışması" sekmesiyle
+      AYNI veri kaynağı). "Tartışmaya Katıl" ayrı bir sayfaya DEĞİL, var olan
+      "Tartışma" sekmesine geçiyor - ikinci bir tartışma sayfası İCAT
+      EDİLMEDİ.
+- [x] **"Kategoriler" restyle edildi** - var olan `popularTags` verisi artık
+      küçük bir ikon-rozet ızgarası (2 sütun) olarak gösteriliyor.
+- [x] **`DepartmentDonutChart`** ("İstatistikler") - **backend'e küçük, güvenli
+      bir alan eklendi:** `WikiDashboardDto.DepartmentBreakdown`
+      (`GetWikiDashboardQueryHandler`'ın ZATEN bellekte tuttuğu
+      `visiblePages`'ten türetiliyor, `PopularTags`'le AYNI desen, yeni bir
+      sorgu/endpoint YOK) - donut grafiği SAHTE/rastgele veri GÖSTERMEDİ,
+      gerçek departman dağılımını gösteriyor. Harici bir grafik kütüphanesi
+      EKLENMEDİ - CSS `conic-gradient` + `color-mix()` ile saf bir donut
+      (brand-accent'in azalan opaklık tonları, Gün 1'deki "kategorik çoklu
+      renk yerine sade kalma" kararıyla tutarlı).
+- [x] **`HomeFooter`** - SADECE gerçek linkler (mockup'taki "SSS"/"Destek
+      Talebi"/sahte sosyal medya ikonları gibi karşılığı OLMAYAN dekoratif
+      linkler BİLEREK EKLENMEDİ - projenin baştan beri sürdürdüğü "dekoratif/
+      çalışmayan bir şey gösterme" ilkesi).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, hem koyu hem açık modda):**
+TÜM bölümler doğru veriyle render edildi (Favoriler/Pinlenenler/Belgeler
+gerçek kayıtlar gösterdi, İstatistikler donut'u gerçek departman dağılımını
+- IT %78, Engineering %11, IK %11 - doğru çizdi). Hero arama kutusu uçtan uca
+test edildi: "sunucu bakım" yazılıp gönderilince `/wiki/pages?q=sunucu%20bak%C4%B1m`'a
+yönlendirdi VE WikiSearch otomatik çalışıp GERÇEK, alakalı sonuçlar
+("Sunucu Bakım ve İzleme Rehberi") döndürdü. Videolar/Tartışmalar widget'ları
+başlangıçta veri olmadığı için (doğru şekilde) hiç görünmüyordu - birer test
+kaydı (video sayfası + platform-geneli yorum) eklenip widget'ların GERÇEKTEN
+çalıştığı kanıtlandı, sonra temizlendi. Hero gradient'i ve donut grafiğinin
+`conic-gradient`/`color-mix()`'i hem koyu hem açık modda doğru renklere
+(gerçek render edilen CSS değerleri okunarak) geçtiği teyit edildi.
+`npm run lint`/`build`/`test` (32/32) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` yeşil (regresyon yok - `WikiDashboardDto`'ya yeni
+alan eklemek hiçbir testi kırmadı, bu DTO'ya referans veren test yoktu).
+
+**"Görsel Tasarım Yenileme" artık TAMAMEN BİTTİ (Gün 1-2, palet+logo+ana
+sayfa).**
 
 ## Sırada ne var
 

@@ -79,6 +79,15 @@ public class GetWikiDashboardQueryHandler : IRequestHandler<GetWikiDashboardQuer
             .Take(PopularTagsCount)
             .ToList();
 
+        // İstatistik donut grafiği (Görsel Tasarım Yenileme Gün 2) -
+        // PopularTags'teki AYNI "zaten bellekteki visiblePages'ten türet"
+        // deseni, yeni bir sorgu YOK.
+        var departmentBreakdown = visiblePages
+            .GroupBy(p => p.DepartmentName)
+            .Select(g => new WikiDepartmentCountDto(g.Key, g.Count()))
+            .OrderByDescending(d => d.Count)
+            .ToList();
+
         return new WikiDashboardDto(
             visiblePages.Count,
             visiblePages.Count(p => p.CreatedAtUtc >= oneWeekAgo),
@@ -87,7 +96,8 @@ public class GetWikiDashboardQueryHandler : IRequestHandler<GetWikiDashboardQuer
             recentlyUpdated,
             departmentPages.Count,
             departmentSpecific,
-            popularTags);
+            popularTags,
+            departmentBreakdown);
     }
 
     private static bool IsVisibleTo(WikiPageDto page, string? viewerDepartmentName, bool viewerIsAdmin)
