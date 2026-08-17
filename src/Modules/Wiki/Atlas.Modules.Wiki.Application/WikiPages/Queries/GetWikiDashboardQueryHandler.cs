@@ -44,7 +44,7 @@ public class GetWikiDashboardQueryHandler : IRequestHandler<GetWikiDashboardQuer
 
         var recentlyAdded = visiblePages
             .OrderByDescending(p => p.CreatedAtUtc)
-            .Take(request.ItemsPerSection)
+            .Take(request.RecentlyAddedCount)
             .Select(ToCard)
             .ToList();
 
