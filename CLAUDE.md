@@ -1928,6 +1928,37 @@ banner beklendiği gibi doğru çıktı. Test verisi (oluşturulan sayfa + tüm
 **"Eksik-özellik listesi B grubu" artık TAMAMEN BİTTİ (Wiki Version History
 Gün 1-2 + Autosave/Draft Gün 3).**
 
+## Eksik-özellik listesi - C Grubu, Gün 1: Vimeo/Loom embed desteği (2026-08-17)
+
+C grubu ("Video Merkezi/Medya Kütüphanesi") başlamadan önce kapsam kullanıcıyla
+netleştirildi (`AskUserQuestion`) - üç seçenek sunuldu: (a) sadece embed+galeri,
+gerçek dosya depolama YOK (önerilen), (b) yukarıdakine ek gerçek video dosyası
+yükleme (Documents'a benzer yeni bir depolama katmanı), (c) sadece embed,
+galeri YOK. Kullanıcı (a)'yı seçti - video transkript indeksleme zaten D
+grubunda AYRI bir madde olduğu için, C grubunun gerçek dosya depolamaya
+girmesi kapsam karışıklığı yaratırdı.
+
+- [x] **`VideoBlock` (markdown.jsx) Vimeo/Loom tanıyacak şekilde genişletildi** -
+      YouTube-only mimari DEĞİŞTİRİLMEDİ, SADECE genişletildi: sıralama
+      YouTube→Vimeo→Loom→dosya→düz-link (eskisiyle AYNI "önce özel servisler,
+      sonra genel dosya, en sonda düz link" mantığı). `VIMEO_PATTERN`
+      (`vimeo.com/123...` ve zaten embed formatındaki `player.vimeo.com/
+      video/123...` ikisini de yakalıyor) + `LOOM_PATTERN` (`loom.com/share/...`
+      ve `loom.com/embed/...` ikisini de yakalıyor). Backend'e HİÇ dokunulmadı -
+      bu tamamen bir render-katmanı genişlemesi.
+      **Tanınmayan bir URL hâlâ kırık bir gömme DENEMİYOR**, sade bir
+      "Videoyu Aç" linkine düşüyor - eski davranış korundu.
+- [x] Editördeki video düğmesi/slash-command placeholder metni güncellendi
+      ("YouTube/Vimeo/Loom linki ya da video dosyası URL'si") - kullanıcı
+      artık desteklenen üç servisin farkında.
+
+Canlı doğrulandı: YouTube+Vimeo+Loom+tanınmayan-URL içeren 4 blok taşıyan
+gerçek bir sayfa oluşturuldu, render edilen `<iframe>` `src`'leri doğru
+embed URL'lerine (`youtube-nocookie.com/embed/...`, `player.vimeo.com/
+video/...`, `loom.com/embed/...`) dönüştüğü, tanınmayan URL'in düz linke
+düştüğü, alt yazıların (figcaption) doğru göründüğü DOM üzerinden teyit
+edildi. `npm run lint`/`build`/`test` (24/24) yeşil. Test verisi temizlendi.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

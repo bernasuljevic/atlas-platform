@@ -361,18 +361,33 @@ function ImageBlock({ src, alt }) {
   );
 }
 
-// Video - kullanıcı ya bir YouTube URL'si ya doğrudan bir video dosyası URL'si
-// (mp4/webm/ogg/mov) yapıştırıyor. YouTube ise embed iframe, dosyaysa native
-// <video> etiketi - üçüncü, TANINMAYAN bir URL ise (ör. Vimeo, kurumsal bir
-// video sunucusu) kırık bir gömme DENEMİYORUZ, sade bir "Videoyu Aç" linkine
-// düşüyoruz - her URL şeklini "embed edilebilir" varsaymak, kullanıcıya boş
-// bir kare göstermekten daha kötü bir deneyim olurdu.
+// Video - kullanıcı YouTube/Vimeo/Loom URL'si ya da doğrudan bir video
+// dosyası URL'si (mp4/webm/ogg/mov) yapıştırıyor. Tanınan üç servis kendi
+// iframe embed'ine, dosya native <video> etiketine düşüyor - DÖRDÜNCÜ,
+// TANINMAYAN bir URL ise (ör. kurumsal bir video sunucusu) kırık bir gömme
+// DENEMİYORUZ, sade bir "Videoyu Aç" linkine düşüyoruz - her URL şeklini
+// "embed edilebilir" varsaymak, kullanıcıya boş bir kare göstermekten daha
+// kötü bir deneyim olurdu.
+// C grubu, Gün 1 (2026-08-17) - Vimeo/Loom eklendi (YouTube-only mimarisi
+// GENİŞLETİLDİ, DEĞİŞTİRİLMEDİ - sıralama kontrolü YouTube→Vimeo→Loom→dosya→
+// link, eskisiyle BİREBİR aynı "önce özel servisler, sonra genel dosya, en
+// sonda düz link" mantığı).
 const YOUTUBE_PATTERN = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
+// Vimeo video ID'si sayısal - hem "vimeo.com/123456789" hem
+// "player.vimeo.com/video/123456789" (zaten embed formatındaki bir URL'nin
+// yapıştırılması) aynı desenle yakalanıyor.
+const VIMEO_PATTERN = /vimeo\.com\/(?:video\/)?(\d+)/;
+// Loom paylaşım ID'si alfasayısal (32 karakter hex) - hem "loom.com/share/..."
+// (kullanıcının kopyaladığı normal paylaşım linki) hem "loom.com/embed/..."
+// aynı desenle yakalanıyor.
+const LOOM_PATTERN = /loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/;
 const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
 
 function VideoBlock({ url, caption }) {
   const youtubeMatch = url.match(YOUTUBE_PATTERN);
-  const isVideoFile = VIDEO_FILE_PATTERN.test(url);
+  const vimeoMatch = !youtubeMatch && url.match(VIMEO_PATTERN);
+  const loomMatch = !youtubeMatch && !vimeoMatch && url.match(LOOM_PATTERN);
+  const isVideoFile = !youtubeMatch && !vimeoMatch && !loomMatch && VIDEO_FILE_PATTERN.test(url);
 
   return (
     <figure className="my-4 mx-auto w-full max-w-[800px]">
@@ -382,6 +397,26 @@ function VideoBlock({ url, caption }) {
         <div className="relative aspect-video overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--border)" }}>
           <iframe
             src={`https://www.youtube-nocookie.com/embed/${youtubeMatch[1]}`}
+            title={caption || "Video"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+          />
+        </div>
+      ) : vimeoMatch ? (
+        <div className="relative aspect-video overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--border)" }}>
+          <iframe
+            src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
+            title={caption || "Video"}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+          />
+        </div>
+      ) : loomMatch ? (
+        <div className="relative aspect-video overflow-hidden rounded-lg border shadow-sm" style={{ borderColor: "var(--border)" }}>
+          <iframe
+            src={`https://www.loom.com/embed/${loomMatch[1]}`}
             title={caption || "Video"}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
