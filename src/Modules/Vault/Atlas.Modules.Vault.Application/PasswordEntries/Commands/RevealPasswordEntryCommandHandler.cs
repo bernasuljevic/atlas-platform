@@ -7,13 +7,16 @@ namespace Atlas.Modules.Vault.Application.PasswordEntries.Commands;
 public class RevealPasswordEntryCommandHandler : IRequestHandler<RevealPasswordEntryCommand, string>
 {
     private readonly IPasswordEntryRepository _repository;
+    private readonly IPasswordEntryShareRepository _shareRepository;
     private readonly IPasswordEncryptor _encryptor;
     private readonly ICurrentUserAccessor _currentUser;
 
     public RevealPasswordEntryCommandHandler(
-        IPasswordEntryRepository repository, IPasswordEncryptor encryptor, ICurrentUserAccessor currentUser)
+        IPasswordEntryRepository repository, IPasswordEntryShareRepository shareRepository,
+        IPasswordEncryptor encryptor, ICurrentUserAccessor currentUser)
     {
         _repository = repository;
+        _shareRepository = shareRepository;
         _encryptor = encryptor;
         _currentUser = currentUser;
     }
@@ -29,7 +32,14 @@ public class RevealPasswordEntryCommandHandler : IRequestHandler<RevealPasswordE
             throw new ArgumentException("Kayıt bulunamadı.", nameof(request.Id));
 
         var isOwner = entry.CreatedByUserId == _currentUser.UserId.Value;
-        if (!_currentUser.IsAdmin && !isOwner)
+
+        // Vault paylaşım modeli (D grubu, Gün 1) - paylaşımın ASIL AMACI bu:
+        // alıcının kaydı GÖRÜNTÜLEYEBİLMESİ değil, PAROLAYI AÇABİLMESİ. Owner-
+        // or-Admin değilse SON çare olarak paylaşım kontrolü yapılıyor.
+        var isSharedWithViewer = !isOwner && !_currentUser.IsAdmin
+            && await _shareRepository.IsSharedWithAsync(entry.Id, _currentUser.UserId.Value, cancellationToken);
+
+        if (!_currentUser.IsAdmin && !isOwner && !isSharedWithViewer)
             throw new UnauthorizedAccessException("Bu kaydın parolasını görüntüleme yetkiniz yok.");
 
         request.AuditDetails = entry.Title;

@@ -41,6 +41,8 @@ public static class VaultModule
             .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 
         services.AddScoped<IPasswordEntryRepository, EfPasswordEntryRepository>();
+        // Vault paylaşım modeli (D grubu, Gün 1).
+        services.AddScoped<IPasswordEntryShareRepository, EfPasswordEntryShareRepository>();
 
         // Singleton - IDataProtectionProvider'ın kendisi de Singleton (framework
         // bunu böyle kaydediyor), CreateProtector() maliyeti bir kere ödensin

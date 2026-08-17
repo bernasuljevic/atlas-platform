@@ -5,6 +5,7 @@ using Atlas.Modules.Auth.Infrastructure.CurrentUser;
 using Atlas.Modules.Auth.Infrastructure.Email;
 using Atlas.Modules.Auth.Infrastructure.Persistence;
 using Atlas.Modules.Auth.Infrastructure.Security;
+using Atlas.Modules.Auth.Infrastructure.UserLookup;
 using Atlas.Shared.Contracts;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
@@ -58,6 +59,12 @@ public static class AuthModule
         // istek bazlı bir kaynak, o yüzden burada Scoped doğru (geçen dersteki hatanın tersi).
         services.AddHttpContextAccessor();
 services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
+
+// Shared.Contracts'taki IUserLookupService'in gerçek implementasyonu -
+// Vault paylaşım modeli (D grubu, Gün 1) bunu "bu e-postayla bir kullanıcı
+// var mı" sorusuna cevap vermek için kullanıyor, ICurrentUserAccessor ile
+// AYNI "modül dışarıya sadece dar bir arayüz gösteriyor" deseni.
+services.AddScoped<IUserLookupService, AuthUserLookupService>();
 
 services.AddScoped<IPasswordHasher, Pbkdf2PasswordHasher>();
 services.AddScoped<ITokenGenerator, JwtTokenGenerator>();

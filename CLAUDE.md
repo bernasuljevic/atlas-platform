@@ -2064,6 +2064,88 @@ sonrası) - ÜÇÜ de doğru şekilde dönüştürülMEDİ. `npm run lint`/`buil
 **D grubunun geri kalanı (video transkript indeksleme, Vault paylaşım
 modeli) henüz BAŞLANMADI.**
 
+## Eksik-özellik listesi - D Grubu, Gün 2: Vault paylaşım modeli - backend (2026-08-17)
+
+D grubunun ikinci maddesi (video transkript indeksleme, YouTube/Vimeo/Loom'un
+basit bir transkript API'si olmadığı için hâlâ bloklanmış durumda, bkz. Gün 1).
+
+**Mimari kararlar (koda geçmeden önce):**
+- **Departman bazlı DEĞİL, kullanıcı bazlı paylaşım.** `PasswordEntry.cs`'in
+  kendi yorumunda "Vault'ta departman kavramı yok" diye bilinçli bir
+  sınırlama zaten var - departman paylaşımı eklemek bu kararla ÇELİŞİRDİ,
+  üstelik bir şifre kasası için "belirli kişiyle paylaş" (least-privilege)
+  departman-geneli paylaşımdan daha güvenli/doğru bir model.
+- **Paylaşım SADECE görüntüleme+reveal yetkisi veriyor, düzenleme/silme
+  DEĞİL** - alıcı kaydı görüp parolasını açabiliyor ama sahibi (ya da Admin)
+  dışında kimse düzenleyip silemiyor. Update/DeletePasswordEntryCommandHandler'a
+  HİÇ DOKUNULMADI.
+- **Yeni cross-module sözleşme: `IUserLookupService` (Shared.Contracts)** -
+  Vault, bir e-postayı kullanıcı ID'sine çevirebilmek için Auth'a ihtiyaç
+  duyuyor ama Domain/Application/Infrastructure'ına referans veremez.
+  `ICurrentUserAccessor`/`IWikiVisibilityChecker` ile AYNI desen - dar bir
+  `UserSummary(Id, Email, FullName)` DTO'su, gerçek implementasyon
+  (`AuthUserLookupService`) Auth.Infrastructure'da, var olan `IUserRepository.
+  GetByEmailAsync`'i SARMALIYOR (ikinci bir veri erişim yolu icat edilmedi).
+- **Paylaşım/paylaşımı kaldırma audit'leniyor** ("PasswordEntry.Shared"/
+  "PasswordEntry.ShareRevoked") - Reveal'la AYNI gerekçe, "kim buna
+  erişebilir" değişikliği gerçek bir güvenlik olayı.
+
+- [x] **`PasswordEntryShare` (YENİ entity, Vault.Domain)** - `WikiPageVersion`/
+      `DocumentVersion`'daki AYNI desen: `PasswordEntry`'ye FK İLE BAĞLI
+      DEĞİL, temizlik Handler orkestrasyonuna bırakılıyor.
+      `(PasswordEntryId, SharedWithUserId)` composite unique index - aynı
+      kayıt aynı kullanıcıyla iki kez paylaşılamaz. Migration
+      (`AddPasswordEntryShares`) uygulandı.
+- [x] **`IPasswordEntryRepository.GetAllAsync` genişledi** - artık SADECE
+      "sahip olduğum" DEĞİL, "sahip olduğum VEYA benimle paylaşılan"
+      kayıtları döndürüyor (`EfPasswordEntryRepository`'de iki ayrı sorgu -
+      Vault'un "kişisel kasa, küçük ölçek" varsayımında bir JOIN'e gerek
+      yok, okunabilirlik tercih edildi).
+- [x] **`GetPasswordEntryByIdQueryHandler`/`RevealPasswordEntryCommandHandler`
+      genişledi** - owner-or-Admin'in yanına ÜÇÜNCÜ bir yol: paylaşılan
+      kullanıcı da görüntüleyebiliyor/reveal edebiliyor
+      (`IPasswordEntryShareRepository.IsSharedWithAsync`, gereksiz DB
+      round-trip'inden kaçınmak için SADECE owner/Admin değilse sorgulanıyor).
+- [x] **`DeletePasswordEntryCommandHandler` genişledi** - kayıt silinince
+      `IPasswordEntryShareRepository.DeleteAllForEntryAsync` ile TÜM
+      paylaşımları da temizliyor (WikiPageVersion'ın "yetim veri bırakma"
+      gerekçesiyle AYNI). **Ders #22'nin AYNI dersi tekrar uygulandı:**
+      `ExecuteDeleteAsync` yerine `ToListAsync+RemoveRange` - Vault'un test
+      host'unda şu an gerçek SQL Server kullanılsa da (InMemory'ye
+      çevrilmiyor), küçük bir işlem için ekstra bir sağlayıcı-bağımlılığı
+      riski almanın gereği yok.
+- [x] **`SharePasswordEntryCommand`/`RemovePasswordEntryShareCommand`/
+      `GetPasswordEntrySharesQuery`** - owner-or-Admin (paylaşımı yönetmek de
+      bir düzenleme eylemi, paylaşılan kullanıcı KENDİSİ yeniden paylaşamıyor).
+      Share Handler'ı dört koruma uyguluyor: kendi kendine paylaşma
+      reddediliyor, olmayan bir e-posta reddediliyor, aynı kullanıcıyla
+      TEKRAR paylaşma reddediliyor (hepsi net 400 mesajıyla). Shares sorgusu
+      `GetWikiPageVersionsQuery`'deki AYNI "varlığı gizle" deseninde - SADECE
+      sahibi/Admin kiminle paylaşıldığını görebiliyor.
+- [x] **3 yeni endpoint:** `POST/GET /api/vault/entries/{id}/shares`,
+      `DELETE /api/vault/entries/{id}/shares/{sharedWithUserId}`.
+
+**Canlı doğrulandı (curl + sqlcmd ile uçtan uca, iki test kullanıcısıyla):**
+paylaşılmadan ÖNCE B, kayda erişemedi (404) ve reveal edemedi (403); A'nın
+kendi kendine paylaşma/var olmayan e-posta/tekrar paylaşma denemeleri hepsi
+net 400 mesajıyla reddedildi; paylaşım sonrası B kaydı görebildi (200),
+parolayı doğru şekilde açabildi (200, gerçek parola döndü), listesinde
+kayıt göründü - AMA düzenleme (403) ve silme (403) denemeleri reddedildi;
+A paylaşım listesini görebildi, B GÖREMEDİ (404); paylaşım kaldırılınca B
+tekrar erişimini kaybetti (404); Admin owner/paylaşım OLMADAN da hem kaydı
+hem paylaşım listesini görebildi (bypass); kayıt silinince
+`vault.PasswordEntryShares`'te 0 yetim satır kaldığı doğrulandı; audit
+log'da `PasswordEntry.Created`→`Shared`→`Revealed`→`ShareRevoked` sırasıyla,
+doğru kullanıcı/detaylarla kayıtlı olduğu görüldü. `dotnet test
+tests/Atlas.IntegrationTests` (24/24) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` yeşil (regresyon yok - Vault'un henüz hiç
+Application-katmanı unit test projesi yoktu, bu yüzden Handler imza
+değişiklikleri hiçbir testi kırmadı; Gün 4'te bu boşluk kapatılacak). Test
+verileri (1 kayıt + 2 kullanıcı) temizlendi.
+
+**Gün 3 (frontend) VE Gün 4 (Vault.Application.Tests projesi) henüz
+BAŞLANMADI.**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
