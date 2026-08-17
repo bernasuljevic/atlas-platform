@@ -2006,6 +2006,58 @@ Video Merkezi galerisi Gün 2).** Sırada D grubu var: link/embed otomatik
 algılama, video transkript indeksleme, Vault paylaşım modeli - henüz hiç
 başlanmadı.
 
+## Görsel Tasarım Yenileme - Teal/Cyan + Turuncu Palet (2026-08-17)
+
+Eksik-özellik listesinden (D grubu) BAĞIMSIZ, kullanıcının bir referans
+mockup ekran görüntüsü (koyu tema, teal/cyan + turuncu gradient vurgulu bir
+Atlas Wiki ana sayfa tasarımı) paylaşıp "aynı olsun" demesiyle açıldı. Ayrı
+bir branch'te (`design/teal-cyan-homepage-redesign`, `master`'dan) - D
+grubunun devam eden branch'leriyle (`feature/video-link-autodetect`,
+`feature/vault-sharing`) İLGİSİZ, o yüzden karışmasınlar diye bilerek ayrı
+tutuldu. 2 güne bölündü - Gün 1 (bu bölüm) palet+logo, Gün 2 ana sayfanın
+kendisi (hero/öne çıkan makale/belgeler widget'ı/video widget'ı/istatistik
+grafiği/footer).
+
+**Gün 1 - Renk paleti + logo:**
+
+- [x] **`index.css` TAMAMEN yeniden renklendirildi** - eski yeşil+krem+kahve
+      paleti (aylar süren WCAG-doğrulama emeğiyle kurulmuştu) yerine teal/cyan
+      (ANA etkileşim rengi, eski yeşille AYNI ROL - link/buton/rozet/focus
+      ring) + turuncu (YENİ, SADECE ikincil/gradient bir vurgu - `--accent-warm`,
+      `--brand-accent`'in yerine GEÇMİYOR). **Eski paletin WCAG emeği BOŞA
+      GİTMEDİ** - AYNI yöntem (tahminle değil, gerçek kontrast oranı
+      hesaplanıp doğrulanarak, bkz. scratchpad'teki `contrast.js`) burada da
+      uygulandı: koyu modda `--brand-accent` (#0d828f) beyazla 4.56:1, sayfa
+      zeminiyle 4.06:1 - eski #1d8660 düzeltmesinin (4.53/4.01) BİREBİR AYNI
+      "iki ucu da mümkün olduğunca yükseğe çek" dengesiyle seçildi. Açık mod
+      için de aynı titizlik (#0c7c92: beyazla 4.87:1, zeminle 4.54:1).
+      `--accent-warm` turuncusu da AYNI şekilde doğrulandı (koyu #c2570f
+      beyazla 4.50:1, açık #ad4a0d beyazla 5.58:1). Yeni `--gradient-hero`
+      token'ı (teal→turuncu) Gün 2'nin hero bölümü için hazırlandı.
+- [x] **`AtlasLogo.jsx` (YENİ, SVG bileşen)** - eski `logo.png` (statik PNG,
+      yeşil blob) yeni paletle renk UYUMSUZLUĞUNA düştüğü için (CSS
+      değişkenleriyle yeniden renklendirilemiyordu) yerine geçti. Header'da
+      ZATEN `h-7 w-7 rounded-full`'a kırpıldığı için (yazı okunaklı
+      değildi) TAM "ATLAS WIKI" yazısını piksel piksel yeniden çizmek yerine
+      basit bir marka işareti (organik blob + "A" harfi, `var(--brand-accent)`→
+      `var(--accent-warm)` gradient'i) tercih edildi - SVG olduğu için CSS
+      custom property'lerini DOĞRUDAN okuyor, açık/koyu temada otomatik
+      doğru renklere geçiyor (favicon.png - ayrı bir dosya - bu değişikliğin
+      kapsamı DIŞINDA bırakıldı, istenirse ayrı ele alınır).
+
+**Canlı doğrulandı (gerçek tarayıcıda, CSS custom property'lerin GERÇEKTEN
+render edilen değerlerini okuyarak - sadece dosyanın "doğru yazıldığını"
+değil):** koyu modda `body`'nin `background-color`'ı `rgb(10, 20, 32)`
+(`--page-bg`) ile birebir eşleşti, logo SVG'sinin gradient durak renkleri
+`rgb(13, 130, 143)`→`rgb(194, 87, 15)` (tam beklenen teal→turuncu) çıktı,
+aktif sekme alt çizgisi doğru teal rengi taşıdı; tema değiştirilip açık
+moda geçilince TÜM değerler (body bg, brand-accent, accent-warm, text/text-h)
+doğru açık-mod karşılıklarına döndüğü teyit edildi. `npm run lint`/`build`/
+`test` (32/32 - bu branch `master`'dan, D grubunun henüz merge edilmemiş
+`isRecognizedVideoUrl` testlerini İÇERMİYOR, beklenen) yeşil.
+
+**Gün 2 (ana sayfanın kendisi) henüz BAŞLANMADI.**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
