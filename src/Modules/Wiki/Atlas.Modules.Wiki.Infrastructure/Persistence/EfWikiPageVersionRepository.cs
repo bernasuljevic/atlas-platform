@@ -30,8 +30,20 @@ public class EfWikiPageVersionRepository : IWikiPageVersionRepository
         => await _context.WikiPageVersions
             .FirstOrDefaultAsync(v => v.WikiPageId == wikiPageId && v.VersionNumber == versionNumber, ct);
 
+    // ExecuteDeleteAsync BİLEREK KULLANILMIYOR - integration test host'unun
+    // WikiDbContext'i EF Core InMemory sağlayıcısını kullanıyor (bkz.
+    // AtlasApiFactory.cs), ve InMemory sağlayıcısı ExecuteDelete/ExecuteUpdate'i
+    // DESTEKLEMİYOR (canlı CI'da 500 ile yakalandı - "InvalidOperationException:
+    // ... provider does not support ExecuteDelete"). RemoveRange + AddAsync'teki
+    // AYNI "stage et, SaveChanges'i ÇAĞIRMA" deseni hem InMemory/SQL Server
+    // ikisinde de çalışıyor HEM de asıl amaçlanan atomikliği sağlıyor -
+    // ExecuteDeleteAsync ZATEN HEMEN/AYRI çalışıyordu, DeleteWikiPageCommandHandler'ın
+    // sonundaki tek SaveChangesAsync'in DIŞINDA kalıyordu.
     public async Task DeleteAllForWikiPageAsync(Guid wikiPageId, CancellationToken ct = default)
-        => await _context.WikiPageVersions
+    {
+        var versions = await _context.WikiPageVersions
             .Where(v => v.WikiPageId == wikiPageId)
-            .ExecuteDeleteAsync(ct);
+            .ToListAsync(ct);
+        _context.WikiPageVersions.RemoveRange(versions);
+    }
 }

@@ -353,6 +353,34 @@ HTTP endpoint'i yok (Gün 5'te gelecek).
     onu doğrulayan testler görünmez şekilde kırılmıştı. "Testler mevcut, o
     zaman güvenlik ağı sağlam" varsayımı, o testlerin GERÇEKTEN çalıştırıldığı
     (ve CI'ın onları atlamadığı) doğrulanmadan yapılmamalı.
+22. **EF Core'un `ExecuteDeleteAsync`/`ExecuteUpdateAsync`'i InMemory
+    sağlayıcısında ÇALIŞMIYOR - gerçek SQL Server'a karşı yerelde test etmek
+    bunu YAKALAYAMAZ:** Wiki Version History'nin `EfWikiPageVersionRepository.
+    DeleteAllForWikiPageAsync`'i ilk yazıldığında `ExecuteDeleteAsync`
+    kullanıyordu - yerelde (gerçek `.\SQLEXPRESS`'e karşı) hem curl/sqlcmd hem
+    tarayıcı testinde SORUNSUZ çalıştı, hiçbir hata vermedi. PR #19'un CI'ında
+    (2026-08-17) `OutboxIntegrationTests.SayfaSilininceOlusanOutboxMesaji_
+    DogruEventTipindeYaziliyor` `DELETE /api/wiki/pages/{id}`'de 500 alıp
+    kırıldı - kök sebep: integration test host'u (`AtlasApiFactory.cs`)
+    `WikiDbContext`'i (Auth/Wiki/Audit/Documents gibi) EF Core InMemory
+    sağlayıcısına çeviriyor (SADECE Vault/AI gerçek veritabanına bağlı kalıyor,
+    bkz. yukarıdaki "InMemory'ye çevrilme" notları) - InMemory sağlayıcısı
+    `ExecuteDelete`/`ExecuteUpdate`'i DESTEKLEMİYOR, `InvalidOperationException`
+    fırlatıyor. Düzeltme: `ExecuteDeleteAsync` yerine `ToListAsync()` +
+    `RemoveRange()` (AddAsync'teki AYNI "stage et, çağıranın `SaveChangesAsync`'i
+    beklesin" deseni) - hem InMemory'de HEM gerçek SQL Server'da çalışıyor,
+    ÜSTELİK asıl istenen atomikliği de sağlıyor (`ExecuteDeleteAsync` zaten
+    HEMEN/AYRI çalışıyordu, `DeleteWikiPageCommandHandler`'ın sonundaki TEK
+    `SaveChangesAsync`'in dışında kalıyordu - bu da ayrı, gizli bir
+    atomiklik kusuruydu, sadece CI'ın InMemory sağlayıcısı sayesinde daha
+    erken yakalandı). Genel ders: **gerçek bir veritabanına karşı yerel test
+    "yeterince gerçek" değildir** - bu proje kasıtlı olarak bazı modüllerde
+    InMemory (hız için) bazılarında gerçek DB (Vault/AI, davranış doğruluğu
+    için) kullanıyor; EF Core'un bulk `Execute*` API'leri gibi provider'a özgü
+    davranış farklılıkları SADECE CI'ın (ya da InMemory'nin) kullandığı
+    provider'a karşı ortaya çıkabilir - "yerelde sorunsuz çalıştı" tek başına
+    yeterli bir doğrulama değil, mümkünse HER İKİ sağlayıcıya karşı da (ya da
+    en azından CI'ınkine karşı) test edilmeli.
 
 ## Şu ana kadar tamamlananlar
 
