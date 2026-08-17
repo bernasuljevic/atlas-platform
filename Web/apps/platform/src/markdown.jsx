@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { AlertTriangle, Check, CheckCircle2, Copy, FileText, Info, Maximize2, PlayCircle, X, XCircle } from "lucide-react";
+import { LOOM_PATTERN, VIDEO_FILE_PATTERN, VIMEO_PATTERN, YOUTUBE_PATTERN } from "./videoExtraction";
 
 // Kasıtlı olarak KÜÇÜK, ELLE YAZILMIŞ bir render katmanı - dışarıdan bir
 // markdown kütüphanesi (react-markdown/marked) EKLENMEDİ, çünkü sadece
@@ -372,16 +373,9 @@ function ImageBlock({ src, alt }) {
 // GENİŞLETİLDİ, DEĞİŞTİRİLMEDİ - sıralama kontrolü YouTube→Vimeo→Loom→dosya→
 // link, eskisiyle BİREBİR aynı "önce özel servisler, sonra genel dosya, en
 // sonda düz link" mantığı).
-const YOUTUBE_PATTERN = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/;
-// Vimeo video ID'si sayısal - hem "vimeo.com/123456789" hem
-// "player.vimeo.com/video/123456789" (zaten embed formatındaki bir URL'nin
-// yapıştırılması) aynı desenle yakalanıyor.
-const VIMEO_PATTERN = /vimeo\.com\/(?:video\/)?(\d+)/;
-// Loom paylaşım ID'si alfasayısal (32 karakter hex) - hem "loom.com/share/..."
-// (kullanıcının kopyaladığı normal paylaşım linki) hem "loom.com/embed/..."
-// aynı desenle yakalanıyor.
-const LOOM_PATTERN = /loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/;
-const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov)(\?.*)?$/i;
+// D grubu, Gün 1 (2026-08-17) - desenler videoExtraction.js'e TAŞINDI (bu
+// dosyadan İÇE AKTARILIYOR) - WikiEditorPage'in yapıştırma algılayıcısı AYNI
+// desenlere ihtiyaç duyuyor, iki ayrı kopya YAŞAMASIN diye.
 
 // export EDİLDİ (C grubu Gün 2, Video Merkezi galerisi) - embed algılama
 // mantığının (YouTube/Vimeo/Loom/dosya/düz-link) TEK bir yerde yaşamaya

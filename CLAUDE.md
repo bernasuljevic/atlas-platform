@@ -2006,6 +2006,64 @@ Video Merkezi galerisi Gün 2).** Sırada D grubu var: link/embed otomatik
 algılama, video transkript indeksleme, Vault paylaşım modeli - henüz hiç
 başlanmadı.
 
+## Eksik-özellik listesi - D Grubu, Gün 1: Link/embed otomatik algılama (2026-08-17)
+
+D grubunda üç ayrı, birbiriyle ilgisiz madde var (C grubunun aksine) - hangi
+maddeyle başlanacağı `AskUserQuestion` ile netleştirildi, kullanıcı "Link/embed
+otomatik algılama"yı seçti. **Video transkript indeksleme henüz BAŞLANMADI**
+- YouTube/Vimeo/Loom'un resmi, basit bir "transkripti bana ver" API'si yok
+(YouTube'un altyazı verisine erişim ya kırılgan/gayrı-resmi bir "timedtext"
+endpoint'i scrape etmeyi ya da Google'ın kendi API key gerektiren, kotalı Data
+API'sini gerektiriyor) - bu, gerçek embedding sağlayıcısının API key'ini
+beklediği durumla AYNI sınıf bir engel, kullanıcıya açıkça belirtildi.
+
+- [x] **Regex desenleri `markdown.jsx`'ten `videoExtraction.js`'e TAŞINDI**
+      (`YOUTUBE_PATTERN`/`VIMEO_PATTERN`/`LOOM_PATTERN`/`VIDEO_FILE_PATTERN`,
+      hepsi `export`) - HEM `VideoBlock` (render zamanı embed URL'si için)
+      HEM yeni yapıştırma algılayıcısı AYNI kaynaktan besleniyor, iki ayrı
+      kopya YAŞAMASIN diye (biri güncellenip diğeri unutulursa sessizce
+      birbirinden sapardı). Yeni `isRecognizedVideoUrl(text)` - KISMİ
+      eşleşme arıyor (dört desenin HİÇBİRİ `^...$` ile çapalanmamış), "SADECE
+      bu mu" ayrımı BİLEREK burada YAPILMIYOR - bu, çağıranın sorumluluğu
+      (bkz. altta). 4 yeni Vitest testi.
+- [x] **`WikiEditorPage.jsx`'e yapıştırma (paste) algılayıcısı** - kullanıcı
+      araç çubuğundaki "🎬 Video" düğmesini/"/video" komutunu hiç bilmese bile,
+      düz bir YouTube/Vimeo/Loom/video-dosyası linkini yapıştırdığında
+      otomatik olarak `:::video:::` bloğuna dönüşüyor (Medium/Notion'daki
+      "bir link yapıştır, otomatik gömülsün" alışkanlığıyla tutarlı).
+      BİLEREK DAR bir tetikleyici - üç koşulun HEPSİ gerekiyor:
+      (1) trim'lenmiş yapıştırılan metin HİÇ boşluk karakteri taşımıyor VE
+      tanınan bir video deseniyle eşleşiyor (`isRecognizedVideoUrl`'ün kısmi
+      eşleşme araması nedeniyle "SADECE bu mu" ayrımı BURADA, boşluk
+      kontrolüyle sağlanıyor - bir URL'nin içinde boşluk OLAMAZ), (2) o anda
+      aktif bir metin seçimi YOK (Video düğmesiyle eklenmiş bir bloğun
+      İÇİNDEKİ yer tutucu URL'yi değiştirmek için yapıştırma yapılıyorsa
+      dokunulmuyor - aksi halde bloğun içine ikinci bir sarmalayıcı ekleyip
+      bozardı), (3) imlecin bulunduğu satır TAMAMEN BOŞ (`[buraya tıkla](`
+      yazıp link hedefini yapıştıran bir kullanıcının markdown link
+      sözdizimi yarım kalmasın). Başarılı dönüşümde kısa bir `toast()` ile
+      bilgilendiriliyor.
+      **Kod incelemesi sırasında kendi tasarımımda bulunan gerçek bir hata
+      (canlı teste geçmeden önce yakalandı):** ilk yazımda sadece
+      `trimmed.includes("\n")` kontrol ediliyordu, boşluk KARAKTERİ (satır
+      İÇİ boşluk) kontrol edilmiyordu - "bak şu videoya: https://youtu.be/xyz
+      diyorum" gibi TEK satırlık ama İÇİNDE link geçen bir cümle yanlışlıkla
+      "SADECE bir video linki" sayılıp TÜM cümle `:::video:::` bloğunun URL
+      alanına yazılırdı (geçersiz bir embed URL'si üretirdi). `/\s/.test(...)`
+      kontrolüyle düzeltildi.
+
+Canlı doğrulandı (tarayıcıda gerçek/simüle paste event'leriyle, backend
+gerektirmeden - sadece client-side davranış): boş bir satıra bare bir
+YouTube linki yapıştırılınca DOĞRU şekilde `:::video\n{url}\n:::`'ye
+dönüştü; cümle içindeki bir link (`preventDefault` ÇAĞRILMADI, native
+yapıştırma davranışı korundu) VE aktif seçim varken yapıştırma (placeholder
+değiştirme senaryosu) VE satır ortasında yapıştırma (`[buraya tıkla](`
+sonrası) - ÜÇÜ de doğru şekilde dönüştürülMEDİ. `npm run lint`/`build`/
+`test` (36/36) yeşil.
+
+**D grubunun geri kalanı (video transkript indeksleme, Vault paylaşım
+modeli) henüz BAŞLANMADI.**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
