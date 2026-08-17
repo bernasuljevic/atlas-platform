@@ -298,6 +298,51 @@ function ArticleCard({ article }) {
   );
 }
 
+// "Son Eklenen Makaleler" carousel'ı (2026-08-17 takip, referans mockup'taki
+// nokta işaretleri) - "Tümünü Gör" linkinin (başka sayfaya gider) YANINA,
+// sayfada KALARAK ilerlemeyi sağlayan bir sayfalama ekliyor. Gerçek bir
+// kaydırma/animasyon kütüphanesi EKLENMEDİ - sadece bir dizi dilimleme +
+// nokta düğmeleri, projenin geri kalanındaki "framework'e ihtiyaç olmayan
+// yerde framework ekleme" tercihiyle tutarlı. `page` state'i BİLEREK
+// component'in kendi içinde - parent (HomePage) `articles` prop'unu sadece
+// bir kez (dashboard fetch'i tamamlanınca) dolduruyor, sonrasında
+// değişmiyor, bu yüzden bir reset mekanizması gerekmiyor.
+function RecentArticlesCarousel({ articles }) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(articles.length / RECENT_ARTICLES_PAGE_SIZE);
+  const start = page * RECENT_ARTICLES_PAGE_SIZE;
+  const visible = articles.slice(start, start + RECENT_ARTICLES_PAGE_SIZE);
+
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2">
+        {visible.map((a) => (
+          <ArticleCard key={a.id} article={a} />
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-1.5">
+          {Array.from({ length: totalPages }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setPage(i)}
+              aria-label={`${i + 1}. sayfa`}
+              aria-current={page === i}
+              className="h-1.5 cursor-pointer rounded-full transition-all hover:opacity-80"
+              style={{
+                width: page === i ? "18px" : "6px",
+                background: page === i ? "var(--brand-accent)" : "var(--border)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 // Hero (Görsel Tasarım Yenileme Gün 2, 2026-08-17) - kullanıcının referans
 // mockup'ındaki gradient karşılama alanı + arama kutusu. `--gradient-hero`
 // (index.css, Gün 1'de hazırlanmıştı) temadan BAĞIMSIZ SABİT bir gradient -
@@ -727,6 +772,12 @@ function HomeFooter() {
   );
 }
 
+// "Son Eklenen Makaleler" carousel'ı (2026-08-17 takip) - Öne Çıkan Makale
+// (1) + 3 "sayfa" x 4 kart = 13. Sayfa boyutu (4) BİLEREK mevcut 2 sütunlu
+// grid'le (2x2) eşleşiyor.
+const RECENT_ARTICLES_PAGE_SIZE = 4;
+const RECENT_ARTICLES_TOTAL = 1 + RECENT_ARTICLES_PAGE_SIZE * 3;
+
 // Giriş yapınca artık doğrudan makale listesine değil buraya (Dashboard)
 // geliniyor (bkz. App.jsx - /wiki index route'u).
 function HomePage({ token }) {
@@ -736,7 +787,7 @@ function HomePage({ token }) {
 
   useEffect(() => {
     let cancelled = false;
-    getWikiDashboard(token)
+    getWikiDashboard(token, RECENT_ARTICLES_TOTAL)
       .then((result) => {
         if (!cancelled) setDashboard(result);
       })
@@ -750,16 +801,18 @@ function HomePage({ token }) {
 
   // Kapak görsele sahip sayfalar hafifçe önceliklendiriliyor (ızgara tamamen
   // görselsiz kartlarla dolmasın diye), ama görselsiz sayfalar da (bkz.
-  // ArticleCard'ın placeholder'ı) listeden hiç ATILMIYOR.
+  // ArticleCard'ın placeholder'ı) listeden hiç ATILMIYOR. Array.sort() stabil
+  // olduğu için (modern JS motorları) bu sıralama, backend'in zaten
+  // en-yeni-önce verdiği sırayı grup içinde BOZMUYOR.
   const gridArticles = [...(dashboard?.recentlyAdded ?? [])]
-    .sort((a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0))
-    .slice(0, 9);
-  // Kullanıcı isteği (2026-08-17, "ilk sayfada örnek olarak 3-5 tane olsun") -
-  // eskiden 9 kart gösteriliyordu, şimdi 4'e indirildi (Öne Çıkan Makale
-  // ZATEN en yeniyi ayrıca büyük gösterdiği için, ikinci koleksiyon SIRADAKİ
-  // 4'ü gösteriyor - aynı sayfa iki kez görünmesin).
+    .sort((a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0));
+  // Kullanıcı isteği (2026-08-17, "ilk sayfada 3-5 tane gözükecek, devamı
+  // tıklanınca gözükebilir") - Öne Çıkan Makale ZATEN en yeniyi ayrıca büyük
+  // gösterdiği için, ikinci koleksiyon SIRADAKİ'leri bir carousel'da (bkz.
+  // RecentArticlesCarousel) sayfa sayfa (4'er) gösteriyor - aynı sayfa iki
+  // kez görünmüyor, "Tümünü Gör" linki de AYRICA duruyor.
   const featuredArticle = gridArticles[0] ?? null;
-  const recentArticles = gridArticles.slice(1, 5);
+  const recentArticles = gridArticles.slice(1);
   const recentUpdates = (dashboard?.recentlyUpdated ?? []).slice(0, 5);
 
   const [activeTab, setActiveTab] = useState("home");
@@ -845,7 +898,21 @@ function HomePage({ token }) {
             </section>
           )}
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] xl:items-start">
+          {/* xl:items-start BİLEREK KULLANILMIYOR (2026-08-17 takip, kullanıcı
+              geri bildirimi: "aşağı kaydırdıkça sağ taraf altı boş
+              kalmasın") - grid'in VARSAYILAN align-items:stretch'i sağ
+              sütunun (<aside>, xl:sticky) KENDİ KUTUSUNU sol sütunla AYNI
+              satır yüksekliğine geriyor. items-start VARKEN sağ sütunun
+              kutusu SADECE kendi içeriği kadar (daha kısa) oluyordu -
+              sticky'nin "yapışacak" alanı erken tükeniyordu, sol sütun
+              (Favoriler/Pinlenenler/Tartışmalar) daha uzun olduğunda sağ
+              taraf sayfanın geri kalanında GERÇEKTEN kayboluyordu (boş
+              zemin görünüyordu). Stretch ile <aside>'ın kutusu sol sütunla
+              AYNI yüksekliğe geriliyor - içeriği (üstte, gerilmemiş) hâlâ
+              kompakt duruyor ama artık sticky'nin TÜM satır boyunca
+              "yapışacak" alanı var, sağ taraf sol sütun ne kadar uzarsa
+              uzasın görünür kalmaya devam ediyor. */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
             {/* SOL/GENİŞ sütun */}
             <div className="flex min-w-0 flex-col gap-6">
               {recentArticles.length > 0 && (
@@ -862,11 +929,7 @@ function HomePage({ token }) {
                       Tümünü Gör <ArrowRight size={13} />
                     </Link>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-2">
-                    {recentArticles.map((a) => (
-                      <ArticleCard key={a.id} article={a} />
-                    ))}
-                  </div>
+                  <RecentArticlesCarousel articles={recentArticles} />
                 </section>
               )}
 
