@@ -1838,6 +1838,68 @@ eklemedi.
 TAMAMEN BİTTİ (Gün 1-2, backend+frontend).** Sırada grubun ikinci maddesi:
 Autosave/Draft göstergesi.
 
+## Eksik-özellik listesi - B Grubu, Gün 3: Autosave/Draft göstergesi (2026-08-17)
+
+B grubunun ikinci ve son maddesi - "mevcut desenleri tekrar kullanıyor"
+temasına rağmen bu sefer YENİ bir mimari karar gerekiyordu: taslak nereye
+yazılacak?
+
+**Mimari karar - backend'e HİÇ dokunulmadı, tamamen `localStorage`:**
+Gün 1-2'de bitirdiğimiz `WikiPageVersion` GERÇEK, kaydedilmiş bir geçmiş
+tutuyor - Autosave'in amacı bunun TAMAMEN FARKLISI: sadece tarayıcı-yerel bir
+kazayı (yanlışlıkla sekme kapatma, "Vazgeç"e basma, tarayıcı çökmesi) telafi
+etmek. Bu, theme/Okuma Ayarları/TOC-panel durumu gibi projenin ZATEN
+`localStorage`'da tuttuğu "cihaza özel, senkron gerekmeyen" veri kategorisiyle
+BİREBİR aynı. Bir backend `Draft` entity'si (yeni tablo/endpoint/sahiplik
+kuralı/temizlik mantığı) hem gereksiz karmaşıklık olurdu hem de gerçek
+versiyon geçmişiyle kavramsal olarak karışırdı - "taslak karalama" ile
+"kaydedilmiş sürüm" aynı tabloda YAŞAMAMALI.
+
+- [x] **`WikiEditorPage.jsx`'e autosave** - `AUTOSAVE_DEBOUNCE_MS` (1500ms)
+      sonra title/content/tags/visibility/folderId/department (SADECE
+      oluşturma modunda) `localStorage`'a yazılıyor. Anahtar şeması:
+      düzenleme modunda `wiki-draft-edit-{pageId}` (sayfalar birbirini
+      EZMESİN), oluşturma modunda TEK bir `wiki-draft-new` (theme/reading
+      settings'teki AYNI "tek global anahtar" basitliği - aynı anda birden
+      fazla "yeni sayfa" taslağı YAGNI).
+- [x] **Taslak kurtarma banner'ı** - sayfa açılışında (fetch tamamlandıktan/
+      red-link prefill'inden HEMEN SONRA) var olan bir taslak, o anki state'ten
+      HERHANGİ bir alanda farklıysa "Kaydedilmemiş bir taslak bulundu... geri
+      yüklemek ister misin?" banner'ı çıkıyor - "Geri Yükle" / "Yok say".
+      **Kritik sıralama detayı:** `draftCheckDoneRef` (bir state DEĞİL, bir ref)
+      kullanıcı bu karara VARANA kadar otomatik kaydetmeyi BLOKLUYOR - aksi
+      halde fetch'ten gelen İLK state değişikliği, kullanıcının henüz
+      GÖRMEDİĞİ bir taslağın üzerine sessizce yazardı (canlı test edilerek
+      doğrulanan bir tasarım kararı, kod yazılırken baştan düşünüldü).
+- [x] **"Vazgeç" taslağı SİLMİYOR** - sadece gerçek bir kayıt (`handleSave`
+      başarılı olunca) taslağı temizliyor. Yanlışlıkla "Vazgeç"e basan bir
+      kullanıcı, sayfaya geri döndüğünde taslağını hâlâ bulabiliyor - bu,
+      autosave'in "kazaya karşı güvenlik ağı" olma amacıyla tutarlı (kazara
+      Vazgeç de bir kaza sayılıyor).
+- [x] **Durum göstergesi** - Kaydet/Vazgeç düğmelerinin yanında "Taslak
+      kaydedildi · HH:MM:SS" (sade, tek satır metin - yeni bir UI elementi
+      İCAT EDİLMEDİ).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle):** hem oluşturma hem
+düzenleme modunda - yazıp 2sn beklenince taslak `localStorage`'a doğru
+içerikle yazıldı, gösterge göründü; kaydetmeden başka bir sayfaya gidip geri
+dönülünce banner doğru çıktı; "Geri Yükle" tıklanınca alanlar taslaktan
+doğru dolduruldu; "Yok say" tıklanınca hem banner kapandı hem `localStorage`
+temizlendi VE alanlar mevcut (fetch edilmiş/boş) hâlinde kaldı; gerçek bir
+"Yayınla"/"Kaydet" sonrası taslağın `localStorage`'dan silindiği doğrulandı.
+**Test sırasında kendi test script'imde bulunan bir hata (ürün kodunda
+değil):** ilk düzenleme-modu testinde textarea'ya `computer` aracıyla
+yazdırılan ek metin GERÇEKTE textarea'ya ulaşmamıştı (muhtemelen stale bir
+element referansı) - banner'ın "görünmediği" ilk gözlem BU YÜZDENDİ, ürün
+kodunda bir eksiklik değildi; native input setter + `dispatchEvent`
+kullanılarak yeniden denenince (içeriğin gerçekten değiştiği doğrulanarak)
+banner beklendiği gibi doğru çıktı. Test verisi (oluşturulan sayfa + tüm
+`wiki-draft-*` anahtarları) temizlendi. `npm run lint`/`build`/`test`
+(24/24) yeşil - yeni kod hiçbir yeni uyarı/hata eklemedi.
+
+**"Eksik-özellik listesi B grubu" artık TAMAMEN BİTTİ (Wiki Version History
+Gün 1-2 + Autosave/Draft Gün 3).**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
