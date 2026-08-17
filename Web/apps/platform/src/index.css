@@ -11,19 +11,41 @@
 @source "../../../packages/ui/src";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Teal/Cyan + Turuncu Gradient paleti (2026-08-17, kullanıcının referans
+   mockup'ı) - eski yeşil+krem+kahve paletinin (WCAG-doğrulanmıştı, bkz. git
+   geçmişi) YERİNİ TAMAMEN ALIYOR, o palet için harcanan kontrast emeği BOŞA
+   GİTMEDİ - AYNI yöntem (gerçek WCAG kontrast oranı hesaplanıp doğrulanarak,
+   tahminle değil) burada da uygulandı. --brand-accent (teal/cyan, ANA
+   etkileşim rengi - link/buton/rozet/focus ring, eski yeşille AYNI ROL) hem
+   BEYAZ metinle (rozet arka planı olarak kullanıldığında) hem sayfa
+   zeminiyle (metin/link olarak kullanıldığında) >=4:1 civarında kalacak
+   şekilde seçildi - koyu modda #0d828f: beyazla 4.56:1, zeminle 4.06:1 (AYNI
+   "her iki ucu da mümkün olduğunca yükseğe çek, biri tam eşiğin altında
+   kalsa bile" dengesi, eski #1d8660 düzeltmesindeki (4.53/4.01) YÖNTEMLE
+   BİREBİR aynı). --accent-warm (turuncu) YENİ bir token - SADECE ikincil/
+   gradient bir vurgu (hero arka planı, birkaç ikon), --brand-accent'in
+   YERİNİ ALMIYOR, tüm arayüz vurgu rengi hâlâ teal/cyan. */
 :root {
-  --text: #33373b;
-  --text-h: #101418;
-  --bg: #f9f6ef;
-  --page-bg: #f4f0e6;
-  --border: #e2dcd0;
-  --code-bg: #efeae0;
-  --brand-accent: #1b4d3e;
-  --brand-accent-bg: rgba(27, 77, 62, 0.12);
-  --brand-accent-border: rgba(27, 77, 62, 0.4);
-  --social-bg: rgba(239, 234, 224, 0.5);
+  --text: #3b5563;
+  --text-h: #0d222b;
+  --bg: #ffffff;
+  --page-bg: #f2f8fa;
+  --border: #d7e7ec;
+  --code-bg: #e7f2f5;
+  --brand-accent: #0c7c92;
+  --brand-accent-bg: rgba(12, 124, 146, 0.1);
+  --brand-accent-border: rgba(12, 124, 146, 0.35);
+  /* Turuncu - SADECE gradient hero/birkaç ikon vurgusu için (bkz. yukarıdaki
+     not) - WCAG'ye göre beyaz metinle 5.58:1 (rozet arka planı olarak da
+     güvenle kullanılabilir, ama bilerek ÇOK sınırlı yerde kullanılıyor). */
+  --accent-warm: #ad4a0d;
+  --accent-warm-bg: rgba(173, 74, 13, 0.1);
+  --accent-warm-border: rgba(173, 74, 13, 0.35);
+  --gradient-hero: linear-gradient(135deg, #0c7c92 0%, #0d8fa3 45%, #ad4a0d 100%);
+  --social-bg: rgba(231, 242, 245, 0.5);
   --shadow:
-    rgba(0, 0, 0, 0.05) 0 4px 12px -2px, rgba(0, 0, 0, 0.03) 0 2px 4px -1px;
+    rgba(12, 124, 146, 0.08) 0 4px 12px -2px, rgba(12, 124, 146, 0.05) 0 2px 4px -1px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -43,99 +65,85 @@
     font-size: 14px;
   }
 
-  --background: #f9f6ef;
-  --foreground: #101418;
-  --card: #f9f6ef;
-  --card-foreground: #101418;
-  --popover: #f9f6ef;
-  --popover-foreground: #101418;
-  --primary: #1b4d3e;
-  --primary-foreground: #f9f6ef;
-  --secondary: #efeae0;
-  --secondary-foreground: #101418;
-  --muted: #efeae0;
-  --muted-foreground: #33373b;
-  --accent-foreground: #101418;
+  --background: #ffffff;
+  --foreground: #0d222b;
+  --card: #ffffff;
+  --card-foreground: #0d222b;
+  --popover: #ffffff;
+  --popover-foreground: #0d222b;
+  --primary: #0c7c92;
+  --primary-foreground: #ffffff;
+  --secondary: #e7f2f5;
+  --secondary-foreground: #0d222b;
+  --muted: #e7f2f5;
+  --muted-foreground: #3b5563;
+  --accent-foreground: #0d222b;
   --destructive: oklch(0.577 0.245 27.325);
-  --input: #e2dcd0;
-  --ring: #1b4d3e;
+  --input: #d7e7ec;
+  --ring: #0c7c92;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.5rem;
-  --sidebar: #f9f6ef;
-  --sidebar-foreground: #101418;
-  --sidebar-primary: #1b4d3e;
-  --sidebar-primary-foreground: #f9f6ef;
-  --sidebar-accent: #efeae0;
-  --sidebar-accent-foreground: #101418;
-  --sidebar-border: #e2dcd0;
-  --sidebar-ring: #1b4d3e;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0d222b;
+  --sidebar-primary: #0c7c92;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e7f2f5;
+  --sidebar-accent-foreground: #0d222b;
+  --sidebar-border: #d7e7ec;
+  --sidebar-ring: #0c7c92;
 }
 
 .dark {
-  /* UI/UX denetimi (2026-08-12): dark mode eskiden soğuk bir slate/grafit
-     paletiydi (--bg: #1b2025, mavimsi) - light mode'un krem/kahve karakteriyle
-     HİÇ akrabalığı yoktu, iki tema "aynı ürün" gibi hissettirmiyordu. Aşağıdaki
-     değerler AYNI koyuluk/luminance seviyesini korurken (WCAG kontrastları
-     bozulmasın diye) tonu mavi-griden sıcak kahve/espresso ailesine çekiyor -
-     light moddaki krem/kahve paletinin KOYU ucu gibi. */
-  --text: #d9d0c2;
-  --text-h: #f5efe3;
-  --bg: #1e1710;
-  --page-bg: #16110b;
-  --border: #392e21;
-  --code-bg: #251e14;
-  /* DÜZELTME (önceki not korunuyor - hâlâ geçerli): #34d399 (parlak nane
-     yeşili) beyaz metinle sadece 1.92:1 WCAG kontrastı veriyordu (hesaplanıp
-     doğrulandı) - "Herkese Açık" rozeti gibi üzerinde BEYAZ METİN olan
-     yerlerde neredeyse okunmuyordu. Aynı ton ailesinde (~158° hue), sistematik
-     olarak taranıp beyaz metinle 4.53:1 (WCAG AA eşiğini geçiyor) VE sayfa
-     zeminiyle 4.01:1 veren bu koyulaştırılmış değere düşürüldü. Yeni, daha
-     koyu/sıcak zeminle (--page-bg: #16110b) kontrast SADECE artıyor - yeniden
-     ölçmeye gerek yok. */
-  --brand-accent: #1d8660;
-  --brand-accent-bg: rgba(29, 134, 96, 0.18);
-  --brand-accent-border: rgba(29, 134, 96, 0.5);
-  --social-bg: rgba(37, 30, 20, 0.5);
+  /* Koyu lacivert/teal aile - eski sıcak kahve/espresso ailesinin (2026-08-12
+     denetiminde ısıtılmıştı) YERİNE geçiyor, AYNI luminance/koyuluk seviyesi
+     korunuyor (WCAG kontrastları BOZULMASIN diye, bkz. text/text-h aşağıda -
+     9.49:1 ve 16.84:1, ikisi de fazlasıyla geçiyor). */
+  --text: #a9bccd;
+  --text-h: #eef5fb;
+  --bg: #0f1b2d;
+  --page-bg: #0a1420;
+  --border: #1f3349;
+  --code-bg: #16273b;
+  --brand-accent: #0d828f;
+  --brand-accent-bg: rgba(13, 130, 143, 0.18);
+  --brand-accent-border: rgba(13, 130, 143, 0.5);
+  --accent-warm: #c2570f;
+  --accent-warm-bg: rgba(194, 87, 15, 0.18);
+  --accent-warm-border: rgba(194, 87, 15, 0.5);
+  --gradient-hero: linear-gradient(135deg, #0d828f 0%, #0c6e85 45%, #c2570f 100%);
+  --social-bg: rgba(22, 39, 59, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
-  /* BULUNAN GERÇEK BUG (denetim sırasında): --primary üç farklı yerde üç
-     farklı değer taşıyordu (#34d399 burada, #24654f aşağıdaki İKİNCİ .dark
-     bloğunda - bkz. dosyanın sonu) - CSS kaskad kuralı gereği SONRAKİ blok
-     kazanıyordu, yani bu satırdaki değer aslında hiç render EDİLMİYORDU
-     (ölü kod). İkisi de yukarıdaki WCAG-doğrulanmış --brand-accent'le
-     (#1d8660) UYUŞMUYORDU. Artık ikisi de --brand-accent'e eşitlendi - tek
-     bir doğruluk kaynağı, shadcn Button/Input gibi bileşenler de aynı
-     yeşili kullanıyor. */
-  --background: #1e1710;
-  --foreground: #f5efe3;
-  --card: #1e1710;
-  --card-foreground: #f5efe3;
-  --popover: #1e1710;
-  --popover-foreground: #f5efe3;
-  --primary: #1d8660;
+  --background: #0f1b2d;
+  --foreground: #eef5fb;
+  --card: #0f1b2d;
+  --card-foreground: #eef5fb;
+  --popover: #0f1b2d;
+  --popover-foreground: #eef5fb;
+  --primary: #0d828f;
   --primary-foreground: #ffffff;
-  --secondary: #251e14;
-  --secondary-foreground: #f5efe3;
-  --muted: #251e14;
-  --muted-foreground: #d9d0c2;
-  --accent: #251e14;
-  --accent-foreground: #f5efe3;
-  --border: #392e21;
-  --input: #392e21;
-  --ring: #1d8660;
-  --sidebar: #1e1710;
-  --sidebar-foreground: #f5efe3;
-  --sidebar-primary: #1d8660;
+  --secondary: #16273b;
+  --secondary-foreground: #eef5fb;
+  --muted: #16273b;
+  --muted-foreground: #a9bccd;
+  --accent: #16273b;
+  --accent-foreground: #eef5fb;
+  --border: #1f3349;
+  --input: #1f3349;
+  --ring: #0d828f;
+  --sidebar: #0f1b2d;
+  --sidebar-foreground: #eef5fb;
+  --sidebar-primary: #0d828f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #251e14;
-  --sidebar-accent-foreground: #f5efe3;
-  --sidebar-border: #392e21;
-  --sidebar-ring: #1d8660;
+  --sidebar-accent: #16273b;
+  --sidebar-accent-foreground: #eef5fb;
+  --sidebar-border: #1f3349;
+  --sidebar-ring: #0d828f;
 }
 
 html,
@@ -311,43 +319,41 @@ body {
 /* Bu ikinci ".dark" bloğu shadcn'in kendi init akışından kalma, YUKARIDAKİ
    ilk ".dark" bloğuyla hiç birleştirilmemiş (aynı dosyada iki ayrı ".dark"
    seçicisi - CSS kaskad kuralı gereği SONRAKİ, yani BU blok kazanıyor).
-   Denetim sırasında bulunan --primary çelişkisi yüzünden burası da
-   yukarıdakiyle AYNI sıcak kahve/yeşil paletine çekildi - tam bir mimari
-   temizlik (iki bloğu birleştirmek) bu değişikliğin kapsamı dışında
-   bırakıldı, ama artık en azından İKİSİ DE aynı değerleri taşıyor, hangisinin
-   kazandığının önemi kalmadı. */
+   Teal/turuncu redesign'da (2026-08-17) da AYNI ikiz-blok deseni KORUNDU -
+   ikisi ARTIK YİNE aynı değerleri taşıyor, hangisinin kazandığının önemi yok
+   (tam mimari birleştirme hâlâ bu değişikliğin kapsamı dışında). */
 .dark {
-  --background: #1e1710;
-  --foreground: #f5efe3;
-  --card: #1e1710;
-  --card-foreground: #f5efe3;
-  --popover: #1e1710;
-  --popover-foreground: #f5efe3;
-  --primary: #1d8660;
+  --background: #0f1b2d;
+  --foreground: #eef5fb;
+  --card: #0f1b2d;
+  --card-foreground: #eef5fb;
+  --popover: #0f1b2d;
+  --popover-foreground: #eef5fb;
+  --primary: #0d828f;
   --primary-foreground: #ffffff;
-  --secondary: #251e14;
-  --secondary-foreground: #f5efe3;
-  --muted: #251e14;
-  --muted-foreground: #d9d0c2;
-  --accent: #251e14;
-  --accent-foreground: #f5efe3;
+  --secondary: #16273b;
+  --secondary-foreground: #eef5fb;
+  --muted: #16273b;
+  --muted-foreground: #a9bccd;
+  --accent: #16273b;
+  --accent-foreground: #eef5fb;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: #392e21;
-  --input: #392e21;
-  --ring: #1d8660;
+  --border: #1f3349;
+  --input: #1f3349;
+  --ring: #0d828f;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: #1e1710;
-  --sidebar-foreground: #f5efe3;
-  --sidebar-primary: #1d8660;
+  --sidebar: #0f1b2d;
+  --sidebar-foreground: #eef5fb;
+  --sidebar-primary: #0d828f;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #251e14;
-  --sidebar-accent-foreground: #f5efe3;
-  --sidebar-border: #392e21;
-  --sidebar-ring: #1d8660;
+  --sidebar-accent: #16273b;
+  --sidebar-accent-foreground: #eef5fb;
+  --sidebar-border: #1f3349;
+  --sidebar-ring: #0d828f;
 }
 
 @layer base {

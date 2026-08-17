@@ -2006,6 +2006,129 @@ Video Merkezi galerisi Gün 2).** Sırada D grubu var: link/embed otomatik
 algılama, video transkript indeksleme, Vault paylaşım modeli - henüz hiç
 başlanmadı.
 
+## Görsel Tasarım Yenileme - Teal/Cyan + Turuncu Palet (2026-08-17)
+
+Eksik-özellik listesinden (D grubu) BAĞIMSIZ, kullanıcının bir referans
+mockup ekran görüntüsü (koyu tema, teal/cyan + turuncu gradient vurgulu bir
+Atlas Wiki ana sayfa tasarımı) paylaşıp "aynı olsun" demesiyle açıldı. Ayrı
+bir branch'te (`design/teal-cyan-homepage-redesign`, `master`'dan) - D
+grubunun devam eden branch'leriyle (`feature/video-link-autodetect`,
+`feature/vault-sharing`) İLGİSİZ, o yüzden karışmasınlar diye bilerek ayrı
+tutuldu. 2 güne bölündü - Gün 1 (bu bölüm) palet+logo, Gün 2 ana sayfanın
+kendisi (hero/öne çıkan makale/belgeler widget'ı/video widget'ı/istatistik
+grafiği/footer).
+
+**Gün 1 - Renk paleti + logo:**
+
+- [x] **`index.css` TAMAMEN yeniden renklendirildi** - eski yeşil+krem+kahve
+      paleti (aylar süren WCAG-doğrulama emeğiyle kurulmuştu) yerine teal/cyan
+      (ANA etkileşim rengi, eski yeşille AYNI ROL - link/buton/rozet/focus
+      ring) + turuncu (YENİ, SADECE ikincil/gradient bir vurgu - `--accent-warm`,
+      `--brand-accent`'in yerine GEÇMİYOR). **Eski paletin WCAG emeği BOŞA
+      GİTMEDİ** - AYNI yöntem (tahminle değil, gerçek kontrast oranı
+      hesaplanıp doğrulanarak, bkz. scratchpad'teki `contrast.js`) burada da
+      uygulandı: koyu modda `--brand-accent` (#0d828f) beyazla 4.56:1, sayfa
+      zeminiyle 4.06:1 - eski #1d8660 düzeltmesinin (4.53/4.01) BİREBİR AYNI
+      "iki ucu da mümkün olduğunca yükseğe çek" dengesiyle seçildi. Açık mod
+      için de aynı titizlik (#0c7c92: beyazla 4.87:1, zeminle 4.54:1).
+      `--accent-warm` turuncusu da AYNI şekilde doğrulandı (koyu #c2570f
+      beyazla 4.50:1, açık #ad4a0d beyazla 5.58:1). Yeni `--gradient-hero`
+      token'ı (teal→turuncu) Gün 2'nin hero bölümü için hazırlandı.
+- [x] **`AtlasLogo.jsx` (YENİ, SVG bileşen)** - eski `logo.png` (statik PNG,
+      yeşil blob) yeni paletle renk UYUMSUZLUĞUNA düştüğü için (CSS
+      değişkenleriyle yeniden renklendirilemiyordu) yerine geçti. Header'da
+      ZATEN `h-7 w-7 rounded-full`'a kırpıldığı için (yazı okunaklı
+      değildi) TAM "ATLAS WIKI" yazısını piksel piksel yeniden çizmek yerine
+      basit bir marka işareti (organik blob + "A" harfi, `var(--brand-accent)`→
+      `var(--accent-warm)` gradient'i) tercih edildi - SVG olduğu için CSS
+      custom property'lerini DOĞRUDAN okuyor, açık/koyu temada otomatik
+      doğru renklere geçiyor (favicon.png - ayrı bir dosya - bu değişikliğin
+      kapsamı DIŞINDA bırakıldı, istenirse ayrı ele alınır).
+
+**Canlı doğrulandı (gerçek tarayıcıda, CSS custom property'lerin GERÇEKTEN
+render edilen değerlerini okuyarak - sadece dosyanın "doğru yazıldığını"
+değil):** koyu modda `body`'nin `background-color`'ı `rgb(10, 20, 32)`
+(`--page-bg`) ile birebir eşleşti, logo SVG'sinin gradient durak renkleri
+`rgb(13, 130, 143)`→`rgb(194, 87, 15)` (tam beklenen teal→turuncu) çıktı,
+aktif sekme alt çizgisi doğru teal rengi taşıdı; tema değiştirilip açık
+moda geçilince TÜM değerler (body bg, brand-accent, accent-warm, text/text-h)
+doğru açık-mod karşılıklarına döndüğü teyit edildi. `npm run lint`/`build`/
+`test` (32/32 - bu branch `master`'dan, D grubunun henüz merge edilmemiş
+`isRecognizedVideoUrl` testlerini İÇERMİYOR, beklenen) yeşil.
+
+**Gün 2 - Ana sayfanın kendisi:**
+
+Kullanıcının referans mockup'ındaki TÜM bölümler eklendi - hiçbiri dekoratif/
+sahte veri DEĞİL, hepsi zaten var olan backend endpoint'lerinden (ya da
+küçük, güvenli bir backend genişlemesinden) besleniyor:
+
+- [x] **`HeroSection`** - `--gradient-hero` (Gün 1) zeminli karşılama alanı +
+      GERÇEK, çalışan bir arama kutusu. Submit olunca `/wiki/pages?q=...`'a
+      yönlendiriyor. **Bu sırada bulunan gerçek bir "bağlanmamış uç" (dangling
+      wiring) düzeltildi:** `WikiSearch.jsx`'in `initialQuery` prop'u + kendi
+      useEffect'i ZATEN vardı (yorumunda "üst bardaki arama kutusundan
+      yönlendirildiğinde" diye açıkça yazıyordu) ama HİÇBİR yer bu URL
+      parametresini okumuyordu - `WikiBoard.jsx`'e `useSearchParams` eklenip
+      tamamlandı. Hero'ya İKİNCİ bir arama mekanizması İCAT EDİLMEDİ, var
+      olan akış TAMAMLANDI.
+- [x] **`FeaturedArticleCard`** ("Öne Çıkan Makale") - en yeni sayfa büyük bir
+      kart olarak tekrar vurgulanıyor. Ayrı bir "editör seçimi" alanı İCAT
+      EDİLMEDİ (backend'de yok, eklemek YAGNI olurdu).
+- [x] **"Son Eklenen Makaleler" 9'dan 4'e indirildi** (kullanıcı isteği: "ilk
+      sayfada örnek olarak 3-5 tane olsun") - Öne Çıkan Makale ZATEN en
+      yeniyi gösterdiği için, bu bölüm SIRADAKİ 4'ü gösteriyor (aynı sayfa
+      iki kez görünmüyor). "Tümünü Gör" zaten vardı.
+- [x] **`SimplePageListPanel`** (Favorilere Eklenenler + Pinlenenler, "ayrı
+      bölüm" olarak) - var olan `getFavoritePages`/`getPinnedPages`'i
+      kullanan tek, esnek bir bileşen - dört ayrı liste bileşeni YAZILMADI.
+- [x] **`DocumentsWidget`** ("Belgeler") - Documents modülünden gerçek veri,
+      format-özel ikonlar `documentIcons.js`'ten (DocumentDetailPage'in
+      ZATEN kullandığı harita - ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
+- [x] **`RecentVideosWidget`** ("Videolar/Eğitimler") - `VideoCenterPage`'in
+      (Eksik-özellik listesi C grubu) AYNI `extractVideosFromContent`'ini
+      tekrar kullanıyor, ikinci bir video-algılama YAZILMADI. VideoCenterPage'in
+      AKSİNE TÜM sayfalar değil, son ~20 sayfalık bir dilim taranıyor (ana
+      sayfa widget'ı için yeterli, tam galeri zaten `/wiki/videos`'ta).
+- [x] **`DiscussionsWidget`** ("Tartışmalar") - platform GENELİNE ait yorumlar
+      (`getComments(token)`, `pageId=null` - "Anasayfa Tartışması" sekmesiyle
+      AYNI veri kaynağı). "Tartışmaya Katıl" ayrı bir sayfaya DEĞİL, var olan
+      "Tartışma" sekmesine geçiyor - ikinci bir tartışma sayfası İCAT
+      EDİLMEDİ.
+- [x] **"Kategoriler" restyle edildi** - var olan `popularTags` verisi artık
+      küçük bir ikon-rozet ızgarası (2 sütun) olarak gösteriliyor.
+- [x] **`DepartmentDonutChart`** ("İstatistikler") - **backend'e küçük, güvenli
+      bir alan eklendi:** `WikiDashboardDto.DepartmentBreakdown`
+      (`GetWikiDashboardQueryHandler`'ın ZATEN bellekte tuttuğu
+      `visiblePages`'ten türetiliyor, `PopularTags`'le AYNI desen, yeni bir
+      sorgu/endpoint YOK) - donut grafiği SAHTE/rastgele veri GÖSTERMEDİ,
+      gerçek departman dağılımını gösteriyor. Harici bir grafik kütüphanesi
+      EKLENMEDİ - CSS `conic-gradient` + `color-mix()` ile saf bir donut
+      (brand-accent'in azalan opaklık tonları, Gün 1'deki "kategorik çoklu
+      renk yerine sade kalma" kararıyla tutarlı).
+- [x] **`HomeFooter`** - SADECE gerçek linkler (mockup'taki "SSS"/"Destek
+      Talebi"/sahte sosyal medya ikonları gibi karşılığı OLMAYAN dekoratif
+      linkler BİLEREK EKLENMEDİ - projenin baştan beri sürdürdüğü "dekoratif/
+      çalışmayan bir şey gösterme" ilkesi).
+
+**Canlı doğrulandı (gerçek tarayıcı etkileşimiyle, hem koyu hem açık modda):**
+TÜM bölümler doğru veriyle render edildi (Favoriler/Pinlenenler/Belgeler
+gerçek kayıtlar gösterdi, İstatistikler donut'u gerçek departman dağılımını
+- IT %78, Engineering %11, IK %11 - doğru çizdi). Hero arama kutusu uçtan uca
+test edildi: "sunucu bakım" yazılıp gönderilince `/wiki/pages?q=sunucu%20bak%C4%B1m`'a
+yönlendirdi VE WikiSearch otomatik çalışıp GERÇEK, alakalı sonuçlar
+("Sunucu Bakım ve İzleme Rehberi") döndürdü. Videolar/Tartışmalar widget'ları
+başlangıçta veri olmadığı için (doğru şekilde) hiç görünmüyordu - birer test
+kaydı (video sayfası + platform-geneli yorum) eklenip widget'ların GERÇEKTEN
+çalıştığı kanıtlandı, sonra temizlendi. Hero gradient'i ve donut grafiğinin
+`conic-gradient`/`color-mix()`'i hem koyu hem açık modda doğru renklere
+(gerçek render edilen CSS değerleri okunarak) geçtiği teyit edildi.
+`npm run lint`/`build`/`test` (32/32) + `dotnet test Atlas.sln --filter
+"Category!=Integration"` yeşil (regresyon yok - `WikiDashboardDto`'ya yeni
+alan eklemek hiçbir testi kırmadı, bu DTO'ya referans veren test yoktu).
+
+**"Görsel Tasarım Yenileme" artık TAMAMEN BİTTİ (Gün 1-2, palet+logo+ana
+sayfa).**
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece
