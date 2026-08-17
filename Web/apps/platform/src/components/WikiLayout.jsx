@@ -2,28 +2,255 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 import {
   Bell,
+  CheckCheck,
   ChevronDown,
+  Clock,
   FileText,
+  Home,
+  ListChecks,
   Menu,
+  MessageSquare,
   Moon,
   PanelLeftClose,
+  Pin,
   Plus,
   Search,
+  Star,
   Sun,
+  Video,
 } from "lucide-react";
-import { getWikiSearchSuggestions } from "../api";
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  getWikiSearchSuggestions,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "../api";
 import { getUserInfoFromToken } from "../jwt";
+import { formatUtcTimestamp } from "../dateUtils";
 import WikiFolderTree from "./WikiFolderTree";
 import AtlasLogo from "./AtlasLogo";
 
 const SEARCH_DEBOUNCE_MS = 250;
 
+// Boş bir Guid - backend'de platform-geneli (sayfaya bağlı olmayan) bir
+// "DiscussionReply" bildiriminin ResourceId'si (bkz. WikiCommentCreatedEventHandler'daki
+// not) - gerçek bir sayfaya değil, ana sayfanın Tartışma sekmesine gitmesi
+// gerektiğini anlamak için kullanılıyor.
+const PLATFORM_WIDE_RESOURCE_ID = "00000000-0000-0000-0000-000000000000";
+
+// Sidebar'ın en üstündeki kompakt ikon navigasyonu (2026-08-17, "sidebar
+// sadeleştirilsin, yazı yerine ikon" isteği) - referans mockup'taki sol
+// sidebar'ın Ana Sayfa/Tüm Sayfalar/Tartışma/Favoriler/Pinlenenler bölümüyle
+// AYNI fikir. Her öğe hem bir tooltip (title) hem bir <Link> - ikona
+// tıklamak ilgili sayfaya gidiyor.
+const COMPACT_NAV_ITEMS = [
+  { key: "home", label: "Ana Sayfa", icon: Home, to: "/wiki" },
+  { key: "pages", label: "Tüm Sayfalar", icon: ListChecks, to: "/wiki/pages" },
+  { key: "talk", label: "Tartışma", icon: MessageSquare, to: "/wiki?tab=talk" },
+  { key: "favorites", label: "Favoriler", icon: Star, to: "/wiki/favorites" },
+  { key: "pinned", label: "Pinlenenler", icon: Pin, to: "/wiki/pinned" },
+  { key: "recent", label: "Son Güncellenenler", icon: Clock, to: "/wiki#son-guncellemeler" },
+  { key: "videos", label: "Video Merkezi", icon: Video, to: "/wiki/videos" },
+];
+
+function CompactNavRow() {
+  return (
+    <div className="flex items-center justify-between gap-1 border-b pb-3" style={{ borderColor: "var(--border)" }}>
+      {COMPACT_NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.key}
+            to={item.to}
+            title={item.label}
+            aria-label={item.label}
+            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-[var(--brand-accent)]/10"
+            style={{ color: "var(--text)" }}
+          >
+            <Icon size={16} />
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+// Bildirim metni EventType'a göre değişiyor - WikiPageCreated ("yeni bir
+// sayfa ekledi") ve DiscussionReply ("bir tartışmaya cevap verdi") AYNI
+// kart şablonunu paylaşıyor, sadece eylem cümlesi farklı.
+function notificationActionText(eventType) {
+  return eventType === "DiscussionReply" ? "bir tartışmaya cevap verdi" : "yeni bir sayfa ekledi";
+}
+
+function notificationLinkFor(n) {
+  if (n.eventType === "DiscussionReply" && n.resourceId === PLATFORM_WIDE_RESOURCE_ID) {
+    return "/wiki?tab=talk";
+  }
+  return `/wiki/${n.resourceId}`;
+}
+
+// Header'daki zil ikonu (2026-08-17, "bildirimler gerçek verilere bağlansın"
+// isteği) - eskiden dekoratif/devre dışıydı ("Bildirimler (yakında)"),
+// artık GetNotificationsQuery/GetUnreadNotificationCountQuery'ye bağlı gerçek
+// bir dropdown. SignalR ile TAM gerçek-zamanlı DEĞİL (NotificationsHub şu an
+// kullanıcı-bazlı hedefleme kurulu değil, bkz. WikiCommentCreatedEventHandler'daki
+// not) - bunun yerine periyodik bir poll (45sn) + panel her açıldığında
+// taze bir fetch kullanılıyor, bu da doğru ve basit bir orta yol.
+function NotificationBell({ token }) {
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function refreshUnreadCount() {
+      getUnreadNotificationCount(token)
+        .then((count) => {
+          if (!cancelled) setUnreadCount(count);
+        })
+        .catch(() => {
+          // Sessizce yut - badge'in kendisi kritik değil, sayfayı bloklamamalı.
+        });
+    }
+
+    refreshUnreadCount();
+    const intervalId = setInterval(refreshUnreadCount, 45_000);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [token]);
+
+  function handleToggle() {
+    const nextOpen = !isOpen;
+    setIsOpen(nextOpen);
+    if (nextOpen) {
+      setError(null);
+      getNotifications(token, 10)
+        .then(setNotifications)
+        .catch((err) => setError(err.message));
+    }
+  }
+
+  async function handleNotificationClick(n) {
+    setIsOpen(false);
+    navigate(notificationLinkFor(n));
+
+    if (!n.isRead) {
+      try {
+        await markNotificationRead(token, n.id);
+        setUnreadCount((c) => Math.max(0, c - 1));
+        setNotifications((list) => list?.map((item) => (item.id === n.id ? { ...item, isRead: true } : item)) ?? list);
+      } catch {
+        // Okundu işaretleme başarısız olsa bile navigasyon zaten gerçekleşti -
+        // bir sonraki panel açılışında/pollde badge kendini düzeltir.
+      }
+    }
+  }
+
+  async function handleMarkAllRead(e) {
+    e.stopPropagation();
+    try {
+      await markAllNotificationsRead(token);
+      setUnreadCount(0);
+      setNotifications((list) => list?.map((item) => ({ ...item, isRead: true })) ?? list);
+    } catch {
+      // best-effort, sessizce yut.
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="relative rounded p-1.5 hover:bg-[var(--brand-accent)]/10"
+        title="Bildirimler"
+      >
+        <Bell size={18} style={{ color: "var(--text)" }} />
+        {unreadCount > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
+            style={{ background: "var(--accent-warm, #c2570f)" }}
+          >
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div
+          className="absolute top-full right-0 z-20 mt-2 w-80 overflow-hidden rounded-lg border shadow-lg"
+          style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+        >
+          <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+            <span className="text-sm font-semibold" style={{ color: "var(--text-h)" }}>
+              Bildirimler
+            </span>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAllRead}
+                className="flex items-center gap-1 text-xs font-medium hover:underline"
+                style={{ color: "var(--brand-accent)" }}
+              >
+                <CheckCheck size={13} /> Tümünü okundu işaretle
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-96 overflow-y-auto">
+            {error && (
+              <p className="px-3.5 py-3 text-xs" style={{ color: "red" }}>
+                {error}
+              </p>
+            )}
+            {!error && notifications === null && (
+              <p className="px-3.5 py-3 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+                Yükleniyor...
+              </p>
+            )}
+            {!error && notifications?.length === 0 && (
+              <p className="px-3.5 py-3 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+                Henüz bir bildirim yok.
+              </p>
+            )}
+            {notifications?.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => handleNotificationClick(n)}
+                className="flex w-full flex-col gap-0.5 border-b px-3.5 py-2.5 text-left text-xs hover:bg-[var(--brand-accent)]/5"
+                style={{ borderColor: "var(--border)", background: n.isRead ? "transparent" : "var(--brand-accent-bg)" }}
+              >
+                <span style={{ color: "var(--text)", opacity: 0.75 }}>
+                  <span className="font-semibold" style={{ color: "var(--text-h)" }}>
+                    {n.actorEmail ?? "Biri"}
+                  </span>{" "}
+                  {notificationActionText(n.eventType)}
+                </span>
+                <span className="truncate font-medium" style={{ color: "var(--brand-accent)" }}>
+                  {n.title}
+                </span>
+                <span style={{ color: "var(--text)", opacity: 0.5 }}>{formatUtcTimestamp(n.createdAtUtc)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Wikipedia'nın "üst bar + sol menü + geniş içerik" mimarisini ödünç
 // alıyoruz (bkz. kullanıcının referans mockup'ları) - Atlas Wiki'nin kendi
 // ismi/renk paleti DEĞİŞMİYOR, sadece iskelet ve bileşen yerleşimi aynı.
-// Bildirim zili ve "Geri Bildirim" BİLEREK dekoratif (henüz bir bildirim
-// merkezi/geri bildirim formu yok) - tema değiştirme ve sidebar daraltma ise
-// gerçek, çalışan özellikler.
+// Bildirim zili artık GERÇEK (2026-08-17, bkz. NotificationBell) - tema
+// değiştirme ve sidebar daraltma zaten gerçek, çalışan özelliklerdi.
 function WikiLayout({ token, onLogout }) {
   const { isAdmin, department: ownDepartment, fullName, email } = useMemo(
     () => getUserInfoFromToken(token),
@@ -185,13 +412,7 @@ function WikiLayout({ token, onLogout }) {
             {isDark ? <Sun size={18} style={{ color: "var(--text)" }} /> : <Moon size={18} style={{ color: "var(--text)" }} />}
           </button>
 
-          <button
-            type="button"
-            className="rounded p-1.5 hover:bg-[var(--brand-accent)]/10"
-            title="Bildirimler (yakında)"
-          >
-            <Bell size={18} style={{ color: "var(--text)" }} />
-          </button>
+          <NotificationBell token={token} />
 
           <button
             type="button"
@@ -238,6 +459,9 @@ function WikiLayout({ token, onLogout }) {
                 Belgeler
               </Link>
               {isAdmin && (
+                // Ana sayfadaki "Audit Log" hızlı erişim kartı kaldırıldı
+                // (2026-08-17, "ana sayfa sadeleşsin" isteği) - TEK erişim
+                // yolu artık burası, kullanıcı menüsü (zaten Admin'e özel).
                 <Link
                   to="/audit-log"
                   onClick={() => setIsUserMenuOpen(false)}
@@ -269,20 +493,20 @@ function WikiLayout({ token, onLogout }) {
           className={`${isSidebarOpen ? "flex" : "hidden"} w-full shrink-0 flex-col gap-4 border-r p-4 md:w-[230px]`}
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}
         >
+          {/* Kompakt ikon navigasyonu (2026-08-17, "sidebar sadeleştirilsin"
+              isteği) - referans mockup'taki Ana Sayfa/Tüm Sayfalar/Tartışma/
+              Favoriler/Pinlenenler bölümünün karşılığı, ama YAZI DEĞİL,
+              tooltip'li ikonlar (bkz. COMPACT_NAV_ITEMS). Ana sayfadaki eski
+              "Hızlı Erişim şeridi" (aynı hedeflere giden YAZILI düğmeler) bu
+              yüzden KALDIRILDI - aynı işlev artık burada, tek yerde yaşıyor. */}
+          <CompactNavRow />
+
           <WikiFolderTree token={token} ownDepartment={ownDepartment} />
 
           {/* Audit Log ve Çıkış Yap BİLEREK burada YOK (2026-08-05, kullanıcı
               geri bildirimi: "sağ üstte var zaten") - ikisi de zaten üst
               bardaki kullanıcı menüsünde (avatar dropdown) duruyor, burada
-              tekrarlamak gereksizdi. Referans mockup'ta (2026-08-07,
-              "buna benzer olsun") sidebar'ın en altında "Çıkış Yap" da
-              gösteriliyordu ama o kararı ŞİMDİ tekrar açmak, iki turda önce
-              verilen açık bir "çıkart, tekrarlı" geri bildirimiyle çelişirdi -
-              o yüzden BİLEREK yine eklenmedi. "+ Yeni Sayfa Oluştur" ise
-              referans mockup'ta olup burada hiç OLMAYAN, gerçek bir eksikti
-              (tek yol WikiFolderTree'nin üstündeki genel "Yeni Sayfa" linkiydi,
-              sidebar'ın kendi içinde hiç yoktu) - dolu, vurgulu bir buton
-              olarak eklendi. */}
+              tekrarlamak gereksizdi. */}
           <div className="mt-auto flex flex-col gap-2 border-t pt-3" style={{ borderColor: "var(--border)" }}>
             <Link
               to="/wiki/new"

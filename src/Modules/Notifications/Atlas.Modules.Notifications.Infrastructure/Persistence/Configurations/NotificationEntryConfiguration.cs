@@ -18,5 +18,9 @@ public class NotificationEntryConfiguration : IEntityTypeConfiguration<Notificat
 
         // "En yeni önce" sorgusu her zaman bu sütuna göre sıralanacak.
         builder.HasIndex(e => e.CreatedAtUtc);
+
+        // TargetUserId'ye göre filtreleme (GetNotificationsQueryHandler'ın
+        // "broadcast OR bana hedeflenmiş" sorgusu) sık çalışıyor.
+        builder.HasIndex(e => e.TargetUserId);
     }
 }

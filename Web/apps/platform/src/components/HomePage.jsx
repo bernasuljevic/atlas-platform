@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   ArrowRight,
   Bell,
+  Building2,
   Clock,
   FilePlus2,
   FileText,
@@ -26,6 +27,7 @@ import {
   getPinnedPages,
   getWikiDashboard,
   getWikiPages,
+  getWikiSearchSuggestions,
 } from "../api";
 import { getUserInfoFromToken } from "../jwt";
 import { formatUtcTimestamp } from "../dateUtils";
@@ -79,48 +81,6 @@ function MiniStat({ icon, value, label, variant }) {
       </span>
       <span style={{ opacity: onGradient ? 0.85 : 0.7 }}>{label}</span>
     </span>
-  );
-}
-
-// "Hızlı Erişim" artık büyük bir Panel/kart değil, üstte küçük ikonlu bir
-// düğme şeridi (kullanıcı spec'i, "5. Hızlı Erişim - büyük kartlar yerine
-// küçük aksiyon butonları"). `to` (React Router linki) VEYA `href` (aynı
-// sayfa içinde bir çapaya kaydırmak için, ör. #son-guncellemeler) kabul
-// ediyor - ikisi birden verilmez. `disabled` HÂLÂ destekleniyor (WikiLayout'taki
-// "Bildirimler (yakında)" Bell düğmesiyle AYNI desende bir title tooltip'i
-// gösterir, gerçek bir backend'i olmayan özellikler için) - Favoriler/
-// Pinlenenler artık gerçek bir backend'e sahip olduğu için BU İKİSİ disabled
-// değil (bkz. UserPageFavorite/UserPagePin, Wiki.Domain).
-function QuickActionButton({ icon, label, to, href, disabled }) {
-  const classes =
-    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition hover:bg-[var(--brand-accent)]/10";
-  const style = {
-    borderColor: "var(--border)",
-    color: "var(--text-h)",
-    opacity: disabled ? 0.55 : 1,
-    cursor: disabled ? "not-allowed" : "pointer",
-  };
-
-  if (disabled) {
-    return (
-      <button type="button" className={classes} style={style} title={`${label} (yakında)`}>
-        {icon} {label}
-      </button>
-    );
-  }
-
-  if (href) {
-    return (
-      <a href={href} className={classes} style={style}>
-        {icon} {label}
-      </a>
-    );
-  }
-
-  return (
-    <Link to={to} className={classes} style={style}>
-      {icon} {label}
-    </Link>
   );
 }
 
@@ -357,14 +317,84 @@ function RecentArticlesCarousel({ articles }) {
 // hiçbir yer bu URL parametresini OKUMUYORDU - bağlanmamış bir uçtu,
 // WikiBoard.jsx'e `useSearchParams` eklenerek TAMAMLANDI (Hero'ya özel bir
 // ikinci arama mekanizması İCAT EDİLMEDİ).
-function HeroSection({ fullName }) {
+const HERO_SEARCH_DEBOUNCE_MS = 250;
+
+// Hero arama kutusu (2026-08-17, "her harfte akıllı tahmin" isteği) - eskiden
+// SADECE Enter'da /wiki/pages?q=...'a yönlendiren düz bir kutuydu. Header'daki
+// WikiLayout.jsx'in arama kutusuyla AYNI altyapıyı (getWikiSearchSuggestions,
+// AYNI debounce süresi) kullanıyor - bu endpoint zaten başlık/etiket/içerik
+// üzerinden eşleşiyor (bkz. SearchWikiPageSuggestionsQueryHandler'daki
+// "başlık > etiket > içerik" katmanları). AI'ın semantic search'ü (/api/ai/search)
+// BİLİNÇLİ OLARAK kullanılmadı - dakikada 20 istekle rate-limitli (bkz.
+// "ai-search" politikası) ve anlam bazlı arama için tasarlandı, tuş-bazlı bir
+// typeahead'de HER harfte çağırmak hem rate limit'i hızla tüketirdi hem de
+// yanlış araç olurdu (semantic search "cümleye benzer" arıyor, typeahead
+// "başlığı bununla başlayan/eşleşen" arıyor - iki farklı ihtiyaç).
+function HeroSection({ fullName, token }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const debounceRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current);
+  }, []);
+
+  function handleChange(e) {
+    const value = e.target.value;
+    setQuery(value);
+    setHighlightedIndex(-1);
+    clearTimeout(debounceRef.current);
+
+    if (!value.trim()) {
+      setSuggestions([]);
+      setIsOpen(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await getWikiSearchSuggestions(token, value);
+        setSuggestions(results);
+        setIsOpen(true);
+      } catch {
+        setSuggestions([]);
+      }
+    }, HERO_SEARCH_DEBOUNCE_MS);
+  }
+
+  function goToSuggestion(s) {
+    setIsOpen(false);
+    setQuery("");
+    navigate(`/wiki/${s.id}`);
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+      goToSuggestion(suggestions[highlightedIndex]);
+      return;
+    }
     if (!query.trim()) return;
+    setIsOpen(false);
     navigate(`/wiki/pages?q=${encodeURIComponent(query.trim())}`);
+  }
+
+  function handleKeyDown(e) {
+    if (!isOpen || suggestions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Escape") {
+      setIsOpen(false);
+      setHighlightedIndex(-1);
+    }
   }
 
   return (
@@ -376,16 +406,56 @@ function HeroSection({ fullName }) {
         Tüm bilgi ve belgelere tek yerden ulaşın, paylaşın ve birlikte geliştirin.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-5 flex max-w-lg gap-2">
+      <form onSubmit={handleSubmit} className="relative mt-5 flex max-w-lg gap-2">
         <div className="relative flex-1">
           <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 opacity-60" style={{ color: "#0d222b" }} />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => query.trim() && suggestions.length > 0 && setIsOpen(true)}
+            onBlur={() => setTimeout(() => setIsOpen(false), 150)}
             placeholder="Aramak istediğiniz konuyu yazın..."
             className="w-full rounded-lg py-2.5 pr-3 pl-9 text-sm outline-none"
             style={{ background: "rgba(255,255,255,0.96)", color: "#0d222b" }}
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-autocomplete="list"
           />
+
+          {isOpen && (
+            <div
+              className="absolute top-full left-0 z-20 mt-1.5 w-full overflow-hidden rounded-lg border shadow-lg"
+              style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+            >
+              {suggestions.length === 0 ? (
+                <p className="px-3 py-3 text-sm" style={{ color: "var(--text)", opacity: 0.7 }}>
+                  Eşleşen bir sayfa bulunamadı.
+                </p>
+              ) : (
+                suggestions.map((s, idx) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={() => goToSuggestion(s)}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    className="flex w-full items-start gap-2 px-3 py-2 text-left"
+                    style={{ background: idx === highlightedIndex ? "var(--brand-accent-bg)" : "transparent" }}
+                  >
+                    <FileText size={14} className="mt-0.5 shrink-0 opacity-50" style={{ color: "var(--text)" }} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium" style={{ color: "var(--text-h)" }}>
+                        {s.title}
+                      </span>
+                      <span className="block truncate text-xs" style={{ color: "var(--text)", opacity: 0.65 }}>
+                        {s.departmentName} · {s.excerpt}
+                      </span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
         <Button type="submit" style={{ background: "#0d222b", color: "#ffffff" }} className="hover:opacity-90">
           Ara
@@ -513,6 +583,204 @@ function SimplePageListPanel({ title, icon, fetcher, token, viewAllTo }) {
   );
 }
 
+// [Departman] İçin Öne Çıkanlar (2026-08-17, ikinci tur kullanıcı geri
+// bildirimi - sağ sütunun sticky/CSS-stretch İLE DEĞİL, GERÇEK kendi
+// içeriğiyle uzaması isteniyordu). Backend'in `dashboard.departmentSpecific`
+// alanı (GetWikiDashboardQueryHandler'da ZATEN hesaplanıyordu) şimdiye kadar
+// frontend'de HİÇ render EDİLMİYORDU - sadece Count'u (Hero'nun altındaki
+// MiniStat şeridinde) kullanılıyordu. Ek bir fetch/endpoint GEREKMEDİ, veri
+// zaten `dashboard` objesinin içinde duruyordu. Departmanı olmayan (ya da
+// giriş yapmamış) bir kullanıcı için backend zaten boş dizi döndürüyor
+// (bkz. Handler'daki not), bu yüzden burada AYRICA bir "departman var mı"
+// kontrolüne gerek yok - `pages.length === 0` kontrolü zaten yeterli.
+function DepartmentHighlightsPanel({ pages, department }) {
+  if (!pages || pages.length === 0) return null;
+
+  return (
+    <Panel title={`${department} İçin Öne Çıkanlar`} icon={<Building2 size={13} />}>
+      {pages.slice(0, 5).map((p) => (
+        <CompactRow
+          key={p.id}
+          to={`/wiki/${p.id}`}
+          icon={<Building2 size={15} />}
+          title={p.title}
+          subtitle={formatUtcTimestamp(p.createdAtUtc)}
+        />
+      ))}
+    </Panel>
+  );
+}
+
+// Sol sütun - Tartışmalar'dan SONRA gelen beş bölüm (2026-08-17, üçüncü tur
+// kullanıcı geri bildirimi: "sol kolon Tartışmalar'da bitip altında CSS'le
+// doldurulmuş boşluk kalıyor, GERÇEK içerikle uzasın"). Hepsi AYNI Panel/
+// CompactRow deseni - yeni bir "dashboard" İCAT EDİLMEDİ, sadece sağ
+// sütunda ZATEN kullanılan görsel dil sol sütunda da tekrar ediyor.
+
+// (1) Departmanlara Göre Öne Çıkanlar - DepartmentHighlightsPanel'in AKSİNE
+// (o SADECE viewer'ın kendi departmanını gösteriyor) TÜM departmanları
+// kapsıyor - ek bir fetch GEREKMEDİ, zaten çekilmiş olan gridArticles
+// (Son Eklenen Makaleler carousel'ının kullandığı AYNI veri, bkz. HomePage
+// içindeki hesaplama) departman bazında gruplanıp her departmanın en
+// yenisi seçiliyor.
+function DepartmentSpotlightPanel({ articles }) {
+  if (!articles || articles.length === 0) return null;
+
+  const latestByDepartment = new Map();
+  for (const a of articles) {
+    const existing = latestByDepartment.get(a.departmentName);
+    if (!existing || new Date(a.createdAtUtc) > new Date(existing.createdAtUtc)) {
+      latestByDepartment.set(a.departmentName, a);
+    }
+  }
+  const entries = Array.from(latestByDepartment.values()).sort(
+    (a, b) => new Date(b.createdAtUtc) - new Date(a.createdAtUtc)
+  );
+  if (entries.length === 0) return null;
+
+  return (
+    <Panel title="Departmanlara Göre Öne Çıkanlar" icon={<Building2 size={13} />}>
+      {entries.map((a) => (
+        <CompactRow
+          key={a.id}
+          to={`/wiki/${a.id}`}
+          icon={<Building2 size={15} />}
+          title={a.title}
+          subtitle={`${a.departmentName} · ${formatUtcTimestamp(a.createdAtUtc)}`}
+        />
+      ))}
+    </Panel>
+  );
+}
+
+// (2) En Aktif Katkıda Bulunanlar - RecentVideosWidget'ın AYNI "kendi
+// verisini kendi çeken, dashboard'a bağımlı olmayan" deseni (getWikiPages
+// ile 50 sayfayı tarayıp CreatedByEmail'e göre sayıyor) - dashboard
+// endpoint'i BÜTÜN yazarları saymaya yetecek kadar veri döndürmüyor,
+// yeni bir backend endpoint'i İCAT ETMEK yerine var olan GET /api/wiki/pages
+// zaten yeterli.
+function TopContributorsPanel({ token }) {
+  const [contributors, setContributors] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getWikiPages(token, 1, 50)
+      .then((result) => {
+        if (cancelled) return;
+        const counts = new Map();
+        for (const page of result.items) {
+          if (!page.createdByEmail) continue;
+          counts.set(page.createdByEmail, (counts.get(page.createdByEmail) ?? 0) + 1);
+        }
+        const sorted = Array.from(counts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([email, count]) => ({ email, count }));
+        setContributors(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setContributors([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  if (contributors !== null && contributors.length === 0) return null;
+
+  return (
+    <Panel title="En Aktif Katkıda Bulunanlar" icon={<Users size={13} />}>
+      {contributors === null ? (
+        <p className="px-3.5 py-3 text-xs" style={{ color: "var(--text)", opacity: 0.6 }}>
+          Yükleniyor...
+        </p>
+      ) : (
+        contributors.map((c) => (
+          <div key={c.email} className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+            <span className="truncate" style={{ color: "var(--text-h)" }}>
+              {c.email}
+            </span>
+            <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
+              {c.count} sayfa
+            </Badge>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
+// (3) Son Aktiviteler - sağ sütundaki "Son Güncellenenler" kutusunun
+// (SADECE güncellemeleri, tarih listesi olarak gösteren) AKSİNE - hem
+// OLUŞTURULMA hem GÜNCELLENME olaylarını TEK bir kronolojik akışta,
+// tam CompactRow kartlarıyla birleştiriyor. dashboard.recentlyAdded/
+// recentlyUpdated ZATEN fetch edilmiş veri - ek bir çağrı GEREKMEDİ.
+function ActivityFeedPanel({ added, updated }) {
+  const events = [
+    ...(added ?? []).map((p) => ({ ...p, kind: "created", timestamp: p.createdAtUtc })),
+    ...(updated ?? []).map((p) => ({ ...p, kind: "updated", timestamp: p.updatedAtUtc })),
+  ]
+    .filter((e) => e.timestamp)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .slice(0, 6);
+
+  if (events.length === 0) return null;
+
+  return (
+    <Panel title="Son Aktiviteler" icon={<Clock size={13} />}>
+      {events.map((e, idx) => (
+        <CompactRow
+          key={`${e.id}-${e.kind}-${idx}`}
+          to={`/wiki/${e.id}`}
+          icon={e.kind === "created" ? <FilePlus2 size={15} /> : <Clock size={15} />}
+          title={e.title}
+          subtitle={`${e.kind === "created" ? "Oluşturuldu" : "Güncellendi"} · ${formatUtcTimestamp(e.timestamp)}`}
+        />
+      ))}
+    </Panel>
+  );
+}
+
+// (4) Hızlı Başlangıç Rehberi - BİLEREK statik (veri gerektirmiyor) - yeni
+// bir kullanıcının platformu nasıl kullanacağını anlatan sabit bir adım
+// listesi, Hızlı Erişim panelinin (sağ sütun) AYNI CompactRow-benzeri satır
+// deseninde ama linksiz (her adım bir eylem değil, bir açıklama).
+function GettingStartedPanel() {
+  const steps = [
+    { icon: <Search size={15} />, text: "Arama kutusuyla aradığın bilgiyi anında bul" },
+    { icon: <Plus size={15} />, text: '"Yeni Sayfa Oluştur" ile kendi bilgini paylaş' },
+    { icon: <Star size={15} />, text: "Sık kullandığın sayfaları favorile veya pinle" },
+    { icon: <Upload size={15} />, text: "Belgelerini yükleyip ekip arkadaşlarınla paylaş" },
+  ];
+
+  return (
+    <Panel title="Hızlı Başlangıç Rehberi" icon={<ListChecks size={13} />}>
+      {steps.map((s, idx) => (
+        <div key={idx} className="flex items-center gap-3 px-3.5 py-2.5 text-sm" style={{ color: "var(--text)" }}>
+          <span className="shrink-0" style={{ color: "var(--brand-accent)" }}>
+            {s.icon}
+          </span>
+          {s.text}
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+// (5) Daha Fazla Keşfet - sol sütunun kapanışı, sayfanın diğer büyük
+// alanlarına (Tüm Sayfalar/Video Merkezi/Belgeler) yönlendiren sade bir
+// CTA - ayrı bir "keşfet" sayfası İCAT EDİLMEDİ, var olan üç rotaya
+// yönlendiriyor.
+function ExplorePanel() {
+  return (
+    <Panel title="Daha Fazla Keşfet" icon={<ArrowRight size={13} />}>
+      <CompactRow to="/wiki/pages" icon={<FileText size={15} />} title="Tüm Sayfaları Gör" />
+      <CompactRow to="/wiki/videos" icon={<Video size={15} />} title="Video Merkezi" />
+      <CompactRow to="/documents" icon={<Upload size={15} />} title="Belge Kütüphanesi" />
+    </Panel>
+  );
+}
+
 // Belgeler (Görsel Tasarım Yenileme Gün 2) - Documents modülünden gerçek
 // veri, format-özel ikonlar (documentIcons.js, DocumentDetailPage'in ZATEN
 // kullandığı AYNI harita - burada ikinci bir ikon eşlemesi İCAT EDİLMEDİ).
@@ -521,7 +789,10 @@ function DocumentsWidget({ token }) {
 
   useEffect(() => {
     let cancelled = false;
-    getDocuments(token, { pageSize: 5 })
+    // 5 -> 8 (2026-08-17, ikinci tur geri bildirim) - sağ sütun artık
+    // sticky/stretch DEĞİL, gerçek içerikle uzuyor; bu panel de kendi
+    // payına biraz daha fazla gerçek öğe gösteriyor.
+    getDocuments(token, { pageSize: 8 })
       .then((result) => {
         if (!cancelled) setDocuments(result.items);
       })
@@ -605,7 +876,8 @@ function RecentVideosWidget({ token }) {
           Yükleniyor...
         </p>
       ) : (
-        videos.slice(0, 4).map((v, idx) => (
+        // 4 -> 6 (2026-08-17, ikinci tur geri bildirim - aynı gerekçe).
+        videos.slice(0, 6).map((v, idx) => (
           <CompactRow
             key={`${v.pageId}-${idx}`}
             to={`/wiki/${v.pageId}`}
@@ -781,7 +1053,7 @@ const RECENT_ARTICLES_TOTAL = 1 + RECENT_ARTICLES_PAGE_SIZE * 3;
 // Giriş yapınca artık doğrudan makale listesine değil buraya (Dashboard)
 // geliniyor (bkz. App.jsx - /wiki index route'u).
 function HomePage({ token }) {
-  const { isAdmin, fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
+  const { fullName, department: ownDepartment } = useMemo(() => getUserInfoFromToken(token), [token]);
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState(null);
 
@@ -815,7 +1087,12 @@ function HomePage({ token }) {
   const recentArticles = gridArticles.slice(1);
   const recentUpdates = (dashboard?.recentlyUpdated ?? []).slice(0, 5);
 
-  const [activeTab, setActiveTab] = useState("home");
+  // ?tab=talk (2026-08-17) - sidebar'ın kompakt "Tartışma" ikonu (bkz.
+  // WikiLayout.jsx'teki COMPACT_NAV_ITEMS) `activeTab`'in local state
+  // OLMASI yüzünden doğrudan bir route'a link veremiyordu - WikiBoard.jsx'in
+  // `?q=` ile arama sorgusunu URL'den okuma deseniyle AYNI çözüm.
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => (searchParams.get("tab") === "talk" ? "talk" : "home"));
 
   return (
     <div className="flex w-full flex-col gap-4 px-4 py-2 text-left md:px-6">
@@ -849,16 +1126,6 @@ function HomePage({ token }) {
         </div>
       </div>
 
-      {/* Hızlı Erişim şeridi */}
-      <div className="flex flex-wrap items-center gap-2">
-        <QuickActionButton icon={<ListChecks size={14} />} label="Tüm Sayfalar" to="/wiki/pages" />
-        <QuickActionButton icon={<Clock size={14} />} label="Son Güncellenenler" href="#son-guncellemeler" />
-        <QuickActionButton icon={<Star size={14} />} label="Favoriler" to="/wiki/favorites" />
-        <QuickActionButton icon={<Pin size={14} />} label="Pinlenenler" to="/wiki/pinned" />
-        <QuickActionButton icon={<Video size={14} />} label="Video Merkezi" to="/wiki/videos" />
-        {isAdmin && <QuickActionButton icon={<ShieldCheck size={14} />} label="Audit Log" to="/audit-log" />}
-      </div>
-
       {error && <p style={{ color: "red" }} className="text-xs">{error}</p>}
 
       {activeTab === "talk" ? (
@@ -874,7 +1141,7 @@ function HomePage({ token }) {
       ) : dashboard && (
         <>
           {/* (1) HERO - Görsel Tasarım Yenileme Gün 2 */}
-          <HeroSection fullName={fullName} />
+          <HeroSection fullName={fullName} token={token} />
 
           {/* (2) İstatistik şeridi - eskiden Hero'nun içindeydi, artık
               Hero'nun HEMEN ALTINDA, ayrı ince bir satır (Hero'nun gradient
@@ -898,21 +1165,23 @@ function HomePage({ token }) {
             </section>
           )}
 
-          {/* xl:items-start BİLEREK KULLANILMIYOR (2026-08-17 takip, kullanıcı
-              geri bildirimi: "aşağı kaydırdıkça sağ taraf altı boş
-              kalmasın") - grid'in VARSAYILAN align-items:stretch'i sağ
-              sütunun (<aside>, xl:sticky) KENDİ KUTUSUNU sol sütunla AYNI
-              satır yüksekliğine geriyor. items-start VARKEN sağ sütunun
-              kutusu SADECE kendi içeriği kadar (daha kısa) oluyordu -
-              sticky'nin "yapışacak" alanı erken tükeniyordu, sol sütun
-              (Favoriler/Pinlenenler/Tartışmalar) daha uzun olduğunda sağ
-              taraf sayfanın geri kalanında GERÇEKTEN kayboluyordu (boş
-              zemin görünüyordu). Stretch ile <aside>'ın kutusu sol sütunla
-              AYNI yüksekliğe geriliyor - içeriği (üstte, gerilmemiş) hâlâ
-              kompakt duruyor ama artık sticky'nin TÜM satır boyunca
-              "yapışacak" alanı var, sağ taraf sol sütun ne kadar uzarsa
-              uzasın görünür kalmaya devam ediyor. */}
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+          {/* İKİ SÜTUN, İKİSİ DE DOĞAL UZUNLUKTA (2026-08-17 takip, ikinci
+              tur kullanıcı geri bildirimi) - önceki denemede sağ sütun
+              xl:sticky + grid'in stretch'i ile sol sütunun yüksekliğine
+              CSS'le "gerilmişti" (kutusu uzuyordu ama içeriği hâlâ üstte
+              kompakt duruyordu). Kullanıcı bunu AÇIKÇA reddetti: "sağ
+              tarafın boş kalan yüksekliğini CSS ile doldurmanı istemiyorum,
+              sağ sütunun İÇERİĞİNİN kendisinin de aşağı doğru devam
+              etmesini istiyorum" - yani istenen sahte bir yükseklik eşitliği
+              DEĞİL, HER İKİ sütunun da kendi GERÇEK içerik akışıyla uzaması.
+              Düzeltme: xl:sticky KALDIRILDI (sağ sütun artık sayfayla
+              BİRLİKTE normal akışta kayıyor, viewport'a sabitlenmiyor),
+              xl:items-start GERİ KONDU (grid'in stretch'i YOK - her sütunun
+              kutusu SADECE kendi içeriği kadar, yapay bir eşitleme yok).
+              Sağ sütun artık DAHA UZUN çünkü GERÇEKTEN daha fazla panel
+              taşıyor (bkz. aşağıdaki DepartmentHighlightsPanel + Belgeler/
+              Videolar panellerinin büyütülmüş öğe sayısı). */}
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px] xl:items-start">
             {/* SOL/GENİŞ sütun */}
             <div className="flex min-w-0 flex-col gap-6">
               {recentArticles.length > 0 && (
@@ -950,10 +1219,23 @@ function HomePage({ token }) {
               />
 
               <DiscussionsWidget token={token} onJoinDiscussion={() => setActiveTab("talk")} />
+
+              {/* Tartışmalar'dan SONRA, sol sütunun DEVAMI olarak beş yeni
+                  bölüm (2026-08-17, üçüncü tur kullanıcı geri bildirimi -
+                  "sol kolon Tartışmalar'da bitip altında boşluk kalıyor,
+                  CSS ile DEĞİL gerçek içerikle uzasın"). Hepsi AYNI Panel/
+                  CompactRow görsel dilini kullanıyor (sağ sütunla, Favoriler/
+                  Pinlenenler'le BİREBİR aynı kart/spacing/typography/border) -
+                  farklı bir "yeni dashboard" İCAT EDİLMEDİ. */}
+              <DepartmentSpotlightPanel articles={gridArticles} />
+              <TopContributorsPanel token={token} />
+              <ActivityFeedPanel added={dashboard.recentlyAdded} updated={dashboard.recentlyUpdated} />
+              <GettingStartedPanel />
+              <ExplorePanel />
             </div>
 
             {/* SAĞ/DAR sütun */}
-            <aside id="son-guncellemeler" className="flex scroll-mt-4 flex-col gap-4 xl:sticky xl:top-4">
+            <aside id="son-guncellemeler" className="flex scroll-mt-4 flex-col gap-4">
               <WritePromptCard />
               <NotificationsPanel token={token} />
 
@@ -987,6 +1269,10 @@ function HomePage({ token }) {
                 <CompactRow to="/wiki/new" icon={<Plus size={15} />} title="Yeni Sayfa Oluştur" />
                 <CompactRow to="/documents/upload" icon={<Upload size={15} />} title="Belge Yükle" />
               </Panel>
+
+              {ownDepartment && (
+                <DepartmentHighlightsPanel pages={dashboard.departmentSpecific} department={ownDepartment} />
+              )}
             </aside>
           </div>
 

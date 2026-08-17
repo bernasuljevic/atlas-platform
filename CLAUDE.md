@@ -2494,6 +2494,119 @@ verisi (1 sayfa, embedding'i ve bildirimi dahil) temizlendi.
 otomatik algılama (Gün 1), Vault paylaşım modeli (Gün 2-4), video transkript
 indeksleme (bu bölüm). D grubunun orijinal 3 maddesi de tamamlandı.
 
+## Ana sayfa sağ sütun - CSS hilesi yerine gerçek içerik akışı (2026-08-17, üçüncü tur)
+
+"Son Eklenen Makaleler carousel'ı + bildirim temizliği" bölümündeki sticky
+sidebar düzeltmesi (`xl:sticky` + grid `stretch`) kullanıcı tarafından AÇIKÇA
+reddedildi: "sağ tarafın boş kalan yüksekliğini CSS ile doldurmanı
+istemiyorum, sağ sütunun İÇERİĞİNİN kendisinin de aşağı doğru devam etmesini
+istiyorum." Yani istenen sahte bir yükseklik eşitliği DEĞİL, HER İKİ
+sütunun da kendi GERÇEK içerik akışıyla uzaması - `align-items: stretch`/
+`height: 100%`/`min-height` gibi hiçbir "doldurma" tekniği kullanılmadan.
+
+- [x] **`xl:sticky xl:top-4` KALDIRILDI** (`<aside>`) - sağ sütun artık
+      sayfayla BİRLİKTE normal akışta kayıyor, viewport'a sabitlenmiyor.
+- [x] **`xl:items-start` GERİ KONDU** (grid) - stretch YOK, her sütunun
+      kutusu SADECE kendi gerçek içeriği kadar.
+- [x] **`DepartmentHighlightsPanel` (YENİ)** - backend'in `dashboard.
+      departmentSpecific` alanı (`GetWikiDashboardQueryHandler`'da ZATEN
+      hesaplanıyordu) şimdiye kadar frontend'de HİÇ render EDİLMİYORDU -
+      sadece `departmentSpecificCount` (Hero altındaki MiniStat'ta) kullanılıyordu.
+      Ek bir fetch/endpoint GEREKMEDİ, veri zaten `dashboard` objesinin
+      içindeydi. "[Departman] İçin Öne Çıkanlar" başlığıyla, Panel/
+      CompactRow'un AYNI görsel dilinde (kart/spacing/typography/border/
+      grid - kullanıcının "farklı bir dashboard gibi olmasın" şartı),
+      sağ sütunun EN ALTINA (mevcut panellerin ardından) eklendi.
+      Departmanı olmayan (Admin dahil) kullanıcı için backend zaten boş
+      dizi döndürdüğünden panel doğal olarak hiç görünmüyor.
+- [x] **`DocumentsWidget`/`RecentVideosWidget` öğe sayıları büyütüldü**
+      (5→8, 4→6) - sağ sütun kendi payına biraz daha fazla GERÇEK öğe
+      gösteriyor, yapay bir dolgu değil.
+
+**Canlı doğrulandı (departmanlı geçici bir test kullanıcısıyla - admin'in
+departmanı yok, bu özelliği hiç göremezdi):** `position: static` (sticky
+kalkmış), grid `align-items: flex-start` (stretch yok), sol/sağ sütun
+yükseklikleri artık GERÇEKTEN farklı (741px / 1623px - bu test kullanıcısı
+için sağ daha uzun, çünkü 9 gerçek panel taşıyor) - CSS'le eşitlenmiş SAHTE
+bir denge değil. "IT İçin Öne Çıkanlar" paneli 5 gerçek IT sayfasını doğru
+gösterdi. Admin hesabıyla (departmansız) panel doğru şekilde hiç görünmedi,
+sayfa hatasız render oldu. Test kullanıcısı temizlendi. `npm run lint`/
+`build`/`test` (38/38) yeşil.
+
+**Genel ders:** "sağ sütun boş kalmasın" gibi bir isteğin İKİ farklı,
+birbirinden TAMAMEN AYRI çözümü olabilir - (1) CSS ile mevcut kısa içeriği
+uzun görünecek şekilde GERMEK (hızlı ama yüzeysel, kutunun kendisi uzun
+görünür ama içeriği hâlâ kısa) ve (2) GERÇEKTEN daha fazla içerik EKLEMEK
+(daha yavaş ama istenen sonuç). İlk turda (1)'i seçtim çünkü "boş kalmasın"
+ifadesi teknik olarak İKİSİYLE de tatmin edilebilir görünüyordu - kullanıcı
+AÇIKÇA (2)'yi kastettiğini belirtince (üçüncü mesajda, somut bir ASCII
+diyagramla) düzeltildi. Böyle bir belirsizlik varsa daha erken netleştirmek
+(AskUserQuestion ile "CSS ile mi, gerçek içerikle mi" diye sormak) gelecekte
+tercih edilmeli.
+
+## Ana sayfa sol sütun - Tartışmalar'dan sonra gerçek içerik akışı (2026-08-17, dördüncü tur)
+
+Bir önceki bölümdeki düzeltme (sticky/stretch kaldırıldı, sağ sütuna
+`DepartmentHighlightsPanel` eklendi) YİNE YANLIŞ yöne gitmişti - kullanıcının
+ekran görüntüsünde net görülen sorun SOL sütunun Tartışmalar'da BİTİP altında
+boşluk kalmasıydı, sağ sütun zaten sorunsuz devam ediyordu. Önceki düzeltme
+YANLIŞLIKLA sağ sütuna daha fazla içerik ekleyip sorunu büyütmüştü (sağ
+sütunu DAHA da uzatmak, sol sütunun kısalığını ÇÖZMÜYORDU). Kullanıcı bu
+sefer kesin bir liste + ASCII diyagramla SOL sütuna eklenecek 5 bölümü
+belirtti, "tekrar 'hangi bölümleri istiyorsun' diye sorma, doğrudan kodu
+değiştir" dedi.
+
+- [x] **`DepartmentSpotlightPanel`** - `DepartmentHighlightsPanel`'in
+      AKSİNE (o SADECE viewer'ın KENDİ departmanını gösteriyor) TÜM
+      departmanları kapsıyor - zaten fetch edilmiş `gridArticles`
+      (Son Eklenen Makaleler carousel'ının kullandığı veri) departman
+      bazında gruplanıp her departmanın en yeni sayfası seçiliyor. Ek
+      fetch/endpoint YOK.
+- [x] **`TopContributorsPanel`** - `RecentVideosWidget`'ın AYNI "kendi
+      verisini kendi çeken" deseni (`getWikiPages(token, 1, 50)` ile
+      50 sayfa taranıp `CreatedByEmail`'e göre sayılıyor) - dashboard
+      endpoint'i tüm yazarları saymaya yetecek veri döndürmediği için
+      var olan `GET /api/wiki/pages` kullanıldı, yeni bir backend
+      endpoint'i İCAT EDİLMEDİ.
+- [x] **`ActivityFeedPanel`** - sağ sütundaki "Son Güncellenenler"in
+      (SADECE güncellemeleri gösteren) AKSİNE, `dashboard.recentlyAdded` +
+      `dashboard.recentlyUpdated`'ı (İKİSİ DE ZATEN fetch edilmiş) TEK bir
+      kronolojik "Oluşturuldu/Güncellendi" akışında birleştiriyor.
+- [x] **`GettingStartedPanel`** - BİLEREK statik (veri gerektirmiyor), 4
+      adımlık bir "nasıl kullanılır" rehberi.
+- [x] **`ExplorePanel`** - sol sütunun kapanışı, Tüm Sayfalar/Video
+      Merkezi/Belgeler'e yönlendiren sade bir CTA.
+
+Beşi de AYNI `Panel`/`CompactRow` görsel dilini kullanıyor (sağ sütunla,
+Favoriler/Pinlenenler/Tartışmalar'la BİREBİR aynı kart/spacing/typography/
+border) - "farklı bir dashboard" İCAT EDİLMEDİ, `DiscussionsWidget`'ın
+(Tartışmalar) HEMEN ardına, sol sütunun İÇİNE eklendi.
+
+**Canlı doğrulandı:** sol sütun artık 2053px, sağ sütun 1368px (ÖNCEKİ
+turun tam TERSİ - artık sol daha uzun, çünkü GERÇEKTEN 9 bölüm taşıyor,
+sağ 8) - `align-items: flex-start`, hiçbir stretch/sticky YOK, iki
+sütun da SADECE kendi içeriği kadar. Tüm 5 yeni bölüm doğru veriyle
+render edildi (Departmanlara Göre: IT/Engineering/IK; En Aktif Katkıda
+Bulunanlar: admin 4 sayfa, browser-test-1 2 sayfa; Son Aktiviteler:
+oluşturma+güncelleme karışık kronolojik liste).
+**Doğrulama sırasında kendi test script'imde bulunan bir hata (ürün
+kodunda DEĞİL):** `main.textContent.includes('TARTIŞMALAR')` (büyük harf)
+`false` döndü, bu YANLIŞLIKLA "içerik kayboldu" alarmı verdi - gerçek sebep
+Panel başlıklarındaki `uppercase` CSS `text-transform`'unun SADECE görsel
+olması, DOM'daki gerçek `textContent`'in JSX'te yazıldığı gibi
+("Tartışmalar", küçük/büyük karışık) kalması. Doğru case ile (`'Tartışmalar'`)
+tekrar kontrol edilince hepsi doğru çıktı - ürün kodunda hiçbir sorun
+yoktu, sadece doğrulama script'im CSS transform'u DOM metniyle karıştırmıştı.
+`npm run lint`/`build`/`test` (38/38) yeşil.
+
+**Genel ders (bu turun kendine özgü):** "boş kalan alanı doldur" gibi bir
+geri bildirimi almak, HANGİ sütunun eksik olduğunu VARSAYMAK yerine
+kullanıcının paylaştığı ekran görüntüsünü/ASCII diyagramı TEK doğruluk
+kaynağı olarak almalıydı - önceki turda "sağ sütun daha da uzasın" YANLIŞ
+varsayımıyla ilerlendi, gerçek sorun sol sütundaydı. Bir sonraki turda
+kullanıcı zaten SOL/SAĞ ayrımını net çizince hata düzeldi, ama bu netliğe
+daha ERKEN ulaşılabilirdi.
+
 ## Sırada ne var
 
 1. Gerçek embedding/LLM sağlayıcısına geçiş (API key'ler gelince) - sadece

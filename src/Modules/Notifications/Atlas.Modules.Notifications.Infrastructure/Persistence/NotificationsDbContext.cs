@@ -10,6 +10,7 @@ public class NotificationsDbContext : DbContext
     }
 
     public DbSet<NotificationEntry> NotificationEntries => Set<NotificationEntry>();
+    public DbSet<NotificationRead> NotificationReads => Set<NotificationRead>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
